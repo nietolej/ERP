@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Paleta del dashboard de ventas (tema oscuro, paneles translúcidos) — spec_reportes §1.2 */
+:root {
+  --fondo: #0f172a;
+  --fondo-2: #1e293b;
+  --texto: #f8fafc;
+  --texto-2: #94a3b8;
+  --acento: #3b82f6;
+  --acento-hover: #2563eb;
+  --exito: #10b981;
+  --advertencia: #f59e0b;
+  --peligro: #ef4444;
+  --panel: rgba(30, 41, 59, 0.75);
+  --borde: rgba(255, 255, 255, 0.1);
+}
+
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-fondo-2: var(--fondo-2);
+  --color-texto: var(--texto);
+  --color-texto-2: var(--texto-2);
+  --color-acento: var(--acento);
+  --color-acento-hover: var(--acento-hover);
+  --color-exito: var(--exito);
+  --color-advertencia: var(--advertencia);
+  --color-peligro: var(--peligro);
+  --color-panel: var(--panel);
+  --color-borde: var(--borde);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: radial-gradient(circle at top left, #1e293b 0%, var(--fondo) 55%);
+  color: var(--texto);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(12px);
+}
+
+.campo {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--borde);
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.5rem 0.75rem;
+  color: var(--texto);
+  font-size: 0.875rem;
+}
+.campo:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: 0;
+}

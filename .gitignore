@@ -1,0 +1,50 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.*
+
+# Compilación
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Variables de entorno y secretos (nunca se suben)
+.env
+.env.*
+!.env.example
+*.pem
+
+# Respaldos y volcados de base de datos (contienen datos reales)
+*.sql.gz
+*.dump
+*.backup
+backups/
+
+# Archivos subidos por los usuarios (comprobantes, soportes)
+uploads/
+
+# Registros
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Pruebas
+coverage/
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Despliegue
+.vercel
+
+# Base de datos local de desarrollo (PGlite)
+.data/
