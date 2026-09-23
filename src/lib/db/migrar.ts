@@ -27,7 +27,8 @@ export async function migrar(db: Db, dir = DIR_MIGRACIONES): Promise<string[]> {
 
   for (const archivo of archivos) {
     const sql = await readFile(path.join(dir, archivo), 'utf8');
-    const checksum = createHash('sha256').update(sql).digest('hex');
+    // El hash ignora CRLF/LF: el mismo archivo en Windows o Linux debe dar el mismo resultado.
+    const checksum = createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
     const previa = aplicadas.get(archivo);
     if (previa) {
       if (previa !== checksum) {

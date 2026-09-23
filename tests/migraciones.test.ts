@@ -26,6 +26,19 @@ describe('migraciones', () => {
     expect(await migrar(db)).toEqual([]);
   });
 
+  it('el mismo archivo con finales de línea CRLF no se toma como una migración editada', async () => {
+    const { mkdtemp, readdir, readFile, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const path = await import('node:path');
+    const { DIR_MIGRACIONES } = await import('@/lib/db/migrar');
+    const dir = await mkdtemp(path.join(tmpdir(), 'migraciones-crlf-'));
+    for (const f of await readdir(DIR_MIGRACIONES)) {
+      const sql = await readFile(path.join(DIR_MIGRACIONES, f), 'utf8');
+      await writeFile(path.join(dir, f), sql.replace(/\r?\n/g, '\r\n'));
+    }
+    expect(await migrar(db, dir)).toEqual([]);
+  });
+
   it('cargan el plan de cuentas con su jerarquía', async () => {
     const { rows } = await db.query<{ codigo: string; padre: string | null }>(
       `select c.codigo, p.codigo as padre

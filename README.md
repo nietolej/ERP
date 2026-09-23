@@ -40,7 +40,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - empresa y sucursales, tasas de cambio, parámetros fiscales (validación del contador y nuevas vigencias) y usuarios y roles;
   - periodos contables, plan de cuentas y balance de comprobación en VES y USD;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
-- **Calidad:** 33 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Calidad:** 34 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 

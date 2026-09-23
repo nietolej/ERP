@@ -1,0 +1,5 @@
+# Finales de línea LF en todos los equipos: las migraciones se verifican por hash
+# y un cambio CRLF/LF no debe parecer una edición.
+* text=auto eol=lf
+*.png binary
+*.ico binary
