@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Rol } from '@/lib/auth/constantes';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/roles';
 
 interface Item {
   href: string;
@@ -25,6 +26,12 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: '/reportes/devoluciones', texto: 'Devoluciones (M5)' },
       { href: '/reportes/inventario', texto: 'Inventario (M6)' },
       { href: '/metas', texto: 'Configuración de Metas' },
+    ],
+  },
+  {
+    titulo: 'Maestros',
+    items: [
+      { href: '/maestros/clientes', texto: 'Clientes', roles: ROLES_VEN_CLIENTES },
     ],
   },
   {

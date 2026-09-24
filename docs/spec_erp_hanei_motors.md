@@ -268,7 +268,9 @@ create table cliente (
   condicion_pago_id uuid references condicion_pago(id),
   limite_credito_usd numeric(14,2) not null default 0 check (limite_credito_usd >= 0),
   descuento_pct   numeric(5,2) not null default 0,
-  estado          text not null default 'activo' check (estado in ('activo','inactivo','bloqueado'))
+  estado          text not null default 'pendiente' check (estado in ('pendiente','activo','inactivo','bloqueado')),
+  aprobado_por    uuid references usuario(id),            -- Gerencia (§5.5)
+  aprobado_at     timestamptz
 );
 
 create table proveedor (
@@ -326,7 +328,9 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 
 ### 5.5 Calidad de datos maestros
 - Validar el RIF (formato y dígito verificador) al crear. Detectar duplicados por RIF y por nombre parecido.
-- Bloqueo por aprobación: un cliente nuevo queda en `pendiente` hasta que Crédito asigna límite y condición de pago.
+- Bloqueo por aprobación: **Facturación** registra el cliente, que queda en `pendiente` hasta que **Gerencia** le asigna condición de pago, límite de crédito y nivel de precio. La base de datos rechaza la aprobación de un usuario sin el rol Gerencia, y un cliente aprobado no vuelve a `pendiente`.
+- El código visible del cliente (C00001…) lo asigna el numerador y no cambia. Si el RIF ya existe como tercero (por ejemplo, es proveedor), el cliente se enlaza a ese tercero.
+- Los nombres se comparan normalizados (sin acentos, signos ni sufijos como C.A. o S.A.): un nombre igual al de otro tercero exige confirmación.
 - **Nunca se borra un maestro con movimientos.** Se inactiva.
 
 ---

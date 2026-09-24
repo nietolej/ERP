@@ -1,8 +1,9 @@
 import { ErrorPermiso } from '@/lib/auth/dal';
 import { ErrorContable } from '@/lib/contabilidad/motor';
+import { ErrorMaestro } from '@/lib/maestros/clientes';
 
 /** Resultado que las acciones de servidor devuelven a los formularios. */
-export type EstadoAccion = { ok?: string; error?: string } | undefined;
+export type EstadoAccion = { ok?: string; error?: string; confirmar?: boolean } | undefined;
 
 /**
  * Traduce un error a un mensaje para el usuario.
@@ -10,7 +11,7 @@ export type EstadoAccion = { ok?: string; error?: string } | undefined;
  * - Errores desconocidos: mensaje genérico; el detalle va al registro del servidor, no a la pantalla.
  */
 export function mensajeDeError(e: unknown): string {
-  if (e instanceof ErrorPermiso || e instanceof ErrorContable) return e.message;
+  if (e instanceof ErrorPermiso || e instanceof ErrorContable || e instanceof ErrorMaestro) return e.message;
   const err = e as { code?: string; message?: string };
   if (err?.code === 'P0001' && err.message) return err.message;
   if (err?.code === '23505') return 'Ya existe un registro con esos datos.';

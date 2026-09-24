@@ -11,7 +11,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 | Especificación funcional y técnica | ✅ Lista para revisión |
 | Decisiones abiertas ([docs/decisiones.md](docs/decisiones.md)) | ⏳ Pendientes: las toman Gerencia y el contador (la Fase 0 asumió provisionalmente las recomendaciones 1 y 2) |
 | **Fase 0: Fundaciones** | 🟡 Casi lista: solo falta la carga automática de la tasa BCV, que espera la decisión 2 |
-| Fase 1: Maestros | ⬜ No iniciada |
+| Fase 1: Maestros | 🟡 En curso: terceros y clientes listos; siguen vendedores, proveedores, productos y los demás maestros |
 
 ### Fase 0: qué está hecho
 
@@ -44,11 +44,18 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - asientos contables (libro diario) y asientos manuales: Contabilidad registra el borrador y el Jefe de contabilidad lo aprueba y contabiliza. Quien registra no aprueba, y la base de datos lo impide;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
 - **Concurrencia de numeración probada contra PostgreSQL 17 real** ([tests/concurrencia.test.ts](tests/concurrencia.test.ts)): 20 transacciones simultáneas reciben números distintos y sin huecos, también cuando algunas fallan. La prueba falla si se quita el bloqueo de fila.
-- **Calidad:** 54 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Calidad:** 67 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 
 - **Carga automática diaria de la tasa BCV.** Por ahora la tasa se registra a mano; falta definir la fuente de consulta (decisión 2).
+
+### Fase 1: qué está hecho
+
+- **Terceros:** un RIF es una sola persona. La base valida el formato y el dígito verificador del SENIAT; también se aplica al RIF de la empresa.
+- **Clientes:** Facturación los registra con código automático (C00001…) y quedan pendientes hasta que Gerencia les asigna condición de pago, límite de crédito y nivel de precio. Aviso y confirmación ante nombres parecidos a otro tercero. Un cliente no se borra: se inactiva o se bloquea.
+- **Seguridad por fila:** quien solo tiene el rol Ventas ve únicamente los clientes de su vendedor. La búsqueda viaja por acción de servidor para no poner RIF ni nombres en la URL.
+- **Condiciones de pago** base (contado, 15, 30 y 45 días). El descuento por pronto pago lo configura Gerencia.
 
 ## Uso
 
@@ -98,6 +105,7 @@ ERP/
 │   └── lib/
 │       ├── auth/         claves, sesiones, roles y capa de acceso a datos
 │       ├── contabilidad/ motor de contabilización y asientos manuales
+│       ├── maestros/     RIF, terceros y clientes
 │       └── db/           conexión (PGlite / PostgreSQL) y migraciones
 ├── tests/                pruebas automatizadas
 └── docs/                 especificaciones y decisiones

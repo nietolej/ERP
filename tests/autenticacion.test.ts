@@ -18,7 +18,8 @@ describe('claves', () => {
     expect(problemasDeClave('corta1')).toContain('Debe tener al menos 10 caracteres.');
     expect(problemasDeClave('sololetrasaqui')).toContain('Debe incluir al menos un número.');
     expect(problemasDeClave('Buena-clave-2026')).toEqual([]);
-    expect(problemasDeClave(claveTemporal())).toEqual([]);
+    // Muchas muestras: una clave temporal sin números salía ~1 de cada 9 veces.
+    for (let i = 0; i < 500; i++) expect(problemasDeClave(claveTemporal())).toEqual([]);
   });
 });
 

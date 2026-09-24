@@ -29,7 +29,7 @@ export default async function EmpresaPage() {
         <Panel titulo="Datos de la empresa">
           <Formulario accion={guardarEmpresa} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo etiqueta="RIF" ayuda="Formato J-12345678-9">
+              <Campo etiqueta="RIF" ayuda="Formato J-12345678-4, con su dígito verificador">
                 <input name="rif" required defaultValue={empresa?.rif} className="campo" />
               </Campo>
               <Campo etiqueta="Razón social">

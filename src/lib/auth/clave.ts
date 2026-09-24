@@ -42,8 +42,12 @@ export function problemasDeClave(clave: string): string[] {
 /** Clave temporal legible para entregar a un usuario nuevo (debe cambiarla al entrar). */
 export function claveTemporal(): string {
   const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  const bytes = randomBytes(14);
-  let c = '';
-  for (const b of bytes) c += alfabeto[b % alfabeto.length];
-  return `${c.slice(0, 7)}-${c.slice(7)}`;
+  // Se repite hasta que cumpla la regla de claves: sin esto, ~1 de cada 9 claves salía sin números.
+  for (;;) {
+    const bytes = randomBytes(14);
+    let c = '';
+    for (const b of bytes) c += alfabeto[b % alfabeto.length];
+    const clave = `${c.slice(0, 7)}-${c.slice(7)}`;
+    if (problemasDeClave(clave).length === 0) return clave;
+  }
 }

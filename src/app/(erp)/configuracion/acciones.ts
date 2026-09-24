@@ -8,8 +8,8 @@ import { ROLES, type Rol } from '@/lib/auth/constantes';
 import { autorizar } from '@/lib/auth/dal';
 import { eliminarSesionesDeUsuario } from '@/lib/auth/sesiones';
 import { conUsuario } from '@/lib/db';
+import { normalizarRif, problemaDeRif } from '@/lib/maestros/rif';
 
-const RIF = /^[VEJPG]-[0-9]{8}-[0-9]$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 // ---------------------------------------------------------------------------
@@ -18,9 +18,10 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export async function guardarEmpresa(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
     const u = await autorizar('administrador');
-    const rif = texto(fd, 'rif').toUpperCase();
+    const problema = problemaDeRif(texto(fd, 'rif'));
+    if (problema) return { error: problema };
+    const rif = normalizarRif(texto(fd, 'rif'))!;
     const razon = texto(fd, 'razon_social');
-    if (!RIF.test(rif)) return { error: 'RIF inválido. Formato: J-12345678-9' };
     if (!razon) return { error: 'La razón social es obligatoria.' };
     const si = (c: string) => fd.get(c) === 'on';
     await conUsuario(u.id, (tx) => tx.query(
