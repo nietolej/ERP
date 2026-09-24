@@ -1,6 +1,10 @@
 import type { Db } from '@/lib/db/tipos';
-import { normalizarRif, problemaDeRif, tipoPersona } from './rif';
 import { ROLES_VEN_TODOS } from './roles';
+import {
+  ErrorMaestro, exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero,
+} from './terceros';
+
+export { ErrorConfirmable, ErrorMaestro, posiblesDuplicados, type DatosTercero } from './terceros';
 
 /**
  * Clientes (§5.1, §5.5).
@@ -10,22 +14,6 @@ import { ROLES_VEN_TODOS } from './roles';
  * - Seguridad por fila: un usuario que solo tiene el rol Ventas ve únicamente su cartera.
  * La base de datos garantiza el RIF, el código y la aprobación (migración 0007).
  */
-
-export class ErrorMaestro extends Error {}
-
-/** Error que el usuario puede superar confirmando (p. ej. un nombre parecido a otro tercero). */
-export class ErrorConfirmable extends ErrorMaestro {}
-
-export interface DatosTercero {
-  razonSocial: string;
-  nombreComercial?: string;
-  domiciliado: boolean;
-  contribuyenteEspecial: boolean;
-  agenteRetencionIva: boolean;
-  direccionFiscal?: string;
-  telefono?: string;
-  email?: string;
-}
 
 export interface DatosComerciales {
   sucursalId?: string | null;
@@ -44,16 +32,6 @@ export interface DatosCredito {
 
 const MONTO = /^\d{1,12}(\.\d{1,2})?$/;
 const PORCENTAJE = /^\d{1,3}(\.\d{1,2})?$/;
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-const vacioANull = (v?: string | null) => (v && v.trim() ? v.trim() : null);
-
-function validarTercero(d: DatosTercero): void {
-  const errores: string[] = [];
-  if (d.razonSocial.trim().length < 2) errores.push('Indique la razón social o el nombre.');
-  if (d.email?.trim() && !EMAIL.test(d.email.trim())) errores.push('El correo no tiene un formato válido.');
-  if (errores.length) throw new ErrorMaestro(errores.join('\n'));
-}
 
 function validarCredito(d: DatosCredito): void {
   const errores: string[] = [];
@@ -66,19 +44,6 @@ function validarCredito(d: DatosCredito): void {
   if (errores.length) throw new ErrorMaestro(errores.join('\n'));
 }
 
-/** Terceros con un nombre que, normalizado, coincide con el dado (posibles duplicados). */
-export async function posiblesDuplicados(
-  db: Db, razonSocial: string, excluirId?: string,
-): Promise<{ id: string; rif: string; razon_social: string }[]> {
-  const { rows } = await db.query<{ id: string; rif: string; razon_social: string }>(
-    `select id, rif, razon_social from tercero
-      where fn_nombre_normalizado(razon_social) = fn_nombre_normalizado($1)
-        and ($2::uuid is null or id <> $2::uuid)
-      order by rif limit 5`,
-    [razonSocial, excluirId ?? null]);
-  return rows;
-}
-
 /**
  * Registra un cliente pendiente de aprobación. Debe llamarse dentro de una transacción.
  * Devuelve el id (tercero_id) y el código asignado.
@@ -87,45 +52,20 @@ export async function crearCliente(
   tx: Db, usuarioId: string,
   d: { rif: string; tercero: DatosTercero; comercial: DatosComerciales; confirmarNombreParecido?: boolean },
 ): Promise<{ id: string; codigo: string; terceroExistente: boolean }> {
-  const problema = problemaDeRif(d.rif);
-  if (problema) throw new ErrorMaestro(problema);
-  const rif = normalizarRif(d.rif)!;
-
-  const { rows: existente } = await tx.query<{ id: string; codigo: string | null }>(
-    `select t.id, c.codigo from tercero t left join cliente c on c.tercero_id = t.id where t.rif = $1`, [rif]);
-
-  let terceroId: string;
-  if (existente[0]) {
-    if (existente[0].codigo) {
-      throw new ErrorMaestro(`El RIF ${rif} ya es el cliente ${existente[0].codigo}.`);
-    }
-    terceroId = existente[0].id; // ya existe como tercero (p. ej. proveedor): se reutiliza sin cambiar sus datos
-  } else {
-    validarTercero(d.tercero);
-    const parecidos = await posiblesDuplicados(tx, d.tercero.razonSocial);
-    if (parecidos.length && !d.confirmarNombreParecido) {
-      throw new ErrorConfirmable(
-        `Ya existe un tercero con un nombre igual o muy parecido:\n` +
-        parecidos.map((p) => `• ${p.rif} · ${p.razon_social}`).join('\n') +
-        `\nSi es una persona distinta, marque la confirmación y guarde de nuevo.`);
-    }
-    const t = d.tercero;
-    const { rows } = await tx.query<{ id: string }>(
-      `insert into tercero (rif, razon_social, nombre_comercial, tipo_persona, domiciliado, contribuyente_especial,
-                            agente_retencion_iva, direccion_fiscal, telefono, email, created_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
-      [rif, t.razonSocial.trim(), vacioANull(t.nombreComercial), tipoPersona(rif), t.domiciliado,
-       t.contribuyenteEspecial, t.agenteRetencionIva, vacioANull(t.direccionFiscal), vacioANull(t.telefono),
-       vacioANull(t.email)?.toLowerCase() ?? null, usuarioId]);
-    terceroId = rows[0].id;
-  }
+  const rif = rifOError(d.rif);
+  const { rows: previo } = await tx.query<{ codigo: string }>(
+    `select c.codigo from tercero t join cliente c on c.tercero_id = t.id where t.rif = $1`, [rif]);
+  if (previo[0]) throw new ErrorMaestro(`El RIF ${rif} ya es el cliente ${previo[0].codigo}.`);
+  // Si ya existe como tercero (p. ej. proveedor), se reutiliza sin cambiar sus datos.
+  const tercero = await obtenerOCrearTercero(tx, usuarioId, rif, d.tercero, d.confirmarNombreParecido);
+  const terceroId = tercero.id;
 
   const c = d.comercial;
   const { rows } = await tx.query<{ codigo: string }>(
     `insert into cliente (tercero_id, sucursal_id, vendedor_id, zona, created_by)
      values ($1, $2, $3, $4, $5) returning codigo`,
     [terceroId, c.sucursalId || null, c.vendedorId || null, vacioANull(c.zona), usuarioId]);
-  return { id: terceroId, codigo: rows[0].codigo, terceroExistente: !!existente[0] };
+  return { id: terceroId, codigo: rows[0].codigo, terceroExistente: tercero.existente };
 }
 
 async function estadoCliente(tx: Db, id: string): Promise<string> {
@@ -168,13 +108,7 @@ export async function actualizarDatosCliente(
 ): Promise<void> {
   validarTercero(d.tercero);
   await estadoCliente(tx, id);
-  const parecidos = await posiblesDuplicados(tx, d.tercero.razonSocial, id);
-  if (parecidos.length && !d.confirmarNombreParecido) {
-    throw new ErrorConfirmable(
-      `Ya existe otro tercero con un nombre igual o muy parecido:\n` +
-      parecidos.map((p) => `• ${p.rif} · ${p.razon_social}`).join('\n') +
-      `\nSi es una persona distinta, marque la confirmación y guarde de nuevo.`);
-  }
+  await exigirNombreDistinto(tx, d.tercero.razonSocial, d.confirmarNombreParecido, id);
   const t = d.tercero;
   await tx.query(
     `update tercero set razon_social = $2, nombre_comercial = $3, domiciliado = $4, contribuyente_especial = $5,

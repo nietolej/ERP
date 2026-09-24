@@ -1,6 +1,6 @@
 import { ErrorPermiso } from '@/lib/auth/dal';
 import { ErrorContable } from '@/lib/contabilidad/motor';
-import { ErrorMaestro } from '@/lib/maestros/clientes';
+import { ErrorMaestro } from '@/lib/maestros/terceros';
 
 /** Resultado que las acciones de servidor devuelven a los formularios. */
 export type EstadoAccion = { ok?: string; error?: string; confirmar?: boolean } | undefined;

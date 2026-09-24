@@ -298,6 +298,8 @@ create table vendedor (
   estado       text not null default 'activo'
 );
 ```
+Los vendedores los registran y modifican **Gerencia y Supervisor de ventas**. El código (V001, V002…) lo asigna el numerador y no cambia. Un vendedor externo necesita RIF: si ese RIF ya existe como tercero (por ejemplo, es cliente), se reutiliza. El usuario del ERP enlazado debe tener el rol Ventas o Supervisor de ventas, y un usuario se enlaza a un solo vendedor. Un vendedor no se borra: se inactiva.
+
 Las ventas de mostrador, de la "casa" o de uso administrativo se registran con un vendedor de `tipo = 'administrativo'` o `'casa'`. Así se excluyen de rankings y comisiones con un filtro explícito, sin listas de códigos escritas en el programa (el error que hoy tiene la operación actual).
 
 ### 5.3 Productos o materiales

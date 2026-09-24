@@ -56,7 +56,7 @@ describe('clientes (§5.1, §5.5)', () => {
     vendedorUsuario = await usuarioDePrueba(db, 'vendedor@prueba.test', ['ventas']);
     otroVendedorUsuario = await usuarioDePrueba(db, 'vendedor2@prueba.test', ['ventas']);
     const { rows } = await db.query<{ id: string }>(
-      `insert into vendedor (codigo, nombre, tipo, usuario_id) values ('V001', 'Pedro Pérez', 'interno', $1) returning id`,
+      `insert into vendedor (nombre, tipo, usuario_id) values ('Pedro Pérez', 'interno', $1) returning id`,
       [vendedorUsuario]);
     vendedorId = rows[0].id;
     contado = (await db.query<{ id: string }>(`select id from condicion_pago where codigo = 'CONTADO'`)).rows[0].id;
