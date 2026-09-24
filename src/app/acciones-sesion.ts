@@ -1,13 +1,25 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { hashClave, problemasDeClave, verificarClave } from '@/lib/auth/clave';
 import { COOKIE_SESION } from '@/lib/auth/constantes';
 import { exigirSesion } from '@/lib/auth/dal';
-import { autenticar, crearSesion, eliminarSesion, eliminarSesionesDeUsuario } from '@/lib/auth/sesiones';
+import { VENTANA_MINUTOS } from '@/lib/auth/limite';
+import { autenticarConLimite, crearSesion, eliminarSesion, eliminarSesionesDeUsuario } from '@/lib/auth/sesiones';
 import { conUsuario, getDb } from '@/lib/db';
+
+/**
+ * IP del cliente según el proxy inverso (primera entrada de X-Forwarded-For).
+ * En producción el servidor debe estar detrás de un proxy que fije esta cabecera;
+ * sin ella solo aplica el límite por correo.
+ */
+async function ipCliente(): Promise<string | null> {
+  const h = await headers();
+  const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip')?.trim();
+  return ip || null;
+}
 
 async function guardarCookie(token: string, expira: Date) {
   (await cookies()).set(COOKIE_SESION, token, {
@@ -27,8 +39,12 @@ export async function iniciarSesion(_: EstadoAccion, fd: FormData): Promise<Esta
   let destino: string;
   try {
     const db = await getDb();
-    const u = await autenticar(db, email, clave);
-    if (!u) return { error: 'Correo o clave incorrectos.' };
+    const r = await autenticarConLimite(db, email, clave, await ipCliente());
+    if (r.estado === 'bloqueado') {
+      return { error: `Demasiados intentos fallidos. Espere ${VENTANA_MINUTOS} minutos e intente de nuevo.` };
+    }
+    if (r.estado === 'rechazado') return { error: 'Correo o clave incorrectos.' };
+    const u = r.usuario;
     const { token, expira } = await crearSesion(db, u.id);
     await guardarCookie(token, expira);
     destino = u.debeCambiarPassword ? '/cambiar-clave' : '/';

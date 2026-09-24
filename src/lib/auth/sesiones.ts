@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Db } from '@/lib/db/tipos';
 import { hashClave, verificarClave } from './clave';
+import { estaBloqueado, limpiarFallos, registrarFallo } from './limite';
 
 /**
  * Autenticación y sesiones en base de datos (sin dependencias de Next.js, para poder probarlas).
@@ -38,6 +39,25 @@ export async function autenticar(db: Db, email: string, clave: string): Promise<
   if (!valida || !u.activo) return null;
   await db.query('update usuario set ultimo_acceso = now() where id = $1', [u.id]);
   return cargarUsuario(db, u.id);
+}
+
+export type ResultadoAcceso =
+  | { estado: 'ok'; usuario: UsuarioSesion }
+  | { estado: 'rechazado' }
+  | { estado: 'bloqueado' };
+
+/** `autenticar` con el límite de intentos fallidos por correo y por IP (ver limite.ts). */
+export async function autenticarConLimite(
+  db: Db, email: string, clave: string, ip: string | null,
+): Promise<ResultadoAcceso> {
+  if (await estaBloqueado(db, email, ip)) return { estado: 'bloqueado' };
+  const usuario = await autenticar(db, email, clave);
+  if (!usuario) {
+    await registrarFallo(db, email, ip);
+    return { estado: 'rechazado' };
+  }
+  await limpiarFallos(db, email);
+  return { estado: 'ok', usuario };
 }
 
 export async function cargarUsuario(db: Db, id: string): Promise<UsuarioSesion | null> {

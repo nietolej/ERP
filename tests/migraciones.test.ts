@@ -19,6 +19,7 @@ describe('migraciones', () => {
       '0002_configuracion.sql',
       '0003_contabilidad.sql',
       '0004_semillas.sql',
+      '0005_limite_acceso.sql',
     ]);
   });
 

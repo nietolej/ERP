@@ -33,20 +33,20 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - inicio de sesión con claves scrypt y sesiones guardadas en la base (la cookie lleva un token cuyo hash se guarda);
   - `proxy.ts` en todas las rutas y verificación real en la capa de acceso a datos;
   - roles sin superusuario implícito;
-  - cambio obligatorio de la clave temporal.
+  - cambio obligatorio de la clave temporal;
+  - límite de intentos fallidos por correo y por IP, con el bloqueo registrado en la auditoría. Para que el límite por IP funcione, en producción el servidor debe estar detrás de un proxy inverso que fije `X-Forwarded-For`.
 - **Pantallas**:
   - inicio de sesión y cambio de clave;
   - Inicio con el estado real de la configuración del día 0 y el control de cuadre del mayor;
   - empresa y sucursales, tasas de cambio, parámetros fiscales (validación del contador y nuevas vigencias) y usuarios y roles;
   - periodos contables, plan de cuentas y balance de comprobación en VES y USD;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
-- **Calidad:** 34 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Calidad:** 40 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 
 - **Carga automática diaria de la tasa BCV.** Por ahora la tasa se registra a mano; falta definir la fuente de consulta (decisión 2).
 - **Prueba de concurrencia de numeración contra PostgreSQL real.** PGlite es de una sola conexión: la numeración sin huecos está probada con transacciones que se revierten; la prueba de dos transacciones simultáneas necesita un servidor PostgreSQL.
-- **Límite de intentos de inicio de sesión** (protección contra fuerza bruta).
 - **Pantalla de asientos manuales con aprobación** (§3.1). El mayor y sus reglas ya existen en la base.
 
 ## Uso

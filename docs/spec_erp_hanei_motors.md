@@ -195,6 +195,7 @@ flowchart TB
 
 ### 4.3 Seguridad, roles y auditoría
 - **Usuarios propios del ERP** (tabla `usuario`), con **autenticación** obligatoria en todas las rutas, incluidas las rutas API.
+- **Límite de intentos de inicio de sesión:** 5 intentos fallidos con un mismo correo en 15 minutos, o 30 desde una misma dirección IP, bloquean el acceso hasta que venza la ventana. El bloqueo aplica igual a correos inexistentes (no revela qué correos están registrados), un acceso correcto reinicia el contador del correo y cada bloqueo de un usuario queda en `audit_log`. La tabla `intento_fallido` guarda solo el hash del correo o de la IP.
 - **Roles base:** Administrador, Gerencia, Ventas (vendedor), Supervisor de ventas, Facturación, Cobranzas, Compras, Almacén, Tesorería, Contabilidad, Auditor (solo lectura) y, si se construye el portal, Cliente.
 - **Seguridad por fila:** un vendedor ve solo su cartera, un cliente del portal solo sus documentos, y el almacén solo los almacenes que tiene asignados (`usuario_almacen`).
 - **Matriz de segregación de funciones (mínima):**
