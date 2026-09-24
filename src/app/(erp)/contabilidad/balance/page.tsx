@@ -6,7 +6,7 @@ import { fecha, hoyCaracas, monto } from '@/lib/formato';
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 export default async function BalancePage({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string; moneda?: string }> }) {
-  await exigirRol('contabilidad', 'gerencia', 'auditor');
+  await exigirRol('contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
   const sp = await searchParams;
   const hoy = hoyCaracas();
   const desde = sp.desde && FECHA.test(sp.desde) ? sp.desde : `${hoy.slice(0, 4)}-01-01`;

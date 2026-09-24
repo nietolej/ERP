@@ -10,7 +10,7 @@ const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio
 const TONO = { abierto: 'exito', cerrado: 'advertencia', bloqueado: 'peligro' } as const;
 
 export default async function PeriodosPage({ searchParams }: { searchParams: Promise<{ anio?: string }> }) {
-  const u = await exigirRol('contabilidad', 'gerencia', 'auditor');
+  const u = await exigirRol('contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
   const puedeCambiar = tieneRol(u, ['contabilidad']);
   const anioActual = Number(hoyCaracas().slice(0, 4));
   const anio = Number((await searchParams).anio) || anioActual;

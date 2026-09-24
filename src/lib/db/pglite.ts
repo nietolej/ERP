@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { PGlite, types, type Transaction } from '@electric-sql/pglite';
 import type { Db } from './tipos';
 
@@ -29,6 +31,8 @@ function envolver(e: Ejecutor, enTransaccion: boolean): Db {
 
 /** Base PGlite. Sin `dataDir` vive en memoria (pruebas); con `dataDir`, en disco (desarrollo). */
 export async function crearDbPglite(dataDir?: string): Promise<{ db: Db; cerrar: () => Promise<void> }> {
+  // PGlite crea la carpeta de datos, pero no sus carpetas padre (p. ej. .data/ la primera vez).
+  if (dataDir) mkdirSync(path.dirname(dataDir), { recursive: true });
   const pg = new PGlite({ dataDir, parsers });
   await pg.waitReady;
   return { db: envolver(pg, false), cerrar: () => pg.close() };

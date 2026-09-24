@@ -45,13 +45,21 @@ interface Regla {
   glosa: string | null;
 }
 
-interface Linea {
+/** Línea en la moneda original, antes de convertirla a VES y USD. */
+export interface LineaOriginal {
   cuentaId: string;
   lado: 'D' | 'H';
   original: Decimal;
-  ves: Decimal;
-  usd: Decimal;
   glosa: string | null;
+  centroCostoId?: string | null;
+  terceroId?: string | null;
+}
+
+export interface Tasas {
+  /** VES por 1 unidad de la moneda original. */
+  moneda: Decimal;
+  /** VES por 1 USD. */
+  usd: Decimal;
 }
 
 const dos = (d: Decimal) => d.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
@@ -77,14 +85,8 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
     throw new ErrorContable(`No hay reglas contables activas para el evento "${ev.evento}"`);
   }
 
-  const { rows: tasas } = await tx.query<{ tasa_moneda: string; tasa_usd: string }>(
-    `select fn_tasa($1, $2::date) as tasa_moneda, fn_tasa('USD', $2::date) as tasa_usd`,
-    [ev.moneda, ev.fecha],
-  );
-  const tasaMoneda = new Decimal(tasas[0].tasa_moneda);
-  const tasaUsd = new Decimal(tasas[0].tasa_usd);
-
-  const lineas: Linea[] = [];
+  const tasas = await tasasDelDia(tx, ev.moneda, ev.fecha);
+  const lineas: LineaOriginal[] = [];
   for (const r of reglas) {
     const texto = ev.importes[r.importe];
     if (texto === undefined) {
@@ -95,26 +97,16 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
       throw new ErrorContable(`El importe "${r.importe}" es negativo (${texto}); las reglas usan importes positivos`);
     }
     if (original.isZero()) continue;
-    const ves = dos(original.times(tasaMoneda));
-    const usd = ev.moneda === 'USD' ? dos(original) : dos(ves.dividedBy(tasaUsd));
-    lineas.push({ cuentaId: r.cuenta_id, lado: r.lado, original, ves, usd, glosa: r.glosa });
+    lineas.push({
+      cuentaId: r.cuenta_id, lado: r.lado, original, glosa: r.glosa,
+      centroCostoId: ev.centroCostoId, terceroId: ev.terceroId,
+    });
   }
 
   // Las reglas deben cuadrar en la moneda original: si no, están mal definidas.
-  const suma = (lado: 'D' | 'H', campo: 'original' | 'ves' | 'usd') =>
-    lineas.filter((l) => l.lado === lado).reduce((s, l) => s.plus(l[campo]), new Decimal(0));
-  if (!suma('D', 'original').equals(suma('H', 'original'))) {
-    throw new ErrorContable(
-      `Las reglas del evento "${ev.evento}" no cuadran: debe ${suma('D', 'original')} ≠ haber ${suma('H', 'original')}`,
-    );
-  }
-
-  // Redondeo: como máximo 1 centavo por línea; más que eso es un error de reglas.
-  const tolerancia = new Decimal(lineas.length).times('0.01');
-  const difVes = suma('D', 'ves').minus(suma('H', 'ves'));
-  const difUsd = suma('D', 'usd').minus(suma('H', 'usd'));
-  if (difVes.abs().greaterThan(tolerancia) || difUsd.abs().greaterThan(tolerancia)) {
-    throw new ErrorContable(`Diferencia de conversión fuera de tolerancia (VES ${difVes}, USD ${difUsd})`);
+  if (!cuadraEnOriginal(lineas)) {
+    const { debe, haber } = sumasOriginales(lineas);
+    throw new ErrorContable(`Las reglas del evento "${ev.evento}" no cuadran: debe ${debe} ≠ haber ${haber}`);
   }
 
   const { rows: asientos } = await tx.query<{ id: string }>(
@@ -123,22 +115,76 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
     [ev.fecha, ev.descripcion, ev.origen.tipo, ev.origen.id, ev.usuarioId],
   );
   const asientoId = asientos[0].id;
+  await insertarLineasConvertidas(tx, asientoId, ev.moneda, tasas, lineas);
 
-  const insertar = (cuentaId: string, dv: Decimal, hv: Decimal, du: Decimal, hu: Decimal, original: Decimal, glosa: string | null) =>
+  const { rows: final } = await tx.query<{ numero: string }>(
+    `update asiento set estado = 'contabilizado', contabilizado_por = $2 where id = $1 returning numero`,
+    [asientoId, ev.usuarioId],
+  );
+  return { asientoId, numero: final[0].numero, yaExistia: false };
+}
+
+/** Tasas BCV de la fecha: la de la moneda del documento y la del USD. */
+export async function tasasDelDia(tx: Db, moneda: string, fecha: string): Promise<Tasas> {
+  const { rows } = await tx.query<{ tasa_moneda: string; tasa_usd: string }>(
+    `select fn_tasa($1, $2::date) as tasa_moneda, fn_tasa('USD', $2::date) as tasa_usd`,
+    [moneda, fecha],
+  );
+  return { moneda: new Decimal(rows[0].tasa_moneda), usd: new Decimal(rows[0].tasa_usd) };
+}
+
+export function sumasOriginales(lineas: LineaOriginal[]): { debe: Decimal; haber: Decimal } {
+  const suma = (lado: 'D' | 'H') =>
+    lineas.filter((l) => l.lado === lado).reduce((s, l) => s.plus(l.original), new Decimal(0));
+  return { debe: suma('D'), haber: suma('H') };
+}
+
+export function cuadraEnOriginal(lineas: LineaOriginal[]): boolean {
+  const { debe, haber } = sumasOriginales(lineas);
+  return debe.equals(haber);
+}
+
+/**
+ * Convierte las líneas a VES y USD con las tasas dadas y las inserta en el asiento.
+ * Si el redondeo a centavos deja una diferencia (como máximo 1 centavo por línea),
+ * agrega una línea a la cuenta de redondeo configurada. Más que eso es un error.
+ */
+export async function insertarLineasConvertidas(
+  tx: Db, asientoId: string, moneda: string, tasas: Tasas, lineas: LineaOriginal[],
+): Promise<void> {
+  const convertidas = lineas.map((l) => {
+    const ves = dos(l.original.times(tasas.moneda));
+    const usd = moneda === 'USD' ? dos(l.original) : dos(ves.dividedBy(tasas.usd));
+    return { ...l, ves, usd };
+  });
+  const suma = (lado: 'D' | 'H', campo: 'ves' | 'usd') =>
+    convertidas.filter((l) => l.lado === lado).reduce((s, l) => s.plus(l[campo]), new Decimal(0));
+
+  const tolerancia = new Decimal(lineas.length).times('0.01');
+  const difVes = suma('D', 'ves').minus(suma('H', 'ves'));
+  const difUsd = suma('D', 'usd').minus(suma('H', 'usd'));
+  if (difVes.abs().greaterThan(tolerancia) || difUsd.abs().greaterThan(tolerancia)) {
+    throw new ErrorContable(`Diferencia de conversión fuera de tolerancia (VES ${difVes}, USD ${difUsd})`);
+  }
+
+  const insertar = (
+    cuentaId: string, dv: Decimal, hv: Decimal, du: Decimal, hu: Decimal, original: Decimal,
+    glosa: string | null, centroCostoId: string | null = null, terceroId: string | null = null,
+  ) =>
     tx.query(
       `insert into asiento_linea (asiento_id, cuenta_id, centro_costo_id, tercero_id,
                                   debe_ves, haber_ves, debe_usd, haber_usd,
                                   moneda_original, monto_original, tasa, glosa)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [asientoId, cuentaId, ev.centroCostoId ?? null, ev.terceroId ?? null,
+      [asientoId, cuentaId, centroCostoId, terceroId,
        dv.toFixed(2), hv.toFixed(2), du.toFixed(2), hu.toFixed(2),
-       ev.moneda, original.toFixed(2), tasaMoneda.toString(), glosa],
+       moneda, original.toFixed(2), tasas.moneda.toString(), glosa],
     );
 
   const cero = new Decimal(0);
-  for (const l of lineas) {
-    if (l.lado === 'D') await insertar(l.cuentaId, l.ves, cero, l.usd, cero, l.original, l.glosa);
-    else await insertar(l.cuentaId, cero, l.ves, cero, l.usd, l.original, l.glosa);
+  for (const l of convertidas) {
+    if (l.lado === 'D') await insertar(l.cuentaId, l.ves, cero, l.usd, cero, l.original, l.glosa, l.centroCostoId, l.terceroId);
+    else await insertar(l.cuentaId, cero, l.ves, cero, l.usd, l.original, l.glosa, l.centroCostoId, l.terceroId);
   }
 
   if (!difVes.isZero() || !difUsd.isZero()) {
@@ -159,10 +205,4 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
         cero, 'Redondeo de conversión (USD)');
     }
   }
-
-  const { rows: final } = await tx.query<{ numero: string }>(
-    `update asiento set estado = 'contabilizado', contabilizado_por = $2 where id = $1 returning numero`,
-    [asientoId, ev.usuarioId],
-  );
-  return { asientoId, numero: final[0].numero, yaExistia: false };
 }

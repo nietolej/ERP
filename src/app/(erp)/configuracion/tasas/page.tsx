@@ -6,7 +6,7 @@ import { fecha, fechaHora, hoyCaracas, tasa } from '@/lib/formato';
 import { registrarTasa } from '../acciones';
 
 export default async function TasasPage() {
-  const u = await exigirRol('tesoreria', 'contabilidad', 'gerencia', 'auditor');
+  const u = await exigirRol('tesoreria', 'contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
   const puedeRegistrar = tieneRol(u, ['tesoreria', 'contabilidad']);
   const db = await getDb();
   const hoy = hoyCaracas();

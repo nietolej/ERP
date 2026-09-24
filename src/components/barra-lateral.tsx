@@ -10,6 +10,8 @@ interface Item {
   roles?: Rol[]; // si se indica, solo se muestra a esos roles
 }
 
+const CONTABLES: Rol[] = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'];
+
 /** Menú del dashboard de ventas (spec_reportes §1.1) + grupo "Operación" del ERP. */
 const GRUPOS: { titulo: string; items: Item[] }[] = [
   {
@@ -28,16 +30,17 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
   {
     titulo: 'Contabilidad',
     items: [
-      { href: '/contabilidad/balance', texto: 'Balance de comprobación', roles: ['contabilidad', 'gerencia', 'auditor'] },
-      { href: '/contabilidad/periodos', texto: 'Periodos contables', roles: ['contabilidad', 'gerencia', 'auditor'] },
-      { href: '/contabilidad/plan-de-cuentas', texto: 'Plan de cuentas', roles: ['contabilidad', 'gerencia', 'auditor'] },
+      { href: '/contabilidad/asientos', texto: 'Asientos contables', roles: CONTABLES },
+      { href: '/contabilidad/balance', texto: 'Balance de comprobación', roles: CONTABLES },
+      { href: '/contabilidad/periodos', texto: 'Periodos contables', roles: CONTABLES },
+      { href: '/contabilidad/plan-de-cuentas', texto: 'Plan de cuentas', roles: CONTABLES },
     ],
   },
   {
     titulo: 'Configuración',
     items: [
-      { href: '/configuracion/tasas', texto: 'Tasas de cambio', roles: ['tesoreria', 'contabilidad', 'gerencia', 'auditor'] },
-      { href: '/configuracion/parametros-fiscales', texto: 'Parámetros fiscales', roles: ['contabilidad', 'gerencia', 'auditor'] },
+      { href: '/configuracion/tasas', texto: 'Tasas de cambio', roles: ['tesoreria', ...CONTABLES] },
+      { href: '/configuracion/parametros-fiscales', texto: 'Parámetros fiscales', roles: CONTABLES },
       { href: '/configuracion/empresa', texto: 'Empresa y sucursales', roles: ['administrador'] },
       { href: '/configuracion/usuarios', texto: 'Usuarios y roles', roles: ['administrador'] },
     ],

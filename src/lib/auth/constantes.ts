@@ -3,7 +3,7 @@ export const COOKIE_SESION = 'erp_sesion';
 
 export const ROLES = [
   'administrador', 'gerencia', 'ventas', 'supervisor_ventas', 'facturacion', 'cobranzas',
-  'compras', 'almacen', 'tesoreria', 'contabilidad', 'auditor',
+  'compras', 'almacen', 'tesoreria', 'contabilidad', 'jefe_contabilidad', 'auditor',
 ] as const;
 
 export type Rol = (typeof ROLES)[number];
@@ -19,5 +19,6 @@ export const NOMBRE_ROL: Record<Rol, string> = {
   almacen: 'Almacén',
   tesoreria: 'Tesorería',
   contabilidad: 'Contabilidad',
+  jefe_contabilidad: 'Jefe de contabilidad',
   auditor: 'Auditor',
 };

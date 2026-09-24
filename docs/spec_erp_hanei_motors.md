@@ -113,7 +113,7 @@ La auditoría del dashboard actual (septiembre de 2026) encontró errores que no
 
 ### 3.1 Fuente única de verdad y documentos antes que asientos
 - Cada hecho económico nace como un **documento de negocio** (factura, cobro, recepción, gasto). El **asiento contable se genera automáticamente** al emitirlo, a partir de reglas configurables (§12.3).
-- Los usuarios operativos no escriben asientos. Los asientos manuales quedan para Contabilidad (ajustes, provisiones, cierres) y requieren aprobación.
+- Los usuarios operativos no escriben asientos. Los asientos manuales quedan para Contabilidad (ajustes, provisiones, cierres) y requieren aprobación: se registran como borrador, en una sola moneda convertida a VES y USD con la tasa BCV de su fecha, y se contabilizan (reciben número) cuando los aprueba un usuario con el rol Jefe de contabilidad distinto de quien los registró. La base de datos rechaza la contabilización sin esa aprobación.
 
 ### 3.2 Partida doble e inmutabilidad
 - Todo asiento cuadra: suma del debe = suma del haber. Lo garantiza la **base de datos**, no solo la aplicación.
@@ -196,7 +196,7 @@ flowchart TB
 ### 4.3 Seguridad, roles y auditoría
 - **Usuarios propios del ERP** (tabla `usuario`), con **autenticación** obligatoria en todas las rutas, incluidas las rutas API.
 - **Límite de intentos de inicio de sesión:** 5 intentos fallidos con un mismo correo en 15 minutos, o 30 desde una misma dirección IP, bloquean el acceso hasta que venza la ventana. El bloqueo aplica igual a correos inexistentes (no revela qué correos están registrados), un acceso correcto reinicia el contador del correo y cada bloqueo de un usuario queda en `audit_log`. La tabla `intento_fallido` guarda solo el hash del correo o de la IP.
-- **Roles base:** Administrador, Gerencia, Ventas (vendedor), Supervisor de ventas, Facturación, Cobranzas, Compras, Almacén, Tesorería, Contabilidad, Auditor (solo lectura) y, si se construye el portal, Cliente.
+- **Roles base:** Administrador, Gerencia, Ventas (vendedor), Supervisor de ventas, Facturación, Cobranzas, Compras, Almacén, Tesorería, Contabilidad, Jefe de contabilidad (aprueba asientos manuales), Auditor (solo lectura) y, si se construye el portal, Cliente.
 - **Seguridad por fila:** un vendedor ve solo su cartera, un cliente del portal solo sus documentos, y el almacén solo los almacenes que tiene asignados (`usuario_almacen`).
 - **Matriz de segregación de funciones (mínima):**
 

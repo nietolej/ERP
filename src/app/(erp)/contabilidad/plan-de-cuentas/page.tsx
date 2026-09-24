@@ -8,7 +8,7 @@ const CONTROL: Record<string, string> = {
 };
 
 export default async function PlanDeCuentasPage() {
-  await exigirRol('contabilidad', 'gerencia', 'auditor');
+  await exigirRol('contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
   const db = await getDb();
   const { rows } = await db.query<{
     codigo: string; nombre: string; tipo: string; naturaleza: string; imputable: boolean; controlada_por: string | null; activa: boolean;

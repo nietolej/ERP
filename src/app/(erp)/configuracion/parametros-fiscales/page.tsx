@@ -13,7 +13,7 @@ interface Param {
 const UNIDAD: Record<string, string> = { porcentaje: '%', bolivares: 'Bs', dias: 'días', factor: '×' };
 
 export default async function ParametrosFiscalesPage() {
-  const u = await exigirRol('contabilidad', 'gerencia', 'auditor');
+  const u = await exigirRol('contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
   const esContador = tieneRol(u, ['contabilidad']);
   const db = await getDb();
   const { rows } = await db.query<Param>('select * from parametro_fiscal order by codigo, vigente_desde desc');

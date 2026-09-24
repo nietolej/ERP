@@ -24,7 +24,8 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - lo contabilizado es inmutable y se corrige con un reverso;
   - un periodo cerrado solo admite reversos, y uno bloqueado no admite nada ni se reabre;
   - las cuentas controladas por un auxiliar no aceptan asientos manuales;
-  - un documento no genera dos asientos.
+  - un documento no genera dos asientos;
+  - un asiento manual se contabiliza solo con la aprobación de un Jefe de contabilidad activo, que no puede ser quien lo registró.
 - **Motor de contabilización** ([src/lib/contabilidad/motor.ts](src/lib/contabilidad/motor.ts)):
   - convierte a VES y USD con la tasa del día y decimales exactos;
   - agrega una línea de redondeo si la conversión deja centavos de diferencia;
@@ -40,18 +41,22 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - Inicio con el estado real de la configuración del día 0 y el control de cuadre del mayor;
   - empresa y sucursales, tasas de cambio, parámetros fiscales (validación del contador y nuevas vigencias) y usuarios y roles;
   - periodos contables, plan de cuentas y balance de comprobación en VES y USD;
+  - asientos contables (libro diario) y asientos manuales: Contabilidad registra el borrador y el Jefe de contabilidad lo aprueba y contabiliza. Quien registra no aprueba, y la base de datos lo impide;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
-- **Calidad:** 40 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Calidad:** 51 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 
 - **Carga automática diaria de la tasa BCV.** Por ahora la tasa se registra a mano; falta definir la fuente de consulta (decisión 2).
 - **Prueba de concurrencia de numeración contra PostgreSQL real.** PGlite es de una sola conexión: la numeración sin huecos está probada con transacciones que se revierten; la prueba de dos transacciones simultáneas necesita un servidor PostgreSQL.
-- **Pantalla de asientos manuales con aprobación** (§3.1). El mayor y sus reglas ya existen en la base.
 
 ## Uso
 
 Requiere Node.js 24.
+
+**En Windows, lo más simple:** doble clic en [abrir-erp.bat](abrir-erp.bat). Instala lo que falte, prepara la base, pide los datos del administrador la primera vez y abre el ERP en http://localhost:3100. Cerrar su ventana detiene el ERP.
+
+A mano:
 
 ```bash
 npm install
@@ -92,7 +97,7 @@ ERP/
 │   ├── components/       componentes visuales
 │   └── lib/
 │       ├── auth/         claves, sesiones, roles y capa de acceso a datos
-│       ├── contabilidad/ motor de contabilización
+│       ├── contabilidad/ motor de contabilización y asientos manuales
 │       └── db/           conexión (PGlite / PostgreSQL) y migraciones
 ├── tests/                pruebas automatizadas
 └── docs/                 especificaciones y decisiones

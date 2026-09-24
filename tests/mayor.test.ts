@@ -9,10 +9,12 @@ describe('mayor contable: reglas garantizadas por la base de datos', () => {
   let db: Db;
   let cerrar: () => Promise<void>;
   let usuario: string;
+  let jefe: string;
 
   beforeAll(async () => {
     ({ db, cerrar } = await baseDePrueba());
     usuario = await usuarioDePrueba(db);
+    jefe = await usuarioDePrueba(db, 'jefe@prueba.test', ['jefe_contabilidad']);
     await db.query('select fn_crear_periodos(2026)');
   });
   afterAll(() => cerrar());
@@ -38,7 +40,7 @@ describe('mayor contable: reglas garantizadas por la base de datos', () => {
     return db.transaction(async (tx) => {
       const id = await crearAsiento(tx, fecha, lineas, tipo);
       const { rows } = await tx.query<{ numero: string }>(
-        `update asiento set estado = 'contabilizado' where id = $1 returning numero`, [id]);
+        `update asiento set estado = 'contabilizado', aprobado_por = $2 where id = $1 returning numero`, [id, jefe]);
       return { id, numero: rows[0].numero };
     });
   }

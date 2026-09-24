@@ -9,12 +9,15 @@ export async function baseDePrueba(): Promise<{ db: Db; cerrar: () => Promise<vo
   return base;
 }
 
-/** Crea un usuario de prueba y devuelve su id. */
-export async function usuarioDePrueba(db: Db, email = 'contador@prueba.test'): Promise<string> {
+/** Crea un usuario de prueba, con los roles indicados, y devuelve su id. */
+export async function usuarioDePrueba(db: Db, email = 'contador@prueba.test', roles: string[] = []): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `insert into usuario (email, nombre, password_hash) values ($1, 'Usuario de prueba', 'x') returning id`,
     [email],
   );
+  for (const rol of roles) {
+    await db.query('insert into usuario_rol (usuario_id, rol) values ($1, $2)', [rows[0].id, rol]);
+  }
   return rows[0].id;
 }
 
