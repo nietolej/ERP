@@ -280,7 +280,17 @@ create table proveedor (
   pais            char(2) not null default 'VE',
   condicion_pago_id uuid references condicion_pago(id),
   concepto_islr_id uuid references concepto_islr(id),   -- concepto por defecto del Decreto 1.808
-  estado          text not null default 'activo'
+  estado          text not null default 'pendiente' check (estado in ('pendiente','activo','inactivo','bloqueado')),
+  aprobado_por    uuid references usuario(id),           -- Gerencia, distinta de quien lo registró
+  aprobado_at     timestamptz
+);
+-- Cambios de datos sensibles de un proveedor aprobado: quedan pendientes hasta que Gerencia los aprueba.
+create table proveedor_cambio (
+  id uuid primary key default gen_random_uuid(),
+  proveedor_id uuid not null references proveedor(tercero_id),
+  datos jsonb not null,                                  -- solo los campos que cambian
+  estado text not null default 'pendiente' check (estado in ('pendiente','aprobado','rechazado')),
+  solicitado_por uuid not null, resuelto_por uuid, motivo_rechazo text   -- resuelto_por <> solicitado_por
 );
 ```
 
@@ -334,6 +344,8 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 - El código visible del cliente (C00001…) lo asigna el numerador y no cambia. Si el RIF ya existe como tercero (por ejemplo, es proveedor), el cliente se enlaza a ese tercero.
 - Los nombres se comparan normalizados (sin acentos, signos ni sufijos como C.A. o S.A.): un nombre igual al de otro tercero exige confirmación.
 - **Nunca se borra un maestro con movimientos.** Se inactiva.
+- **Proveedores:** Compras los registra (código P00001…) y quedan en `pendiente` hasta que Gerencia, distinta de quien los registró, los aprueba y les asigna la condición de pago. Con el proveedor aprobado, Compras cambia directamente los datos de contacto (nombre comercial, dirección, teléfono, correo); los **datos sensibles** (razón social, domiciliado, contribuyente especial, agente de retención de IVA, tipo, país y concepto de ISLR) se cambian con una **solicitud** que Gerencia aprueba o rechaza con motivo, siempre otra persona distinta de quien la pidió. Solo Gerencia cambia la condición de pago. La base de datos impide cambiar esos datos por otra vía, incluso desde la pantalla de clientes cuando el tercero también es proveedor.
+- **Conceptos de ISLR:** Contabilidad registra el catálogo. Sus porcentajes, mínimos y sustraendos, con vigencia, se agregan con la retención de ISLR.
 
 ---
 

@@ -11,7 +11,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 | Especificación funcional y técnica | ✅ Lista para revisión |
 | Decisiones abiertas ([docs/decisiones.md](docs/decisiones.md)) | ⏳ Pendientes: las toman Gerencia y el contador (la Fase 0 asumió provisionalmente las recomendaciones 1 y 2) |
 | **Fase 0: Fundaciones** | 🟡 Casi lista: solo falta la carga automática de la tasa BCV, que espera la decisión 2 |
-| Fase 1: Maestros | 🟡 En curso: terceros, clientes y vendedores listos; siguen proveedores, productos y los demás maestros |
+| Fase 1: Maestros | 🟡 En curso: terceros, clientes, vendedores y proveedores listos; siguen productos, almacenes, bancos, metas y adjuntos |
 
 ### Fase 0: qué está hecho
 
@@ -44,7 +44,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - asientos contables (libro diario) y asientos manuales: Contabilidad registra el borrador y el Jefe de contabilidad lo aprueba y contabiliza. Quien registra no aprueba, y la base de datos lo impide;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
 - **Concurrencia de numeración probada contra PostgreSQL 17 real** ([tests/concurrencia.test.ts](tests/concurrencia.test.ts)): 20 transacciones simultáneas reciben números distintos y sin huecos, también cuando algunas fallan. La prueba falla si se quita el bloqueo de fila.
-- **Calidad:** 72 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Calidad:** 81 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 
@@ -56,6 +56,8 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 - **Clientes:** Facturación los registra con código automático (C00001…) y quedan pendientes hasta que Gerencia les asigna condición de pago, límite de crédito y nivel de precio. Aviso y confirmación ante nombres parecidos a otro tercero. Un cliente no se borra: se inactiva o se bloquea.
 - **Seguridad por fila:** quien solo tiene el rol Ventas ve únicamente los clientes de su vendedor. La búsqueda viaja por acción de servidor para no poner RIF ni nombres en la URL.
 - **Vendedores:** Gerencia y Supervisor de ventas los administran. Código automático (V001…), tipo explícito (interno, externo, administrativo o casa) para excluir de rankings y comisiones sin listas de códigos, RIF obligatorio para el externo y enlace a un usuario de Ventas para su cartera.
+- **Proveedores:** Compras los registra y Gerencia (otra persona) los aprueba y asigna la condición de pago. Los datos de contacto se cambian directo; los sensibles (razón social, datos fiscales, tipo, país, concepto de ISLR) con una solicitud que aprueba Gerencia. La base impide saltarse ese control, también desde clientes.
+- **Conceptos de ISLR:** catálogo que registra Contabilidad (sin tarifas precargadas).
 - **Condiciones de pago** base (contado, 15, 30 y 45 días). El descuento por pronto pago lo configura Gerencia.
 
 ## Uso
@@ -106,7 +108,7 @@ ERP/
 │   └── lib/
 │       ├── auth/         claves, sesiones, roles y capa de acceso a datos
 │       ├── contabilidad/ motor de contabilización y asientos manuales
-│       ├── maestros/     RIF, terceros, clientes y vendedores
+│       ├── maestros/     RIF, terceros, clientes, vendedores y proveedores
 │       └── db/           conexión (PGlite / PostgreSQL) y migraciones
 ├── tests/                pruebas automatizadas
 └── docs/                 especificaciones y decisiones

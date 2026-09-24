@@ -33,6 +33,7 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
     items: [
       { href: '/maestros/clientes', texto: 'Clientes', roles: ROLES_VEN_CLIENTES },
       { href: '/maestros/vendedores', texto: 'Vendedores', roles: ROLES_VEN_TODOS },
+      { href: '/maestros/proveedores', texto: 'Proveedores', roles: ['compras', 'gerencia', 'tesoreria', 'contabilidad', 'jefe_contabilidad', 'auditor'] },
     ],
   },
   {
@@ -49,6 +50,7 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
     items: [
       { href: '/configuracion/tasas', texto: 'Tasas de cambio', roles: ['tesoreria', ...CONTABLES] },
       { href: '/configuracion/parametros-fiscales', texto: 'Parámetros fiscales', roles: CONTABLES },
+      { href: '/configuracion/conceptos-islr', texto: 'Conceptos de ISLR', roles: [...CONTABLES, 'compras'] },
       { href: '/configuracion/empresa', texto: 'Empresa y sucursales', roles: ['administrador'] },
       { href: '/configuracion/usuarios', texto: 'Usuarios y roles', roles: ['administrador'] },
     ],

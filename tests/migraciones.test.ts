@@ -23,6 +23,7 @@ describe('migraciones', () => {
       '0006_asiento_manual.sql',
       '0007_terceros_clientes.sql',
       '0008_vendedores.sql',
+      '0009_proveedores.sql',
     ]);
   });
 
