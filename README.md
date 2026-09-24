@@ -10,7 +10,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 |---|---|
 | Especificación funcional y técnica | ✅ Lista para revisión |
 | Decisiones abiertas ([docs/decisiones.md](docs/decisiones.md)) | ⏳ Pendientes: las toman Gerencia y el contador (la Fase 0 asumió provisionalmente las recomendaciones 1 y 2) |
-| **Fase 0: Fundaciones** | 🟡 En curso: núcleo terminado y probado; pendientes abajo |
+| **Fase 0: Fundaciones** | 🟡 Casi lista: solo falta la carga automática de la tasa BCV, que espera la decisión 2 |
 | Fase 1: Maestros | ⬜ No iniciada |
 
 ### Fase 0: qué está hecho
@@ -43,12 +43,12 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
   - periodos contables, plan de cuentas y balance de comprobación en VES y USD;
   - asientos contables (libro diario) y asientos manuales: Contabilidad registra el borrador y el Jefe de contabilidad lo aprueba y contabiliza. Quien registra no aprueba, y la base de datos lo impide;
   - menú de reportes igual al del dashboard: los módulos indican en qué fase se habilitan y no muestran cifras de ejemplo.
-- **Calidad:** 51 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Concurrencia de numeración probada contra PostgreSQL 17 real** ([tests/concurrencia.test.ts](tests/concurrencia.test.ts)): 20 transacciones simultáneas reciben números distintos y sin huecos, también cuando algunas fallan. La prueba falla si se quita el bloqueo de fila.
+- **Calidad:** 54 pruebas automatizadas, tipos, lint y compilación de producción sin errores. CI en [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Fase 0: qué falta
 
 - **Carga automática diaria de la tasa BCV.** Por ahora la tasa se registra a mano; falta definir la fuente de consulta (decisión 2).
-- **Prueba de concurrencia de numeración contra PostgreSQL real.** PGlite es de una sola conexión: la numeración sin huecos está probada con transacciones que se revierten; la prueba de dos transacciones simultáneas necesita un servidor PostgreSQL.
 
 ## Uso
 
@@ -66,12 +66,12 @@ npm run dev
 ```
 
 - Sin `DATABASE_URL`, el sistema usa **PGlite**, un PostgreSQL embebido que guarda los datos en `./.data/erp`. No hace falta instalar un servidor de base de datos para desarrollar.
-- En producción se define `DATABASE_URL=postgres://…` (ver [.env.example](.env.example)). Las mismas migraciones crean la base.
+- En producción se define `DATABASE_URL=postgres://…` (ver [.env.example](.env.example)). Las mismas migraciones crean la base, que debe estar en **UTF-8** (`create database erp encoding 'UTF8' template template0;`): las migraciones se detienen si no lo está.
 - `db:crear-admin` muestra una clave temporal **una sola vez**. El administrador debe cambiarla al entrar y crear los demás usuarios desde *Configuración → Usuarios y roles*.
 
 | Comando | Qué hace |
 |---|---|
-| `npm test` | Pruebas automatizadas (cada archivo usa una base PGlite nueva en memoria) |
+| `npm test` | Pruebas automatizadas (cada archivo usa una base PGlite nueva en memoria). La de concurrencia usa PostgreSQL real: el servidor de `TEST_DATABASE_URL` si está definida (en un esquema temporal que borra al terminar) o, si no, uno temporal que arranca y borra solo (`embedded-postgres`) |
 | `npm run typecheck` · `npm run lint` | Tipos y estilo |
 | `npm run build` | Compilación de producción |
 | `npm run db:migrar` | Aplica las migraciones pendientes. No permite editar una migración ya aplicada |

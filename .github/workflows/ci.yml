@@ -8,6 +8,21 @@ on:
 jobs:
   verificar:
     runs-on: ubuntu-latest
+    # PostgreSQL real solo para la prueba de concurrencia de numeración (tests/concurrencia.test.ts).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+          POSTGRES_DB: erp_pruebas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,6 +32,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      # Las pruebas crean bases PGlite en memoria: no necesitan servidor de base de datos.
+      # Las pruebas usan bases PGlite en memoria; la de concurrencia usa el PostgreSQL del servicio.
       - run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://erp:erp@localhost:5432/erp_pruebas
       - run: npm run build

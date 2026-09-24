@@ -11,6 +11,14 @@ export const DIR_MIGRACIONES = path.join(process.cwd(), 'db', 'migrations');
  * detiene: el esquema solo cambia con migraciones nuevas (AGENTS.md §3).
  */
 export async function migrar(db: Db, dir = DIR_MIGRACIONES): Promise<string[]> {
+  // En Windows, PostgreSQL crea las bases en WIN1252 por defecto: los textos del ERP necesitan UTF-8.
+  const { rows: cod } = await db.query<{ c: string }>(`select current_setting('server_encoding') as c`);
+  if (cod[0].c !== 'UTF8') {
+    throw new Error(
+      `La base de datos usa la codificación ${cod[0].c}; el ERP requiere UTF8. ` +
+      `Créela con: create database <nombre> encoding 'UTF8' template template0;`,
+    );
+  }
   await db.exec(`
     create table if not exists schema_migrations (
       version    text primary key,
