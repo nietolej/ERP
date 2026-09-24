@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -22,12 +23,15 @@ function puertoLibre(): Promise<number> {
  */
 export async function postgresTemporal(): Promise<{ url: string; detener: () => Promise<void> }> {
   const port = await puertoLibre();
+  const dir = path.join(tmpdir(), `erp-pg-${randomUUID()}`);
   const pg = new EmbeddedPostgres({
-    databaseDir: path.join(tmpdir(), `erp-pg-${randomUUID()}`),
+    databaseDir: dir,
     port,
     user: 'erp',
     password: 'erp',
-    persistent: false,
+    // La carpeta la borramos nosotros: en Windows los archivos siguen bloqueados un instante
+    // después de detener el servidor y el borrado del paquete falla con EBUSY.
+    persistent: true,
     // En Windows initdb usaría WIN1252: la base del ERP siempre es UTF-8 (las migraciones lo requieren).
     initdbFlags: ['--encoding=UTF8', '--locale=C'],
     postgresFlags: ['-c', 'listen_addresses=127.0.0.1'],
@@ -36,5 +40,9 @@ export async function postgresTemporal(): Promise<{ url: string; detener: () => 
   await pg.initialise();
   await pg.start();
   await pg.createDatabase('erp_pruebas');
-  return { url: `postgres://erp:erp@127.0.0.1:${port}/erp_pruebas`, detener: () => pg.stop() };
+  const detener = async () => {
+    await pg.stop();
+    await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  };
+  return { url: `postgres://erp:erp@127.0.0.1:${port}/erp_pruebas`, detener };
 }

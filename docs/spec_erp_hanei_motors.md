@@ -321,6 +321,11 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 | `lista_precio` / `precio` | Listas A, B y D en USD, con `vigente_desde`. **El costo no se guarda como lista de precio** (hoy `precio_d` hace de costo): el costo sale del inventario (§8) |
 | `almacen` | `codigo`, `sucursal_id`, `es_comercial` (01 y 06 hoy), `permite_venta` |
 
+- **Quién los administra:** Almacén crea y modifica productos, grupos, marcas y referencias cruzadas; Gerencia y Supervisor de ventas fijan los precios; Gerencia crea los almacenes y asigna qué usuarios de Almacén ve cada uno (`usuario_almacen`).
+- **Código del producto:** lo escribe el usuario (suele ser el número de parte), se guarda en mayúsculas, es único sin importar mayúsculas y no se cambia.
+- **Alícuota de IVA:** `alicuota_iva` es una categoría (general, reducida, lujo, exento, exonerado) que apunta a códigos de `parametro_fiscal`; el porcentaje de una fecha es la suma de esos parámetros vigentes. Ningún porcentaje se guarda en el producto.
+- **Precios:** no se editan ni se borran. Un cambio es un precio nuevo con su fecha de vigencia, que no puede ser anterior a hoy.
+
 ### 5.4 Otros maestros
 - **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, moneda, cuenta contable, si es de custodia o en el exterior).
 - **Plan de cuentas** (§12.1), **centros de costo** (sucursal, departamento) y **categorías de gasto** (§10.1).

@@ -11,6 +11,9 @@ interface Item {
   roles?: Rol[]; // si se indica, solo se muestra a esos roles
 }
 
+/** Todos los roles salvo el administrador, que configura el sistema pero no opera. */
+const OPERATIVOS: Rol[] = ['ventas', 'supervisor_ventas', 'facturacion', 'cobranzas', 'compras', 'almacen', 'gerencia', 'tesoreria', 'contabilidad', 'jefe_contabilidad', 'auditor'];
+
 const CONTABLES: Rol[] = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'];
 
 /** Menú del dashboard de ventas (spec_reportes §1.1) + grupo "Operación" del ERP. */
@@ -34,6 +37,8 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: '/maestros/clientes', texto: 'Clientes', roles: ROLES_VEN_CLIENTES },
       { href: '/maestros/vendedores', texto: 'Vendedores', roles: ROLES_VEN_TODOS },
       { href: '/maestros/proveedores', texto: 'Proveedores', roles: ['compras', 'gerencia', 'tesoreria', 'contabilidad', 'jefe_contabilidad', 'auditor'] },
+      { href: '/maestros/productos', texto: 'Productos', roles: OPERATIVOS },
+      { href: '/maestros/almacenes', texto: 'Almacenes', roles: OPERATIVOS },
     ],
   },
   {
