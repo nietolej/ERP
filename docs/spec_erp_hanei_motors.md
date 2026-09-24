@@ -315,7 +315,10 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 ### 5.3 Productos o materiales
 | Entidad | Campos clave |
 |---|---|
-| `producto` | `codigo` (único), `descripcion`, `grupo_id` (modelo de vehículo), `marca_id`, `familia`, `unidad`, `alicuota_iva_id`, `inventariable`, `codigo_alterno`, `peso`, `foto_url`, `estado` |
+| `producto_base` | **Código común**: el artículo genérico (p. ej. "Pastilla de freno delantera Tucson") que se vende en una o varias marcas. `codigo` interno (único, fijo), `descripcion`, `categoria_id`, `estado` |
+| `producto` | Producto de marca, que es lo que se vende, se cuenta y tiene precio. `codigo` (único), `producto_base_id` (código común), `descripcion`, `grupo_id` (modelo principal, para los reportes del dashboard), `marca_id`, `categoria_id` (heredada del código común), `unidad`, `alicuota_iva_id`, `inventariable`, `codigo_alterno`, `peso`, `linea_calidad` (original, OEM o alterna), `pais_origen`, `foto_url`, `estado`. **Un solo producto por marca dentro de cada código común** |
+| `categoria_producto` | Árbol de categorías (sistema → subsistema, p. ej. Frenos › Pastillas). Reemplaza la "familia" en texto libre |
+| `producto_base_aplicacion` | Aplicación vehicular del código común: modelo (`grupo_id`), año desde, año hasta y motor. Un repuesto sirve para varios modelos y años |
 | `producto_referencia` | Referencias cruzadas OEM y alternas por fabricante (reemplaza `REFCRUZ`, que hoy no se exporta) |
 | `grupo_producto`, `marca` | Catálogos que crea el usuario (grupo = modelo de vehículo, p. ej. TUCSON, RIO) |
 | `lista_precio` / `precio` | Listas A, B y D en USD, con `vigente_desde`. **El costo no se guarda como lista de precio** (hoy `precio_d` hace de costo): el costo sale del inventario (§8) |
@@ -325,6 +328,7 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 - **Código del producto:** lo escribe el usuario (suele ser el número de parte), se guarda en mayúsculas, es único sin importar mayúsculas y no se cambia.
 - **Alícuota de IVA:** `alicuota_iva` es una categoría (general, reducida, lujo, exento, exonerado) que apunta a códigos de `parametro_fiscal`; el porcentaje de una fecha es la suma de esos parámetros vigentes. Ningún porcentaje se guarda en el producto.
 - **Precios:** no se editan ni se borran. Un cambio es un precio nuevo con su fecha de vigencia, que no puede ser anterior a hoy.
+- **Segmentación para análisis:** todo producto nuevo pertenece a un código común. Así cada indicador se puede ver en dos niveles: el artículo completo (todas sus marcas) y cada producto de marca. Es la base de los pronósticos, la elasticidad de precio y el análisis de promociones (Fase 8).
 
 ### 5.4 Otros maestros
 - **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, moneda, cuenta contable, si es de custodia o en el exterior).
@@ -418,10 +422,32 @@ create table documento_venta_linea (
   iva             numeric(16,2) not null,
   total           numeric(16,2) not null,
   costo_unitario_usd numeric(16,4),            -- foto del costo promedio al emitir: margen por línea
+  -- Foto al emitir para análisis (Fase 8): sin estos datos la elasticidad y el efecto de las promociones no se pueden medir después.
+  producto_base_id  uuid references producto_base(id),   -- código común vigente al emitir
+  lista_precio      char(1) references lista_precio(codigo),
+  precio_lista      numeric(16,4),                        -- precio de lista vigente en la fecha
+  promocion_id      uuid references promocion(id),         -- promoción aplicada, si hubo
   linea_origen_id uuid references documento_venta_linea(id),
   unique (documento_id, linea)
 );
+
+-- Promociones: qué se ofreció, a quién y cuándo. Base del análisis de promociones (Fase 8).
+create table promocion (
+  id            uuid primary key default gen_random_uuid(),
+  codigo        varchar(20) not null unique,
+  nombre        text not null,
+  tipo          text not null check (tipo in ('descuento_pct','precio_especial','cantidad','combo')),
+  vigente_desde date not null,
+  vigente_hasta date not null,
+  alcance       jsonb not null,        -- productos, códigos comunes, categorías, marcas, clientes o zonas
+  descuento_pct numeric(5,2),
+  aprobado_por  uuid references usuario(id),
+  created_by    uuid not null,
+  check (vigente_hasta >= vigente_desde)
+);
 ```
+
+- **Demanda no atendida:** cuando un pedido no se despacha completo por falta de existencia, la cantidad no despachada se registra (producto, cliente, fecha, cantidad). Junto con la existencia diaria por producto y almacén (§8), permite separar "no se vendió" de "no había", y es obligatoria para pronosticar bien.
 
 ### 6.2 Reglas de negocio
 1. **Precio:** según el nivel del cliente (A, B, D) y la lista vigente en la fecha. Un descuento por encima del máximo de su rol requiere aprobación.
@@ -904,6 +930,7 @@ El ERP se construye y se prueba en un **entorno de pruebas** con datos de prueba
 | **5. Arranque en producción** | Configuración del día 0, registro de saldos iniciales como operaciones (§14), capacitación por rol y acompañamiento de la primera semana | Checklist de §14.6 completo y firmado por Gerencia y el contador |
 | **6. Comisiones, estados financieros y reportes** | Planes de comisión, devengo, reversión y liquidación. Estados financieros completos, cierre mensual e indicadores comerciales (§12.5). Puede entregarse durante el primer mes de operación, porque trabaja sobre los datos ya registrados | Primer cierre mensual completo en el ERP, con estados financieros revisados por el contador |
 | **7. Portal de clientes (opcional)** | Pedidos y envío de comprobantes de pago por parte de los clientes, con acceso limitado a sus propios documentos | Un cliente no puede ver datos de otro (prueba de seguridad por fila) |
+| **8. Analítica avanzada** | Cuando haya al menos 12 meses de operación: pronóstico de ventas por producto de marca y por código común, conciliado entre ambos niveles; elasticidad de precio por segmento (categoría, marca, línea de calidad, lista); efecto de cada promoción frente a la venta esperada sin ella; calendario de feriados, quincenas y temporadas. Usa solo datos registrados en el ERP (código común, precio de lista y precio cobrado, promoción, costo, existencia diaria y demanda no atendida) | Cada modelo se valida contra meses reales que no usó para ajustarse, con su error publicado. Ningún pronóstico se muestra sin su margen de error. Sin historia suficiente, la pantalla lo dice y no muestra cifras |
 
 **Reportes:** los módulos de reportes que replican el dashboard se entregan a medida que existen sus datos: Metas en la Fase 1; Inicio, Clientes, Productos, Vendedores, Cobranzas y Devoluciones en la Fase 2; Inventario completo y kardex en la Fase 3. El detalle está en [spec_reportes.md §13](spec_reportes.md#13-entrega-por-fases-y-criterios-de-aceptación).
 

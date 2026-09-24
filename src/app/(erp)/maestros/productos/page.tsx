@@ -18,7 +18,7 @@ export default async function ProductosPage() {
       <Encabezado titulo="Productos" descripcion="Precios vigentes hoy en USD. El costo no es una lista de precio: sale del inventario.">
         <div className="flex gap-2">
           <Link href="/maestros/productos/catalogos" className="rounded-lg border border-borde bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">
-            Grupos y marcas
+            Categorías, grupos y marcas
           </Link>
           {esAlmacen && (
             <Link href="/maestros/productos/nuevo" className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-acento-hover">

@@ -200,7 +200,7 @@ Se calcula con las **mismas funciones** de la pestaña por año, aplicadas a tod
 | Dev. ($) | Devoluciones del periodo |
 | Acción | Abre el detalle del producto |
 
-**Pestaña "Análisis por Grupos / Familias"**. Por grupo muestra: total de artículos, unidades vendidas, venta, devoluciones, **stock valorizado al costo promedio** y producto líder (el de mayor venta del grupo).
+**Pestaña "Análisis por Grupos / Familias"**. En el ERP, la "familia" es la **categoría** del producto (árbol Frenos › Pastillas); además se puede agrupar por **código común** (el mismo artículo en todas sus marcas). Por grupo muestra: total de artículos, unidades vendidas, venta, devoluciones, **stock valorizado al costo promedio** y producto líder (el de mayor venta del grupo).
 
 Ambas pestañas se pueden exportar a CSV.
 
@@ -425,7 +425,7 @@ Los reportes solo leen de estas vistas. Así las definiciones de la §2 se imple
 
 | Vista | Grano | Columnas principales |
 |---|---|---|
-| `vw_venta_linea` | Línea de factura emitida | fecha, documento, cliente, vendedor, sucursal, almacén, producto, grupo, marca, cantidad, precio de lista, descuento de línea, base_usd, costo_usd (foto al emitir) |
+| `vw_venta_linea` | Línea de factura emitida | fecha, documento, cliente, vendedor, sucursal, almacén, producto, código común, categoría, grupo, marca, línea de calidad, cantidad, precio de lista, precio cobrado, descuento de línea, promoción, base_usd, costo_usd (foto al emitir) |
 | `vw_venta_documento` | Factura emitida | fecha, cliente, vendedor, sucursal, base_usd, total_usd, saldo_usd, cancelada (sí/no), fecha de cancelación |
 | `vw_nota_credito_linea` | Línea de NC emitida | fecha, motivo, factura de origen, cliente, vendedor, producto, cantidad, base_usd |
 | `vw_cxc_movimiento` | Movimiento de CxC | fecha y hora, cliente, documento, tipo, cargo_usd, abono_usd (para el estado de cuenta con saldo progresivo) |

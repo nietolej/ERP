@@ -1,9 +1,11 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro, vacioANull } from './terceros';
+import { ErrorMaestro } from './terceros';
 
 /**
  * Productos (§5.3). Almacén crea y modifica el catálogo; Gerencia y Supervisor de ventas fijan precios.
  * - El código lo escribe el usuario (suelen ser números de parte), en mayúsculas, único y fijo.
+ * - Cada producto de marca pertenece a un código común (producto_base), que agrupa el mismo artículo
+ *   en todas sus marcas: así se analiza por artículo y por artículo-marca (pronósticos, elasticidad).
  * - La alícuota de IVA es una categoría: el porcentaje sale de parametro_fiscal por fecha.
  * - Los precios de las listas A, B y D (USD) tienen vigencia y no se editan: se registra uno nuevo.
  * - El costo no es una lista de precio: sale del inventario (§8, Fase 2).
@@ -23,17 +25,27 @@ const PESO = /^\d{1,7}(\.\d{1,3})?$/;
 const PRECIO = /^\d{1,12}(\.\d{1,2})?$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
+export const LINEAS_CALIDAD = ['original', 'oem', 'alterna'] as const;
+export const NOMBRE_LINEA_CALIDAD: Record<(typeof LINEAS_CALIDAD)[number], string> = {
+  original: 'Original (marca del vehículo)',
+  oem: 'OEM (fabricante de equipo original)',
+  alterna: 'Alterna (aftermarket)',
+};
+
 export interface DatosProducto {
   descripcion: string;
+  /** Código común al que pertenece (obligatorio: permite analizar el artículo en todas sus marcas). */
+  productoBaseId: string;
   grupoId?: string | null;
   marcaId?: string | null;
-  familia?: string;
   unidad: string;
   alicuotaIvaId: string;
   inventariable: boolean;
   codigoAlterno?: string;
   /** Texto decimal en kg, hasta 3 decimales. */
   pesoKg?: string;
+  lineaCalidad?: string | null;
+  paisOrigen?: string | null;
 }
 
 /** Normaliza un código: mayúsculas, sin espacios. */
@@ -42,19 +54,31 @@ export const normalizarCodigo = (c: string) => c.trim().toUpperCase().replace(/\
 function validar(d: DatosProducto): void {
   const errores: string[] = [];
   if (d.descripcion.trim().length < 3) errores.push('Indique la descripción del producto.');
+  if (!d.productoBaseId) errores.push('Indique el código común del producto.');
+  if (!d.marcaId) errores.push('Seleccione la marca: el código común agrupa el mismo artículo en varias marcas.');
   if (!UNIDAD.test(d.unidad.trim().toUpperCase())) errores.push('La unidad debe ser una abreviatura en letras (UND, JGO, PAR, LT…).');
   if (!d.alicuotaIvaId) errores.push('Seleccione la alícuota de IVA.');
   if (d.pesoKg?.trim() && !PESO.test(d.pesoKg.trim())) errores.push('El peso debe ser un número en kg con hasta 3 decimales.');
   if (d.codigoAlterno?.trim() && !CODIGO_PRODUCTO.test(normalizarCodigo(d.codigoAlterno))) {
     errores.push('El código alterno admite letras, números, guiones, puntos y barras.');
   }
+  if (d.lineaCalidad && !(LINEAS_CALIDAD as readonly string[]).includes(d.lineaCalidad)) errores.push('Línea de calidad inválida.');
+  if (d.paisOrigen && !/^[A-Z]{2}$/.test(d.paisOrigen)) errores.push('El país de origen debe ser un código de dos letras (CN, KR, JP…).');
   if (errores.length) throw new ErrorMaestro(errores.join('\n'));
 }
 
+/** R-R: una sola marca por código común (mensaje claro antes que el índice único de la base). */
+async function exigirMarcaUnica(tx: Db, d: DatosProducto, excluirId?: string): Promise<void> {
+  const { rows } = await tx.query<{ codigo: string }>(
+    `select codigo from producto where producto_base_id = $1 and marca_id = $2 and ($3::uuid is null or id <> $3::uuid)`,
+    [d.productoBaseId, d.marcaId, excluirId ?? null]);
+  if (rows[0]) throw new ErrorMaestro(`Ese código común ya tiene un producto de esa marca: ${rows[0].codigo}.`);
+}
+
 const valores = (d: DatosProducto) => [
-  d.descripcion.trim(), d.grupoId || null, d.marcaId || null, vacioANull(d.familia), d.unidad.trim().toUpperCase(),
+  d.descripcion.trim(), d.productoBaseId, d.grupoId || null, d.marcaId || null, d.unidad.trim().toUpperCase(),
   d.alicuotaIvaId, d.inventariable, d.codigoAlterno?.trim() ? normalizarCodigo(d.codigoAlterno) : null,
-  d.pesoKg?.trim() || null,
+  d.pesoKg?.trim() || null, d.lineaCalidad || null, d.paisOrigen || null,
 ];
 
 export async function crearProducto(tx: Db, usuarioId: string, codigo: string, d: DatosProducto): Promise<string> {
@@ -65,22 +89,100 @@ export async function crearProducto(tx: Db, usuarioId: string, codigo: string, d
   validar(d);
   const { rows: previo } = await tx.query('select 1 from producto where upper(codigo) = $1', [c]);
   if (previo.length) throw new ErrorMaestro(`Ya existe un producto con el código ${c}.`);
+  await exigirMarcaUnica(tx, d);
   const { rows } = await tx.query<{ id: string }>(
-    `insert into producto (codigo, descripcion, grupo_id, marca_id, familia, unidad, alicuota_iva_id, inventariable,
-                           codigo_alterno, peso_kg, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
+    `insert into producto (codigo, descripcion, producto_base_id, grupo_id, marca_id, unidad, alicuota_iva_id, inventariable,
+                           codigo_alterno, peso_kg, linea_calidad, pais_origen, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning id`,
     [c, ...valores(d), usuarioId]);
   return rows[0].id;
 }
 
 export async function actualizarProducto(tx: Db, id: string, d: DatosProducto): Promise<void> {
   validar(d);
+  await exigirMarcaUnica(tx, d, id);
   const { rows } = await tx.query<{ id: string }>(
-    `update producto set descripcion = $2, grupo_id = $3, marca_id = $4, familia = $5, unidad = $6, alicuota_iva_id = $7,
-            inventariable = $8, codigo_alterno = $9, peso_kg = $10
+    `update producto set descripcion = $2, producto_base_id = $3, grupo_id = $4, marca_id = $5, unidad = $6,
+            alicuota_iva_id = $7, inventariable = $8, codigo_alterno = $9, peso_kg = $10, linea_calidad = $11, pais_origen = $12
       where id = $1 returning id`,
     [id, ...valores(d)]);
   if (!rows[0]) throw new ErrorMaestro('El producto no existe.');
+}
+
+// ---------------------------------------------------------------------------
+// Código común (producto_base), categorías y aplicación vehicular
+// ---------------------------------------------------------------------------
+
+export interface DatosProductoBase {
+  descripcion: string;
+  categoriaId?: string | null;
+}
+
+/**
+ * Devuelve el código común; si no existe, lo crea con `nuevo` (descripción y categoría).
+ * Sin `nuevo`, un código inexistente es un error.
+ */
+export async function resolverProductoBase(
+  tx: Db, codigo: string, nuevo?: DatosProductoBase,
+): Promise<{ id: string; creado: boolean }> {
+  const c = normalizarCodigo(codigo);
+  if (!CODIGO_PRODUCTO.test(c)) {
+    throw new ErrorMaestro('El código común admite hasta 30 letras, números, guiones, puntos y barras.');
+  }
+  const { rows } = await tx.query<{ id: string }>('select id from producto_base where upper(codigo) = $1', [c]);
+  if (rows[0]) return { id: rows[0].id, creado: false };
+  if (!nuevo || nuevo.descripcion.trim().length < 3) {
+    throw new ErrorMaestro(`El código común ${c} no existe: indique su descripción genérica para crearlo.`);
+  }
+  const { rows: r } = await tx.query<{ id: string }>(
+    'insert into producto_base (codigo, descripcion, categoria_id) values ($1, $2, $3) returning id',
+    [c, nuevo.descripcion.trim(), nuevo.categoriaId || null]);
+  return { id: r[0].id, creado: true };
+}
+
+export async function actualizarProductoBase(tx: Db, id: string, d: DatosProductoBase): Promise<void> {
+  if (d.descripcion.trim().length < 3) throw new ErrorMaestro('Indique la descripción genérica.');
+  const { rows } = await tx.query('update producto_base set descripcion = $2, categoria_id = $3 where id = $1 returning id',
+    [id, d.descripcion.trim(), d.categoriaId || null]);
+  if (!rows[0]) throw new ErrorMaestro('El código común no existe.');
+}
+
+export async function crearCategoria(tx: Db, codigo: string, nombre: string, padreId?: string | null): Promise<string> {
+  const c = codigo.trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9._-]{0,19}$/.test(c)) throw new ErrorMaestro('El código admite hasta 20 letras, números, puntos y guiones.');
+  if (nombre.trim().length < 2) throw new ErrorMaestro('Indique el nombre de la categoría.');
+  const { rows: previo } = await tx.query('select 1 from categoria_producto where codigo = $1', [c]);
+  if (previo.length) throw new ErrorMaestro(`Ya existe la categoría ${c}.`);
+  const { rows } = await tx.query<{ id: string }>(
+    'insert into categoria_producto (codigo, nombre, padre_id) values ($1, $2, $3) returning id', [c, nombre.trim(), padreId || null]);
+  return rows[0].id;
+}
+
+export async function agregarAplicacion(
+  tx: Db, productoBaseId: string, a: { grupoId: string; anioDesde?: string; anioHasta?: string; motor?: string },
+): Promise<void> {
+  if (!a.grupoId) throw new ErrorMaestro('Seleccione el modelo de vehículo.');
+  const anio = (v?: string) => {
+    if (!v?.trim()) return null;
+    if (!/^\d{4}$/.test(v.trim())) throw new ErrorMaestro('Los años se escriben con 4 dígitos.');
+    return Number(v.trim());
+  };
+  const desde = anio(a.anioDesde);
+  const hasta = anio(a.anioHasta);
+  if (desde !== null && hasta !== null && hasta < desde) throw new ErrorMaestro('El año final no puede ser menor que el inicial.');
+  const motor = a.motor?.trim().toUpperCase() || null;
+  const { rows } = await tx.query(
+    `select 1 from producto_base_aplicacion where producto_base_id = $1 and grupo_id = $2
+        and coalesce(anio_desde, 0) = coalesce($3::smallint, 0) and coalesce(motor, '') = coalesce($4, '')`,
+    [productoBaseId, a.grupoId, desde, motor]);
+  if (rows.length) throw new ErrorMaestro('Esa aplicación ya está registrada.');
+  await tx.query(
+    'insert into producto_base_aplicacion (producto_base_id, grupo_id, anio_desde, anio_hasta, motor) values ($1, $2, $3, $4, $5)',
+    [productoBaseId, a.grupoId, desde, hasta, motor]);
+}
+
+export async function quitarAplicacion(tx: Db, productoBaseId: string, aplicacionId: string): Promise<void> {
+  await tx.query('delete from producto_base_aplicacion where id = $1 and producto_base_id = $2', [aplicacionId, productoBaseId]);
 }
 
 /** Un producto no se borra: se inactiva (§5.5). */
@@ -136,6 +238,7 @@ export async function fijarPrecio(
 export interface FilaProducto {
   id: string;
   codigo: string;
+  codigo_comun: string | null;
   descripcion: string;
   grupo: string | null;
   marca: string | null;
@@ -150,20 +253,22 @@ export interface FilaProducto {
 export async function buscarProductos(db: Db, filtro: { texto?: string; estado?: string }, hoy: string, limite = 100): Promise<FilaProducto[]> {
   const texto = (filtro.texto ?? '').trim();
   const { rows } = await db.query<FilaProducto>(
-    `select p.id, p.codigo, p.descripcion, g.codigo as grupo, m.codigo as marca, p.unidad, p.estado,
+    `select p.id, p.codigo, b.codigo as codigo_comun, p.descripcion, g.codigo as grupo, m.codigo as marca, p.unidad, p.estado,
             fn_precio(p.id, 'A', $3::date) as precio_a, fn_precio(p.id, 'B', $3::date) as precio_b,
             fn_precio(p.id, 'D', $3::date) as precio_d
        from producto p
+       left join producto_base b on b.id = p.producto_base_id
        left join grupo_producto g on g.id = p.grupo_id
        left join marca m on m.id = p.marca_id
       where ($1 = '' or p.estado = $1)
         and ($2 = '' or upper(p.codigo) like '%' || upper($2) || '%'
                      or upper(coalesce(p.codigo_alterno, '')) like '%' || upper($2) || '%'
+                     or upper(coalesce(b.codigo, '')) like '%' || upper($2) || '%'
                      or fn_nombre_normalizado(p.descripcion) like '%' || fn_nombre_normalizado($2) || '%'
                      or exists (select 1 from producto_referencia r where r.producto_id = p.id
                                   and upper(regexp_replace(r.referencia, '[^A-Za-z0-9]', '', 'g'))
                                       like '%' || upper(regexp_replace($2, '[^A-Za-z0-9]', '', 'g')) || '%'))
-      order by p.codigo
+      order by b.codigo nulls last, p.codigo
       limit $4`,
     [filtro.estado ?? '', texto, hoy, limite]);
   return rows;

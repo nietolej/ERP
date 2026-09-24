@@ -34,7 +34,7 @@ export function ListaProductos({ iniciales, buscar, limite }: { iniciales: FilaP
   return (
     <div className="space-y-4">
       <form onSubmit={enviar} className="flex flex-wrap items-end gap-2 text-sm">
-        <input name="texto" placeholder="Código, descripción o referencia" autoComplete="off" className="campo w-80" aria-label="Buscar" />
+        <input name="texto" placeholder="Código, código común, descripción o referencia" autoComplete="off" className="campo w-80" aria-label="Buscar" />
         <select name="estado" className="campo w-auto" aria-label="Estado" defaultValue="activo">
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
@@ -46,12 +46,13 @@ export function ListaProductos({ iniciales, buscar, limite }: { iniciales: FilaP
       </form>
       {error ? <Aviso tono="peligro">{error}</Aviso> : (
         <>
-          <Tabla columnas={['Código', 'Descripción', 'Grupo', 'Marca', 'Unidad',
+          <Tabla columnas={['Código', 'Código común', 'Descripción', 'Grupo', 'Marca', 'Unidad',
             { t: 'Lista A', derecha: true }, { t: 'Lista B', derecha: true }, { t: 'Lista D', derecha: true }, 'Estado']}
             vacio="No hay productos que coincidan.">
             {filas.map((p) => (
               <tr key={p.id} className="hover:bg-white/[0.03]">
                 <Celda mono><Link href={`/maestros/productos/${p.id}`} className="text-acento hover:underline">{p.codigo}</Link></Celda>
+                <Celda mono className="text-texto-2">{p.codigo_comun ?? '—'}</Celda>
                 <Celda><Link href={`/maestros/productos/${p.id}`} className="hover:underline">{p.descripcion}</Link></Celda>
                 <Celda className="text-texto-2">{p.grupo ?? '—'}</Celda>
                 <Celda className="text-texto-2">{p.marca ?? '—'}</Celda>

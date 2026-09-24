@@ -18,10 +18,15 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
   const db = await getDb();
   const hoy = hoyCaracas();
 
-  const { rows } = await db.query<ValoresProducto & { codigo: string; estado: string; creador: string | null; created_at: Date }>(
-    `select p.codigo, p.descripcion, p.grupo_id, p.marca_id, p.familia, p.unidad, p.alicuota_iva_id, p.inventariable,
-            p.codigo_alterno, p.peso_kg, p.estado, u.nombre as creador, p.created_at
-       from producto p left join usuario u on u.id = p.created_by where p.id = $1`, [id]);
+  const { rows } = await db.query<ValoresProducto & {
+    codigo: string; estado: string; creador: string | null; created_at: Date; base_id: string | null; categoria: string | null;
+  }>(
+    `select p.codigo, b.codigo as codigo_comun, b.id as base_id, fn_categoria_ruta(p.categoria_id) as categoria,
+            p.descripcion, p.grupo_id, p.marca_id, p.unidad, p.alicuota_iva_id, p.inventariable,
+            p.codigo_alterno, p.peso_kg, p.linea_calidad, p.pais_origen, p.estado, u.nombre as creador, p.created_at
+       from producto p
+       left join producto_base b on b.id = p.producto_base_id
+       left join usuario u on u.id = p.created_by where p.id = $1`, [id]);
   const p = rows[0];
   if (!p) notFound();
 
@@ -42,8 +47,12 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
 
   return (
     <>
-      <Encabezado titulo={`${p.codigo} · ${p.descripcion}`} descripcion={`Registrado por ${p.creador ?? '—'} · ${fechaHora(p.created_at)}`}>
+      <Encabezado titulo={`${p.codigo} · ${p.descripcion}`}
+        descripcion={`${p.categoria ? `${p.categoria} · ` : ''}Registrado por ${p.creador ?? '—'} · ${fechaHora(p.created_at)}`}>
         <div className="flex items-center gap-3">
+          {p.base_id
+            ? <Link href={`/maestros/productos/comun/${p.base_id}`} className="rounded-lg border border-borde bg-white/5 px-3 py-1.5 text-sm font-semibold hover:bg-white/10">Código común {p.codigo_comun}</Link>
+            : <Etiqueta tono="advertencia">sin código común</Etiqueta>}
           <Etiqueta tono={p.estado === 'activo' ? 'exito' : 'info'}>{p.estado}</Etiqueta>
           <Link href="/maestros/productos" className="text-sm text-texto-2 hover:text-texto">← Productos</Link>
         </div>

@@ -6,25 +6,33 @@ import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario, getDb } from '@/lib/db';
 import { hoyCaracas } from '@/lib/formato';
+import type { Db } from '@/lib/db/tipos';
 import {
-  ROLES_PRECIOS, ROLES_VEN_PRODUCTOS, actualizarProducto, agregarReferencia, buscarProductos, cambiarEstadoProducto,
-  crearCatalogo, crearProducto, fijarPrecio, quitarReferencia, type DatosProducto, type FilaProducto,
+  ROLES_PRECIOS, ROLES_VEN_PRODUCTOS, actualizarProducto, actualizarProductoBase, agregarAplicacion, agregarReferencia,
+  buscarProductos, cambiarEstadoProducto, crearCatalogo, crearCategoria, crearProducto, fijarPrecio, quitarAplicacion,
+  quitarReferencia, resolverProductoBase, type DatosProducto, type FilaProducto,
 } from '@/lib/maestros/productos';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (fd: FormData, c: string) => (UUID.test(texto(fd, c)) ? texto(fd, c) : null);
 
-function leer(fd: FormData): DatosProducto {
+/** Lee el producto y resuelve su código común (lo crea si es nuevo, con su descripción genérica y categoría). */
+async function leer(tx: Db, fd: FormData): Promise<DatosProducto> {
+  const base = await resolverProductoBase(tx, texto(fd, 'codigo_comun'), {
+    descripcion: texto(fd, 'base_descripcion'), categoriaId: uuid(fd, 'base_categoria_id'),
+  });
   return {
     descripcion: texto(fd, 'descripcion'),
+    productoBaseId: base.id,
     grupoId: uuid(fd, 'grupo_id'),
     marcaId: uuid(fd, 'marca_id'),
-    familia: texto(fd, 'familia'),
     unidad: texto(fd, 'unidad'),
     alicuotaIvaId: uuid(fd, 'alicuota_iva_id') ?? '',
     inventariable: fd.get('inventariable') === 'on',
     codigoAlterno: texto(fd, 'codigo_alterno'),
     pesoKg: texto(fd, 'peso_kg'),
+    lineaCalidad: texto(fd, 'linea_calidad') || null,
+    paisOrigen: texto(fd, 'pais_origen').toUpperCase() || null,
   };
 }
 
@@ -37,7 +45,7 @@ export async function crearProductoAccion(_: EstadoAccion, fd: FormData): Promis
   let id: string;
   try {
     const u = await autorizar('almacen');
-    id = await conUsuario(u.id, (tx) => crearProducto(tx, u.id, texto(fd, 'codigo'), leer(fd)));
+    id = await conUsuario(u.id, async (tx) => crearProducto(tx, u.id, texto(fd, 'codigo'), await leer(tx, fd)));
   } catch (e) {
     return { error: mensajeDeError(e) };
   }
@@ -50,7 +58,7 @@ export async function actualizarProductoAccion(_: EstadoAccion, fd: FormData): P
     const u = await autorizar('almacen');
     const id = uuid(fd, 'id');
     if (!id) return { error: 'Producto inválido.' };
-    await conUsuario(u.id, (tx) => actualizarProducto(tx, id, leer(fd)));
+    await conUsuario(u.id, async (tx) => actualizarProducto(tx, id, await leer(tx, fd)));
     refrescar(id);
     return { ok: 'Producto actualizado.' };
   } catch (e) {
@@ -122,6 +130,60 @@ export async function crearCatalogoAccion(_: EstadoAccion, fd: FormData): Promis
     await conUsuario(u.id, (tx) => crearCatalogo(tx, tabla, texto(fd, 'codigo'), texto(fd, 'nombre')));
     revalidatePath('/maestros/productos/catalogos');
     return { ok: tabla === 'marca' ? 'Marca registrada.' : 'Grupo registrado.' };
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+}
+
+export async function crearCategoriaAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  try {
+    const u = await autorizar('almacen');
+    await conUsuario(u.id, (tx) => crearCategoria(tx, texto(fd, 'codigo'), texto(fd, 'nombre'), uuid(fd, 'padre_id')));
+    revalidatePath('/maestros/productos/catalogos');
+    return { ok: 'Categoría registrada.' };
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+}
+
+export async function actualizarProductoBaseAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  try {
+    const u = await autorizar('almacen');
+    const id = uuid(fd, 'base_id');
+    if (!id) return { error: 'Código común inválido.' };
+    await conUsuario(u.id, (tx) => actualizarProductoBase(tx, id, { descripcion: texto(fd, 'descripcion'), categoriaId: uuid(fd, 'categoria_id') }));
+    revalidatePath(`/maestros/productos/comun/${id}`);
+    revalidatePath('/maestros/productos');
+    return { ok: 'Código común actualizado.' };
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+}
+
+export async function agregarAplicacionAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  try {
+    const u = await autorizar('almacen');
+    const id = uuid(fd, 'base_id');
+    if (!id) return { error: 'Código común inválido.' };
+    await conUsuario(u.id, (tx) => agregarAplicacion(tx, id, {
+      grupoId: uuid(fd, 'grupo_id') ?? '', anioDesde: texto(fd, 'anio_desde'), anioHasta: texto(fd, 'anio_hasta'), motor: texto(fd, 'motor'),
+    }));
+    revalidatePath(`/maestros/productos/comun/${id}`);
+    return { ok: 'Aplicación agregada.' };
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+}
+
+export async function quitarAplicacionAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  try {
+    const u = await autorizar('almacen');
+    const id = uuid(fd, 'base_id');
+    const apl = uuid(fd, 'aplicacion_id');
+    if (!id || !apl) return { error: 'Aplicación inválida.' };
+    await conUsuario(u.id, (tx) => quitarAplicacion(tx, id, apl));
+    revalidatePath(`/maestros/productos/comun/${id}`);
+    return { ok: 'Aplicación eliminada.' };
   } catch (e) {
     return { error: mensajeDeError(e) };
   }
