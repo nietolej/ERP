@@ -1,5 +1,6 @@
 import type { Rol } from '@/lib/auth/constantes';
 import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
+import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 
 /**
@@ -100,7 +101,7 @@ export const MODULOS: Modulo[] = [
     nombre: 'Control de Gestión',
     descripcion: 'Metas de venta y comisiones.',
     items: [
-      { texto: 'Configuración de metas', href: '/metas' },
+      { texto: 'Configuración de metas', href: '/metas', roles: ROLES_VEN_METAS },
       { texto: 'Planes de comisión', fase: 6 },
       { texto: 'Liquidación de comisiones', fase: 6 },
     ],

@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // PGlite carga archivos WebAssembly propios: se ejecuta desde node_modules, sin empaquetar.
   serverExternalPackages: ["@electric-sql/pglite"],
+  // La carga de metas por Excel admite archivos de hasta 2 MB (más lo que añade el formulario).
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   async headers() {
     return [
       {

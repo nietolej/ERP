@@ -404,18 +404,24 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 - **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, moneda, cuenta contable, si es de custodia o en el exterior).
 - **Plan de cuentas** (§12.1), **centros de costo** (sucursal, departamento) y **categorías de gasto** (§10.1).
 - **Conceptos ISLR** (Decreto 1.808) y **alícuotas de IVA**, con vigencia.
-- **Metas de venta**, cargadas y aprobadas por Gerencia en el ERP:
+- **Metas de venta**, cargadas por Gerencia o Supervisor de ventas (Excel o captura manual) y aprobadas por Gerencia en el ERP. Cada carga es un **lote** con número de versión, usuario y fecha, que nace `pendiente`; quien lo cargó no lo aprueba. La meta vigente de cada clave es la del último lote aprobado (vista `vw_meta_periodo`). Las filas de un lote no se editan: un cambio es un lote nuevo. Es todo o nada: si una fila tiene error no se guarda nada.
   ```sql
+  create table meta_lote (
+    id uuid primary key default gen_random_uuid(), version int generated always as identity unique,
+    origen text not null check (origen in ('excel','manual')), archivo text,
+    estado text not null default 'pendiente' check (estado in ('pendiente','aprobado','rechazado')),
+    creado_por uuid not null references usuario(id), created_at timestamptz not null default now(),
+    resuelto_por uuid references usuario(id), resuelto_at timestamptz, motivo_rechazo text
+  );
   create table meta_venta (
-    id uuid primary key default gen_random_uuid(),
-    tipo text not null check (tipo in ('global','sucursal','vendedor','cliente','producto','grupo')),
+    id uuid primary key default gen_random_uuid(), lote_id uuid not null references meta_lote(id),
+    tipo text not null check (tipo in ('global','vendedor','cliente','producto','grupo')),
     entidad_id uuid,                       -- null para 'global'
     anio smallint not null, mes smallint check (mes between 1 and 12),  -- null = anual
-    monto_usd numeric(14,2) not null check (monto_usd >= 0),
-    version int not null default 1, aprobado_por uuid, created_at timestamptz default now(),
-    unique (tipo, entidad_id, anio, mes, version)
+    monto_usd numeric(14,2) not null check (monto_usd >= 0)
   );
   ```
+  Si no hay una fila GLOBAL aprobada, la meta global del año es la suma de las metas de los vendedores (`fn_meta_global`); si hay metas mensuales, la meta anual efectiva es su suma (`vw_meta_anual`).
 
 ### 5.5 Calidad de datos maestros
 - Validar el RIF (formato y dígito verificador) al crear. Detectar duplicados por RIF y por nombre parecido.
