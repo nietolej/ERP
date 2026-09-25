@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import type { Opcion } from '@/components/formulario-cliente';
 import { Campo, Encabezado, Etiqueta, Panel } from '@/components/ui';
+import { PanelAdjuntos } from '@/components/panel-adjuntos';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { fechaHora, monto } from '@/lib/formato';
@@ -156,6 +157,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
           </>
         )}
       </div>
+      <PanelAdjuntos tipo="cliente" entidadId={id} usuario={u} className="mt-5" />
     </>
   );
 }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import { Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
+import { PanelAdjuntos } from '@/components/panel-adjuntos';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { fecha, fechaHora, hoyCaracas, monto } from '@/lib/formato';
@@ -157,6 +158,7 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
           ))}
         </Tabla>
       </Panel>
+      <PanelAdjuntos tipo="producto" entidadId={id} usuario={u} className="mt-5" />
     </>
   );
 }

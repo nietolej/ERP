@@ -191,7 +191,7 @@ flowchart TB
 | `numerador` | Serie, tipo de documento, sucursal, próximo número, prefijo |
 | `condicion_pago` | Contado, 15, 30 o 45 días; descuento por pronto pago asociado |
 | `instrumento_pago` | Transferencia en Bs, pago móvil, efectivo USD, Zelle, USDT, punto de venta, cheque; indica si genera IGTF |
-| `adjunto` | Archivos de soporte (comprobantes de pago, facturas de proveedor, soportes de gastos): ruta en el almacenamiento de archivos, tipo, tamaño, hash, usuario y fecha. Se enlaza a cualquier documento |
+| `adjunto` | Archivos de soporte (comprobantes de pago, facturas de proveedor, soportes de gastos): PDF, PNG, JPG o WebP de hasta 5 MB, reconocidos por su contenido. Los bytes van en una carpeta de almacenamiento propia (`ADJUNTOS_DIR`), fuera de la carpeta pública, y se sirven solo por `/api/adjuntos/[id]` con los mismos permisos del registro (incluida la seguridad por fila). Guarda huella SHA-256 (se verifica al leer), tamaño, tipo, usuario y fecha. No se edita ni se borra: se anula con motivo, y el archivo se conserva. Se enlaza a un cliente, proveedor o producto; los documentos se agregan en sus fases |
 
 ### 4.3 Seguridad, roles y auditoría
 - **Usuarios propios del ERP** (tabla `usuario`), con **autenticación** obligatoria en todas las rutas, incluidas las rutas API.

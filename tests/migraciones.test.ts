@@ -28,6 +28,7 @@ describe('migraciones', () => {
       '0011_segmentacion_productos.sql',
       '0012_bancos.sql',
       '0013_metas.sql',
+      '0014_adjuntos.sql',
     ]);
   });
 

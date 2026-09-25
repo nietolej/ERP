@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import { FormularioProveedor, type ValoresProveedor } from '@/components/formulario-proveedor';
 import { Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
+import { PanelAdjuntos } from '@/components/panel-adjuntos';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { fechaHora } from '@/lib/formato';
@@ -234,6 +235,7 @@ export default async function ProveedorPage({ params }: { params: Promise<{ id: 
           </Tabla>
         </Panel>
       )}
+      <PanelAdjuntos tipo="proveedor" entidadId={id} usuario={u} className="mt-5" />
     </>
   );
 }
