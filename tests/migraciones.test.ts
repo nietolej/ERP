@@ -26,6 +26,7 @@ describe('migraciones', () => {
       '0009_proveedores.sql',
       '0010_productos_almacenes.sql',
       '0011_segmentacion_productos.sql',
+      '0012_bancos.sql',
     ]);
   });
 

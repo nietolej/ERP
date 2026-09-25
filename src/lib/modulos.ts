@@ -1,4 +1,5 @@
 import type { Rol } from '@/lib/auth/constantes';
+import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 
 /**
@@ -88,7 +89,7 @@ export const MODULOS: Modulo[] = [
     nombre: 'Tesorería y Bancos',
     descripcion: 'Bancos, cuentas bancarias, caja chica, gastos y conciliación.',
     items: [
-      { texto: 'Bancos', fase: 1 },
+      { texto: 'Bancos', href: '/maestros/bancos', roles: ROLES_VEN_BANCOS },
       { texto: 'Cuentas bancarias y caja', fase: 3 },
       { texto: 'Gastos y caja chica', fase: 3 },
       { texto: 'Conciliación bancaria', fase: 3 },
