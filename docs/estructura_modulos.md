@@ -13,7 +13,7 @@ El ERP se organiza en módulos con código de dos letras, como SAP. La navegaci�
 | **CR** | CRM y Postventa | CRM | Prospectos, contactos, oportunidades, actividades y casos de postventa (§6.5) | 7 |
 | **FX** | Fiscal Venezuela | Localización VE | Condición fiscal configurable (§11.0), parámetros fiscales, conceptos de ISLR, libros, retenciones de IVA e ISLR, IGTF | 0, 4 |
 | **BI** | Reportes y Analítica | BW | Reportes M1–M6 del dashboard anterior y analítica avanzada | 2, 3, 8 |
-| **BC** | Administración del Sistema | Basis, Business Workflow | Empresa, usuarios y roles, tasas de cambio, **auditoría** y **flujo de trabajo y aprobaciones** (§4.5) | 0, 1, 2 |
+| **BC** | Administración del Sistema | Basis, Business Workflow | Empresa, usuarios y roles, tasas de cambio, **auditoría** y **flujo de trabajo y aprobaciones** (§4.5, ya construido) | 0, 1, 2 |
 
 ## Dónde quedó cada tema
 | Tema | Dónde | Motivo |

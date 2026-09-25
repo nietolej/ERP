@@ -154,8 +154,8 @@ export const MODULOS: Modulo[] = [
       { texto: 'Empresa y sucursales', href: '/configuracion/empresa', roles: ['administrador'] },
       { texto: 'Usuarios y roles', href: '/configuracion/usuarios', roles: ['administrador'] },
       { texto: 'Auditoría', href: '/configuracion/auditoria', roles: ROLES_VEN_AUDITORIA },
-      { texto: 'Bandeja de aprobaciones', fase: 2 },
-      { texto: 'Definición de flujos', fase: 2, roles: ['administrador', 'gerencia'] },
+      { texto: 'Bandeja de aprobaciones', href: '/aprobaciones' },
+      { texto: 'Definición de flujos', href: '/configuracion/flujos', roles: ['administrador', 'gerencia', 'auditor'] },
     ],
   },
 ];

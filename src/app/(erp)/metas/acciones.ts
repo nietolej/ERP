@@ -3,10 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { readSheet } from 'read-excel-file/node';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
-import { autorizar } from '@/lib/auth/dal';
+import { autorizar, autorizarSesion } from '@/lib/auth/dal';
+import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { conUsuario } from '@/lib/db';
 import {
-  aprobarLoteMetas, crearLoteMetas, leerFilasExcel, parsearMonto, rechazarLoteMetas, ROLES_APRUEBAN_METAS, ROLES_CARGAN_METAS,
+  crearLoteMetas, leerFilasExcel, parsearMonto, ROLES_CARGAN_METAS,
   TIPOS_META, type FilaMeta, type TipoMeta,
 } from '@/lib/maestros/metas';
 
@@ -84,10 +85,10 @@ export async function guardarManualAccion(_: EstadoAccion, fd: FormData): Promis
 
 export async function aprobarLoteAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar(...ROLES_APRUEBAN_METAS);
+    const u = await autorizarSesion(); // quién puede aprobar lo decide el motor de aprobaciones (§4.5)
     const id = texto(fd, 'id');
     if (!UUID.test(id)) return { error: 'Lote inválido.' };
-    await conUsuario(u.id, (tx) => aprobarLoteMetas(tx, id, u.id));
+    await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'meta_lote', id, u.id, 'aprobada'));
     revalidatePath('/metas');
     revalidatePath(`/metas/lote/${id}`);
     return { ok: 'Lote aprobado. Sus metas ya son las vigentes.' };
@@ -98,10 +99,10 @@ export async function aprobarLoteAccion(_: EstadoAccion, fd: FormData): Promise<
 
 export async function rechazarLoteAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar(...ROLES_APRUEBAN_METAS);
+    const u = await autorizarSesion();
     const id = texto(fd, 'id');
     if (!UUID.test(id)) return { error: 'Lote inválido.' };
-    await conUsuario(u.id, (tx) => rechazarLoteMetas(tx, id, u.id, texto(fd, 'motivo')));
+    await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'meta_lote', id, u.id, 'rechazada', { comentario: texto(fd, 'motivo') }));
     revalidatePath('/metas');
     revalidatePath(`/metas/lote/${id}`);
     return { ok: 'Lote rechazado.' };

@@ -1,3 +1,4 @@
+import { cancelarSolicitud, solicitarAprobacion } from '@/lib/flujo/flujo';
 import { createHash } from 'node:crypto';
 import Decimal from 'decimal.js';
 import type { Db } from '@/lib/db/tipos';
@@ -106,6 +107,7 @@ export async function guardarBorrador(
       [d.fecha, d.descripcion.trim(), usuarioId],
     );
     asientoId = rows[0].id;
+    await solicitarAprobacion(tx, { tipo: 'asiento_manual', objetoId: asientoId, solicitanteId: usuarioId });
   }
   await insertarLineasConvertidas(tx, asientoId, d.moneda, tasas, lineas);
   return asientoId;
@@ -115,6 +117,7 @@ export async function guardarBorrador(
 export async function eliminarBorrador(tx: Db, id: string, usuarioId: string): Promise<void> {
   await exigirBorradorPropio(tx, id, usuarioId);
   await tx.query('delete from asiento where id = $1', [id]);
+  await cancelarSolicitud(tx, 'asiento_manual', id);
 }
 
 async function exigirBorradorPropio(tx: Db, id: string, usuarioId: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import type { Db } from '@/lib/db/tipos';
 import { ROLES_VEN_TODOS } from './roles';
 import {
@@ -65,6 +66,7 @@ export async function crearCliente(
     `insert into cliente (tercero_id, sucursal_id, vendedor_id, zona, created_by)
      values ($1, $2, $3, $4, $5) returning codigo`,
     [terceroId, c.sucursalId || null, c.vendedorId || null, vacioANull(c.zona), usuarioId]);
+  await solicitarAprobacion(tx, { tipo: 'cliente', objetoId: terceroId, solicitanteId: usuarioId });
   return { id: terceroId, codigo: rows[0].codigo, terceroExistente: tercero.existente };
 }
 

@@ -5,6 +5,7 @@ import { FormularioProveedor, type ValoresProveedor } from '@/components/formula
 import { Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
 import { PanelAdjuntos } from '@/components/panel-adjuntos';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
+import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { getDb } from '@/lib/db';
 import { fechaHora } from '@/lib/formato';
 import { CAMPOS_SENSIBLES, NOMBRE_TIPO_PROVEEDOR, ROLES_VEN_PROVEEDORES, type TipoProveedor } from '@/lib/maestros/proveedores';
@@ -67,6 +68,8 @@ export default async function ProveedorPage({ params }: { params: Promise<{ id: 
   const esCompras = tieneRol(u, ['compras']);
   const esGerencia = tieneRol(u, ['gerencia']);
   const pendiente = p.estado === 'pendiente';
+  const puedeAprobarAlta = pendiente && (await puedeDecidirObjeto(db, u.id, 'proveedor', id));
+  const puedeResolverCambio = abierto ? await puedeDecidirObjeto(db, u.id, 'proveedor_cambio', abierto.id) : false;
   const nombreConcepto = (v: string) => conceptos.find((c) => c.id === v)?.nombre ?? (v ? v : 'Sin concepto');
   const mostrar = (campo: string, v: unknown): string => {
     if (typeof v === 'boolean') return v ? 'Sí' : 'No';
@@ -111,10 +114,12 @@ export default async function ProveedorPage({ params }: { params: Promise<{ id: 
           </dl>
         </Panel>
 
-        {pendiente && esGerencia && (
+        {pendiente && (esGerencia || puedeAprobarAlta) && (
           <Panel titulo="Aprobar proveedor">
-            {p.created_by === u.id ? (
-              <p className="text-sm text-texto-2">Usted registró este proveedor: debe aprobarlo otro usuario de Gerencia.</p>
+            {!puedeAprobarAlta ? (
+              <p className="text-sm text-texto-2">
+                {p.created_by === u.id ? 'Usted registró este proveedor: debe aprobarlo otro usuario de Gerencia.' : 'Usted no está autorizado para aprobar este proveedor.'}
+              </p>
             ) : (
               <Formulario accion={aprobarProveedorAccion} className="space-y-4">
                 <input type="hidden" name="id" value={id} />
@@ -142,7 +147,7 @@ export default async function ProveedorPage({ params }: { params: Promise<{ id: 
                 </tr>
               ))}
             </Tabla>
-            {esGerencia && abierto.solicitado_por !== u.id && (
+            {puedeResolverCambio && (
               <div className="mt-4 flex flex-wrap items-start gap-3">
                 <Formulario accion={resolverCambioAccion}>
                   <input type="hidden" name="id" value={id} />

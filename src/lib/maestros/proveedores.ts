@@ -1,3 +1,4 @@
+import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import type { Db } from '@/lib/db/tipos';
 import {
   ErrorMaestro, exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero,
@@ -87,6 +88,7 @@ export async function crearProveedor(
     `insert into proveedor (tercero_id, tipo, pais, concepto_islr_id, created_by) values ($1, $2, $3, $4, $5)
      returning codigo`,
     [t.id, d.sensibles.tipo, d.sensibles.pais, d.sensibles.conceptoIslrId || null, usuarioId]);
+  await solicitarAprobacion(tx, { tipo: 'proveedor', objetoId: t.id, solicitanteId: usuarioId });
   return { id: t.id, codigo: rows[0].codigo, terceroExistente: t.existente };
 }
 
@@ -180,6 +182,7 @@ export async function solicitarCambio(tx: Db, id: string, usuarioId: string, pro
   const { rows: r } = await tx.query<{ id: string }>(
     'insert into proveedor_cambio (proveedor_id, datos, solicitado_por) values ($1, $2, $3) returning id',
     [id, JSON.stringify(datos), usuarioId]);
+  await solicitarAprobacion(tx, { tipo: 'proveedor_cambio', objetoId: r[0].id, solicitanteId: usuarioId });
   return r[0].id;
 }
 

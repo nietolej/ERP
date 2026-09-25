@@ -3,10 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
-import { autorizar } from '@/lib/auth/dal';
+import { autorizar, autorizarSesion } from '@/lib/auth/dal';
+import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { conUsuario, getDb } from '@/lib/db';
 import {
-  ErrorConfirmable, ROLES_VEN_CLIENTES, actualizarCredito, actualizarDatosCliente, aprobarCliente, buscarClientes,
+  ErrorConfirmable, ROLES_VEN_CLIENTES, actualizarCredito, actualizarDatosCliente, buscarClientes,
   cambiarEstadoCliente, crearCliente, type DatosCredito, type DatosTercero, type FilaCliente,
 } from '@/lib/maestros/clientes';
 
@@ -82,10 +83,10 @@ export async function actualizarClienteAccion(_: EstadoAccion, fd: FormData): Pr
 
 export async function aprobarClienteAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar('gerencia');
+    const u = await autorizarSesion(); // quién puede aprobar lo decide el motor de aprobaciones (§4.5)
     const id = texto(fd, 'id');
     if (!UUID.test(id)) return { error: 'Cliente inválido.' };
-    await conUsuario(u.id, (tx) => aprobarCliente(tx, id, u.id, leerCredito(fd)));
+    await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'cliente', id, u.id, 'aprobada', { datos: { ...leerCredito(fd) } }));
     revalidatePath('/maestros/clientes');
     revalidatePath(`/maestros/clientes/${id}`);
     return { ok: 'Cliente aprobado: ya está activo.' };

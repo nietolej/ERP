@@ -5,6 +5,7 @@ import type { Opcion } from '@/components/formulario-cliente';
 import { Campo, Encabezado, Etiqueta, Panel } from '@/components/ui';
 import { PanelAdjuntos } from '@/components/panel-adjuntos';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
+import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { getDb } from '@/lib/db';
 import { fechaHora, monto } from '@/lib/formato';
 import { ROLES_VEN_CLIENTES, puedeVerCliente } from '@/lib/maestros/clientes';
@@ -79,7 +80,8 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
   const esGerencia = tieneRol(u, ['gerencia']);
   const puedeEditar = tieneRol(u, ['facturacion', 'gerencia']);
-  const condiciones = esGerencia ? await condicionesDePago(db) : [];
+  const puedeAprobar = c.estado === 'pendiente' && (await puedeDecidirObjeto(db, u.id, 'cliente', id));
+  const condiciones = esGerencia || puedeAprobar ? await condicionesDePago(db) : [];
 
   return (
     <>
@@ -121,7 +123,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
           </dl>
         </Panel>
 
-        {esGerencia && c.estado === 'pendiente' && (
+        {puedeAprobar && (
           <Panel titulo="Aprobar cliente">
             <Formulario accion={aprobarClienteAccion} className="space-y-4">
               <input type="hidden" name="id" value={id} />

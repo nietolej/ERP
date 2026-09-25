@@ -3,11 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
-import { autorizar } from '@/lib/auth/dal';
+import { autorizar, autorizarSesion } from '@/lib/auth/dal';
+import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { conUsuario, getDb } from '@/lib/db';
 import {
-  ROLES_VEN_PROVEEDORES, TIPOS_PROVEEDOR, actualizarContacto, aprobarCambio, aprobarProveedor, buscarProveedores,
-  cambiarCondicionProveedor, cambiarEstadoProveedor, corregirPendiente, crearProveedor, rechazarCambio, solicitarCambio,
+  ROLES_VEN_PROVEEDORES, TIPOS_PROVEEDOR, actualizarContacto, buscarProveedores,
+  cambiarCondicionProveedor, cambiarEstadoProveedor, corregirPendiente, crearProveedor, solicitarCambio,
   type DatosContacto, type DatosSensibles, type FilaProveedor, type TipoProveedor,
 } from '@/lib/maestros/proveedores';
 import { ErrorConfirmable } from '@/lib/maestros/terceros';
@@ -100,10 +101,10 @@ export async function solicitarCambioAccion(_: EstadoAccion, fd: FormData): Prom
 
 export async function aprobarProveedorAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar('gerencia');
+    const u = await autorizarSesion(); // quién puede aprobar lo decide el motor de aprobaciones (§4.5)
     const id = uuid(fd, 'id');
     if (!id) return { error: 'Proveedor inválido.' };
-    await conUsuario(u.id, (tx) => aprobarProveedor(tx, id, u.id, uuid(fd, 'condicion_pago_id') ?? ''));
+    await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'proveedor', id, u.id, 'aprobada', { datos: { condicionPagoId: uuid(fd, 'condicion_pago_id') ?? '' } }));
     refrescar(id);
     return { ok: 'Proveedor aprobado: ya está activo.' };
   } catch (e) {
@@ -140,14 +141,13 @@ export async function cambiarEstadoProveedorAccion(_: EstadoAccion, fd: FormData
 
 export async function resolverCambioAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar('gerencia');
+    const u = await autorizarSesion();
     const id = uuid(fd, 'id');
     const cambio = uuid(fd, 'cambio_id');
     if (!id || !cambio) return { error: 'Solicitud inválida.' };
     const decision = texto(fd, 'decision');
-    await conUsuario(u.id, (tx) => decision === 'aprobar'
-      ? aprobarCambio(tx, cambio, u.id)
-      : rechazarCambio(tx, cambio, u.id, texto(fd, 'motivo')));
+    await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'proveedor_cambio', cambio, u.id,
+      decision === 'aprobar' ? 'aprobada' : 'rechazada', { comentario: texto(fd, 'motivo') }));
     refrescar(id);
     return { ok: decision === 'aprobar' ? 'Cambio aprobado y aplicado.' : 'Cambio rechazado.' };
   } catch (e) {

@@ -30,6 +30,7 @@ describe('migraciones', () => {
       '0013_metas.sql',
       '0014_adjuntos.sql',
       '0015_maestros_referenciados.sql',
+      '0016_flujo_trabajo.sql',
     ]);
   });
 

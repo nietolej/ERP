@@ -1,3 +1,4 @@
+import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
@@ -216,6 +217,7 @@ export async function crearLoteMetas(
     'insert into meta_lote (origen, archivo, creado_por) values ($1, $2, $3) returning id, version',
     [origen, archivo ? archivo.slice(0, 120) : null, usuarioId]);
   const lote = rows[0];
+  await solicitarAprobacion(tx, { tipo: 'meta_lote', objetoId: lote.id, solicitanteId: usuarioId });
   await tx.query(
     `insert into meta_venta (lote_id, tipo, entidad_id, anio, mes, monto_usd)
      select $1, t, e, a, m, x from unnest($2::text[], $3::uuid[], $4::int[], $5::int[], $6::numeric[]) as u(t, e, a, m, x)`,

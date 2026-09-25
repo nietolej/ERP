@@ -44,4 +44,11 @@ export async function autorizar(...roles: Rol[]): Promise<UsuarioSesion> {
   return u;
 }
 
+/** Para acciones de servidor cuyo permiso lo decide otra regla (p. ej. el motor de aprobaciones): exige solo sesión válida. */
+export async function autorizarSesion(): Promise<UsuarioSesion> {
+  const u = await obtenerUsuario();
+  if (!u || u.debeCambiarPassword) throw new ErrorPermiso('Su sesión venció. Vuelva a iniciar sesión.');
+  return u;
+}
+
 export class ErrorPermiso extends Error {}

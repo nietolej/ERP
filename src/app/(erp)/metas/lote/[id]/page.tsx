@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import { Aviso, Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
+import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { getDb } from '@/lib/db';
 import { fechaHora, monto } from '@/lib/formato';
 import { NOMBRE_TIPO_META, ROLES_APRUEBAN_METAS, ROLES_VEN_METAS, type TipoMeta } from '@/lib/maestros/metas';
@@ -36,7 +37,8 @@ export default async function LoteMetasPage({ params }: { params: Promise<{ id: 
                 and ($3::boolean or v.version < $2)) as vigente_usd
        from meta_venta m where m.lote_id = $1 order by m.tipo, entidad, m.anio, m.mes nulls first`, [id, l.version, l.estado === 'pendiente']);
 
-  const puedeResolver = l.estado === 'pendiente' && tieneRol(u, ROLES_APRUEBAN_METAS);
+  const puedeDecidir = l.estado === 'pendiente' && (await puedeDecidirObjeto(db, u.id, 'meta_lote', id));
+  const puedeResolver = l.estado === 'pendiente' && (puedeDecidir || tieneRol(u, ROLES_APRUEBAN_METAS));
   const esQuienCargo = l.creado_por === u.id;
 
   return (
@@ -71,8 +73,8 @@ export default async function LoteMetasPage({ params }: { params: Promise<{ id: 
 
       {puedeResolver && (
         <Panel titulo="Resolución de Gerencia" className="mt-5">
-          {esQuienCargo ? (
-            <Aviso tono="advertencia">Usted cargó este lote: lo debe aprobar o rechazar otro usuario con el rol Gerencia.</Aviso>
+          {!puedeDecidir ? (
+            <Aviso tono="advertencia">{esQuienCargo ? 'Usted cargó este lote: lo debe aprobar o rechazar otro usuario con el rol Gerencia.' : 'Usted no está autorizado para resolver este lote.'}</Aviso>
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
               <Formulario accion={aprobarLoteAccion} className="space-y-3">

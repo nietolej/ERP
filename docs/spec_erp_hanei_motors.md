@@ -253,56 +253,35 @@ La aplicación se organiza en módulos con código de dos letras. La navegación
 Los datos maestros viven en el módulo dueño (clientes y vendedores en SD; productos, almacenes y proveedores en MM). Los módulos generan asientos solo mediante el motor de reglas contables (§12.3).
 
 ### 4.5 Flujo de trabajo y aprobaciones (BC)
-En SAP el flujo de trabajo es un componente transversal de Basis. Aquí es un **motor único** que reemplaza la lógica de aprobación propia de cada módulo, para que las reglas de la matriz de la §4.3 sean **datos y no código**.
+En SAP el flujo de trabajo es un componente transversal de Basis. Aquí es un **motor único** que reemplaza la lógica de aprobación propia de cada módulo, para que las reglas de la matriz de la §4.3 sean **datos y no código**. Está construido desde la Fase 2 (migración `0016_flujo_trabajo.sql`, `src/lib/flujo/`).
 
-**Modelo**
+**Modelo** (resumen; el esquema vigente está en la migración)
 ```sql
-create table flujo_definicion (            -- qué objeto se aprueba y cuándo
-  id uuid primary key default gen_random_uuid(),
-  objeto_tipo text not null,               -- 'cliente','proveedor','asiento_manual','descuento','nota_credito','pedido_credito',
-                                           -- 'orden_compra','pago','gasto','ajuste_inventario','liquidacion_comision','anulacion'
-  nombre text not null, activo boolean not null default true
-);
-create table flujo_paso (                  -- pasos en orden; cada uno con su condición y su rol
-  id uuid primary key default gen_random_uuid(),
-  definicion_id uuid not null references flujo_definicion(id),
-  orden smallint not null,
-  condicion_campo text, condicion_operador text, condicion_valor numeric(16,2),   -- p. ej. monto_usd > umbral; nulo = siempre
-  rol_aprobador text not null references rol(codigo),
-  distinto_del_creador boolean not null default true,
-  horas_para_escalar int,                  -- parámetro; nulo = no escala
-  unique (definicion_id, orden)
-);
-create table solicitud_aprobacion (
-  id uuid primary key default gen_random_uuid(),
-  objeto_tipo text not null, objeto_id uuid not null,
-  estado text not null default 'pendiente' check (estado in ('pendiente','aprobada','rechazada','cancelada')),
-  paso_actual smallint not null, solicitante_id uuid not null references usuario(id),
-  created_at timestamptz not null default now(), resuelta_at timestamptz
-);
-create unique index solicitud_pendiente_unica on solicitud_aprobacion (objeto_tipo, objeto_id) where estado = 'pendiente';
-create table aprobacion_decision (
-  id bigint generated always as identity primary key,
-  solicitud_id uuid not null references solicitud_aprobacion(id), paso smallint not null,
-  usuario_id uuid not null references usuario(id),
-  decision text not null check (decision in ('aprobada','rechazada')), comentario text,
-  created_at timestamptz not null default now()
-);
-create table delegacion_aprobacion (        -- sustituto durante una ausencia, con vigencia
-  usuario_id uuid not null references usuario(id), sustituto_id uuid not null references usuario(id),
-  desde date not null, hasta date not null
-);
+flujo_definicion (objeto_tipo unique, nombre, activo)                 -- qué objeto se aprueba; no se borra, se inactiva
+flujo_paso (definicion_id, orden, rol_aprobador,
+            condicion_campo, condicion_operador, condicion_valor,       -- p. ej. monto_usd > 5000; nulo = siempre
+            distinto_del_creador, horas_para_escalar, escalar_a_rol)
+solicitud_aprobacion (objeto_tipo, objeto_id, estado, contexto jsonb,
+                      pasos jsonb,                                      -- COPIA de los pasos que aplican al crearla
+                      paso_actual, solicitante_id, paso_desde, resuelta_at)
+aprobacion_decision (solicitud_id, paso, usuario_id, en_nombre_de,      -- en_nombre_de: quien delegó
+                     decision, comentario, datos jsonb)                 -- datos: lo que aporta el aprobador (p. ej. crédito)
+delegacion_aprobacion (usuario_id, sustituto_id, desde, hasta)
 ```
 
 **Reglas**
-1. Un documento que exige aprobación pasa a `pendiente de aprobación` y crea su solicitud **en la misma transacción**. La decisión final cambia el estado del documento también en una sola transacción.
-2. **Umbrales y roles no se escriben en el código:** los define Gerencia en `flujo_paso`, con la matriz de la §4.3 como configuración inicial.
-3. **Segregación de funciones:** quien crea un documento no lo aprueba (`distinto_del_creador`), y el rol del aprobador se verifica contra la base, no solo en la interfaz.
-4. **Las restricciones y triggers de cada módulo se mantienen** como última barrera (por ejemplo, el cuadre y la aprobación del asiento manual). El motor decide *quién* aprueba; la base de datos sigue rechazando lo que no cumple.
-5. **Bandeja de aprobaciones** por usuario y rol, con historial. Un rechazo exige comentario y devuelve el documento a borrador.
-6. **Escalamiento y delegación:** si `horas_para_escalar` vence, la solicitud pasa al siguiente rol. Un sustituto registrado en `delegacion_aprobacion` puede aprobar durante su vigencia, sin saltarse la regla 3.
-7. Toda solicitud y decisión se registra en `audit_log`.
-8. **Migración interna:** las aprobaciones que hoy existen (clientes, proveedores y asientos manuales) pasan a este motor al iniciar la Fase 2, sin cambiar sus reglas ni sus triggers.
+1. Un documento que exige aprobación abre su solicitud **en la misma transacción** que lo crea (`solicitarAprobacion`, idempotente). La decisión final ejecuta lo que su módulo hace al aprobar o rechazar (un manejador registrado en `src/lib/flujo/objetos.ts`) también en una sola transacción: si el módulo falla, la decisión se revierte.
+2. **Umbrales y roles no se escriben en el código:** los define Gerencia en `flujo_paso` (pantalla Configuración → Definición de flujos), con la matriz de la §4.3 como configuración inicial. El dato de una condición viene en el `contexto` de la solicitud; si no viene, el paso aplica (ante la duda se exige la aprobación).
+3. **Copia de los pasos:** cambiar la definición no altera las solicitudes en curso; aplica a las nuevas.
+4. **Segregación de funciones, validada por la base de datos** (`fn_flujo_puede_decidir`, una sola regla que usan el trigger y la bandeja): el usuario tiene el rol del paso (o el de escalamiento si venció el plazo, o es sustituto de quien lo tiene), no es quien solicitó si el paso lo exige, y no decide dos pasos de la misma solicitud.
+5. **Un flujo conserva siempre un paso sin condición** y no se borra: así ningún objeto queda sin aprobador aunque se cambien los umbrales. Una definición inactiva no admite solicitudes.
+6. **La solicitud solo avanza registrando decisiones**: la base rechaza aprobar, borrar o editar una solicitud por otra vía. Las decisiones no se modifican ni se borran. Solo se cancela (p. ej. un borrador eliminado).
+7. **Las restricciones y triggers de cada módulo se mantienen** como última barrera (por ejemplo, el cuadre y la aprobación del asiento manual, o que aprueben clientes solo usuarios con rol Gerencia). Por eso, si se configura un rol distinto para un tipo ya existente, el módulo lo rechazará hasta que su regla se ajuste; el escalamiento a otro rol es pleno en los tipos nuevos.
+8. **Bandeja de aprobaciones** (`/aprobaciones`): lo que le toca decidir a cada usuario (por rol, escalamiento o delegación), sus solicitudes y sus decisiones recientes. La decisión se toma en la pantalla de cada registro, donde están los datos que se revisan. Un rechazo exige motivo.
+9. **Delegación:** cada usuario delega sus aprobaciones a un sustituto por un rango de fechas. La decisión queda registrada como tomada por el sustituto *en nombre de* quien delegó, y el módulo dueño registra como responsable a quien delegó. La segregación de funciones sigue aplicando.
+10. **Escalamiento sin procesos programados:** pasado `horas_para_escalar`, la solicitud aparece también al rol de escalamiento; no hay que esperar un trabajo nocturno.
+11. Toda solicitud, decisión y cambio de definición queda en `audit_log`.
+12. **Ya pasan por el motor** (con sus mismos roles y reglas): alta de cliente, alta de proveedor, cambio de datos sensibles de un proveedor, asiento manual y lote de metas. Los tipos de las fases siguientes (orden de compra, pago, nota de crédito comercial, ajuste de inventario, liquidación de comisiones, anulación) se registran al construir cada módulo.
 
 ---
 

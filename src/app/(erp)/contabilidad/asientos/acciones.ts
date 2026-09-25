@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
-import { autorizar } from '@/lib/auth/dal';
-import { aprobarAsiento, eliminarBorrador, guardarBorrador, type LineaManual } from '@/lib/contabilidad/manual';
+import { autorizar, autorizarSesion } from '@/lib/auth/dal';
+import { resolverAprobacion } from '@/lib/flujo/objetos';
+import { eliminarBorrador, guardarBorrador, type LineaManual } from '@/lib/contabilidad/manual';
 import { conUsuario } from '@/lib/db';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,10 +61,10 @@ export async function eliminarAsiento(_: EstadoAccion, fd: FormData): Promise<Es
 
 export async function aprobarAsientoManual(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {
-    const u = await autorizar('jefe_contabilidad');
+    const u = await autorizarSesion(); // quién puede aprobar lo decide el motor de aprobaciones (§4.5)
     const id = texto(fd, 'id');
     if (!UUID.test(id)) return { error: 'Asiento inválido.' };
-    const numero = await conUsuario(u.id, (tx) => aprobarAsiento(tx, id, u.id, texto(fd, 'huella')));
+    const { resultado: numero } = await conUsuario(u.id, (tx) => resolverAprobacion(tx, 'asiento_manual', id, u.id, 'aprobada', { datos: { huella: texto(fd, 'huella') } }));
     revalidatePath('/contabilidad/asientos');
     revalidatePath(`/contabilidad/asientos/${id}`);
     revalidatePath('/contabilidad/balance');

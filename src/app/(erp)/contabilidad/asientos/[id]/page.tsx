@@ -4,6 +4,7 @@ import { BotonEnviar, Formulario } from '@/components/formulario';
 import { Aviso, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { huellaAsiento } from '@/lib/contabilidad/manual';
+import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { getDb } from '@/lib/db';
 import { fecha, fechaHora, monto, tasa } from '@/lib/formato';
 import { aprobarAsientoManual, eliminarAsiento } from '../acciones';
@@ -51,7 +52,7 @@ export default async function AsientoPage({ params }: { params: Promise<{ id: st
   const borradorManual = a.tipo === 'manual' && a.estado === 'borrador';
   const esCreador = a.created_by === u.id;
   const puedeEditar = borradorManual && esCreador && tieneRol(u, ['contabilidad']);
-  const puedeAprobar = borradorManual && !esCreador && tieneRol(u, ['jefe_contabilidad']);
+  const puedeAprobar = borradorManual && (await puedeDecidirObjeto(db, u.id, 'asiento_manual', id));
   const huella = puedeAprobar ? await huellaAsiento(db, id) : '';
 
   return (
