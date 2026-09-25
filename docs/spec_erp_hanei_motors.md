@@ -4,7 +4,7 @@
 >
 > **Proyecto separado.** El ERP tiene **su propio repositorio, su propia base de datos, sus propios usuarios y su propio despliegue**. No comparte código, tablas, credenciales ni procesos con el dashboard de ventas actual, con su base PostgreSQL/Supabase, con el sistema DBF ni con los archivos `.txt` exportados. **No hay migración de datos:** la base de datos arranca vacía y se llena con la operación diaria (ventas, compras, cobros, pagos, gastos) desde la fecha de arranque (§14).
 >
-> **Documentos relacionados.** Reportes e indicadores (réplica del dashboard) en [`spec_reportes.md`](spec_reportes.md); reglas de desarrollo en [`../AGENTS.md`](../AGENTS.md); registro de decisiones de la §16 en [`decisiones.md`](decisiones.md).
+> **Documentos relacionados.** Reportes e indicadores (réplica del dashboard) en [`spec_reportes.md`](spec_reportes.md); reglas de desarrollo en [`../AGENTS.md`](../AGENTS.md); registro de decisiones de la §16 en [`decisiones.md`](decisiones.md); mapa de módulos estilo SAP en [`estructura_modulos.md`](estructura_modulos.md).
 >
 > **Cómo usarlo.** Construye en el orden de la §13 (Hoja de ruta). Cada módulo trae entidades, procesos, reglas de negocio, asientos contables y criterios de aceptación. Las tasas fiscales y los porcentajes **nunca se escriben en el código**: van en tablas de parámetros (§4.2). Usa la versión estable más reciente del framework elegido y consulta su documentación oficial antes de escribir código.
 >
@@ -154,7 +154,7 @@ La auditoría del dashboard actual (septiembre de 2026) encontró errores que no
 ```mermaid
 flowchart TB
   subgraph UI["Aplicación web del ERP (repositorio nuevo)"]
-    ERPUI["Operación: maestros, ventas, compras,\ninventario, tesorería, contabilidad"]
+    ERPUI["Operación: ventas y logística, compras,\ninventario, producción, CRM, tesorería, contabilidad"]
     REPUI["Reportes, indicadores y\nestados financieros"]
     B2B["Portal de clientes\n(fase futura, opcional)"]
   end
@@ -175,7 +175,7 @@ flowchart TB
 ```
 
 - **Proyecto nuevo e independiente:** repositorio, base de datos, usuarios, credenciales y despliegue propios. Ningún proceso lee ni escribe en los sistemas actuales (dashboard, Supabase, DBF, `.txt`).
-- **Monolito modular:** una sola aplicación organizada por módulos (maestros, ventas, compras, inventario, tesorería, contabilidad, fiscal, reportes), más fácil de mantener que microservicios para el tamaño de la empresa.
+- **Monolito modular:** una sola aplicación organizada por los módulos de la §4.4 (SD, MM, PP, FI, TR, CO, CR, FX, BI, BC), más fácil de mantener que microservicios para el tamaño de la empresa.
 - **Stack sugerido:** aplicación web en TypeScript (por ejemplo Next.js, en su versión estable más reciente) y **PostgreSQL** en una instancia nueva, administrada o propia. Las reglas de integridad (cuadre del asiento, periodo cerrado, numeración, montos no negativos) van en **restricciones y triggers**, además de la validación en la aplicación.
 - **Migraciones de esquema versionadas** (herramienta de migraciones del stack) desde el primer día: la base de datos se crea solo con scripts del repositorio, nunca a mano.
 - Todas las escrituras de un documento (documento, líneas, movimientos de inventario, asiento y partidas abiertas) ocurren en **una sola transacción**.
@@ -184,7 +184,7 @@ flowchart TB
 ### 4.2 Configuración general
 | Entidad | Contenido |
 |---|---|
-| `empresa` | RIF, razón social, domicilio fiscal, si es contribuyente especial, si es agente de retención de IVA, ISLR o IGTF |
+| `empresa` | RIF, razón social, domicilio fiscal y la **condición fiscal configurable** (§11.0): si es contribuyente especial y si es agente de retención de IVA, de retención de ISLR o de percepción de IGTF |
 | `sucursal` | Barquisimeto, Caracas…; series de numeración propias |
 | `moneda`, `tasa_cambio` | VES, USD (y EUR, USDT si se aceptan); tasa diaria por fuente |
 | `parametro_fiscal` | Alícuotas, porcentajes y UT con vigencia (§11) |
@@ -232,6 +232,76 @@ create table audit_log (
   antes jsonb, despues jsonb, ip inet, created_at timestamptz not null default now()
 );
 ```
+
+### 4.4 Estructura de módulos (estilo SAP)
+La aplicación se organiza en módulos con código de dos letras. La navegación sale de un único mapa (`src/lib/modulos.ts`) y el detalle está en [estructura_modulos.md](estructura_modulos.md).
+
+| Código | Módulo | Contenido | Sección |
+|---|---|---|---|
+| **SD** | Ventas y Distribución | Clientes, vendedores, pedidos, entrega, picking, transporte, facturación, NC/ND, devoluciones | §5, §6 |
+| **MM** | Gestión de Materiales | Productos, almacenes, proveedores, compras, inventario y costo | §5, §7, §8 |
+| **PP** | Producción | Órdenes de producción o ensamblaje simples | §8.4 |
+| **FI** | Contabilidad Financiera | Mayor, periodos, CxC, CxP, activos fijos, estados financieros | §12 |
+| **TR** | Tesorería y Bancos | Bancos, cuentas, gastos, caja chica y conciliación | §10 |
+| **CO** | Control de Gestión | Metas y comisiones | §9 |
+| **CR** | CRM y Postventa | Prospectos, contactos, oportunidades, actividades y casos | §6.5 |
+| **FX** | Fiscal Venezuela | Condición fiscal, libros, retenciones e IGTF | §11 |
+| **BI** | Reportes y Analítica | Reportes M1–M6 y analítica avanzada | `spec_reportes.md` |
+| **BC** | Administración del Sistema | Empresa, usuarios, tasas, auditoría y flujo de trabajo | §4.2, §4.3, §4.5 |
+
+Los datos maestros viven en el módulo dueño (clientes y vendedores en SD; productos, almacenes y proveedores en MM). Los módulos generan asientos solo mediante el motor de reglas contables (§12.3).
+
+### 4.5 Flujo de trabajo y aprobaciones (BC)
+En SAP el flujo de trabajo es un componente transversal de Basis. Aquí es un **motor único** que reemplaza la lógica de aprobación propia de cada módulo, para que las reglas de la matriz de la §4.3 sean **datos y no código**.
+
+**Modelo**
+```sql
+create table flujo_definicion (            -- qué objeto se aprueba y cuándo
+  id uuid primary key default gen_random_uuid(),
+  objeto_tipo text not null,               -- 'cliente','proveedor','asiento_manual','descuento','nota_credito','pedido_credito',
+                                           -- 'orden_compra','pago','gasto','ajuste_inventario','liquidacion_comision','anulacion'
+  nombre text not null, activo boolean not null default true
+);
+create table flujo_paso (                  -- pasos en orden; cada uno con su condición y su rol
+  id uuid primary key default gen_random_uuid(),
+  definicion_id uuid not null references flujo_definicion(id),
+  orden smallint not null,
+  condicion_campo text, condicion_operador text, condicion_valor numeric(16,2),   -- p. ej. monto_usd > umbral; nulo = siempre
+  rol_aprobador text not null references rol(codigo),
+  distinto_del_creador boolean not null default true,
+  horas_para_escalar int,                  -- parámetro; nulo = no escala
+  unique (definicion_id, orden)
+);
+create table solicitud_aprobacion (
+  id uuid primary key default gen_random_uuid(),
+  objeto_tipo text not null, objeto_id uuid not null,
+  estado text not null default 'pendiente' check (estado in ('pendiente','aprobada','rechazada','cancelada')),
+  paso_actual smallint not null, solicitante_id uuid not null references usuario(id),
+  created_at timestamptz not null default now(), resuelta_at timestamptz
+);
+create unique index solicitud_pendiente_unica on solicitud_aprobacion (objeto_tipo, objeto_id) where estado = 'pendiente';
+create table aprobacion_decision (
+  id bigint generated always as identity primary key,
+  solicitud_id uuid not null references solicitud_aprobacion(id), paso smallint not null,
+  usuario_id uuid not null references usuario(id),
+  decision text not null check (decision in ('aprobada','rechazada')), comentario text,
+  created_at timestamptz not null default now()
+);
+create table delegacion_aprobacion (        -- sustituto durante una ausencia, con vigencia
+  usuario_id uuid not null references usuario(id), sustituto_id uuid not null references usuario(id),
+  desde date not null, hasta date not null
+);
+```
+
+**Reglas**
+1. Un documento que exige aprobación pasa a `pendiente de aprobación` y crea su solicitud **en la misma transacción**. La decisión final cambia el estado del documento también en una sola transacción.
+2. **Umbrales y roles no se escriben en el código:** los define Gerencia en `flujo_paso`, con la matriz de la §4.3 como configuración inicial.
+3. **Segregación de funciones:** quien crea un documento no lo aprueba (`distinto_del_creador`), y el rol del aprobador se verifica contra la base, no solo en la interfaz.
+4. **Las restricciones y triggers de cada módulo se mantienen** como última barrera (por ejemplo, el cuadre y la aprobación del asiento manual). El motor decide *quién* aprueba; la base de datos sigue rechazando lo que no cumple.
+5. **Bandeja de aprobaciones** por usuario y rol, con historial. Un rechazo exige comentario y devuelve el documento a borrador.
+6. **Escalamiento y delegación:** si `horas_para_escalar` vence, la solicitud pasa al siguiente rol. Un sustituto registrado en `delegacion_aprobacion` puede aprobar durante su vigencia, sin saltarse la regla 3.
+7. Toda solicitud y decisión se registra en `audit_log`.
+8. **Migración interna:** las aprobaciones que hoy existen (clientes, proveedores y asientos manuales) pasan a este motor al iniciar la Fase 2, sin cambiar sus reglas ni sus triggers.
 
 ---
 
@@ -363,8 +433,10 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 ```mermaid
 flowchart LR
   COT[Cotización] --> PED[Pedido\n(vendedor o mostrador)]
-  PED -->|aprobación de crédito| NE[Nota de entrega /\ndespacho]
-  NE --> FAC[Factura\n(número de control)]
+  PED -->|aprobación de crédito| NE[Nota de entrega]
+  NE --> PIC[Picking y empaque]
+  PIC --> TRA[Transporte y despacho]
+  TRA --> FAC[Factura\n(número de control)]
   FAC --> CXC[Partida CxC]
   CXC --> COB[Cobro + aplicación]
   COB --> RET[Retención IVA recibida]
@@ -508,6 +580,108 @@ create table aplicacion_cobro (
 - No se puede emitir una factura fiscal sin número de control, salvo en contingencia registrada.
 - Una factura anulada no aparece en ventas, en comisiones ni en los libros como venta, pero sí en el libro de ventas como **anulada** (§11.4).
 
+### 6.4 Logística de salida: picking, empaque y transporte
+Pertenece a SD (en SAP es la ejecución de entregas). Se activa por almacén: en el mostrador, el picking y el transporte pueden omitirse con un parámetro del almacén.
+
+**Picking y empaque**
+```sql
+create table orden_picking (
+  id uuid primary key default gen_random_uuid(),
+  nota_entrega_id uuid not null references documento_venta(id),
+  almacen_id uuid not null references almacen(id),
+  estado text not null default 'pendiente' check (estado in ('pendiente','asignada','en_proceso','completa','con_faltante','cancelada')),
+  prioridad smallint not null default 3,
+  asignada_a uuid references usuario(id),
+  creada_at timestamptz not null default now(),
+  asignada_at timestamptz, iniciada_at timestamptz, finalizada_at timestamptz,
+  empacada_at timestamptz
+);
+create table orden_picking_linea (
+  id uuid primary key default gen_random_uuid(),
+  orden_id uuid not null references orden_picking(id),
+  producto_id uuid not null references producto(id),
+  cantidad_pedida numeric(14,3) not null, cantidad_recogida numeric(14,3) not null default 0,
+  motivo_faltante text
+);
+```
+- **Tiempos de picking** (se calculan a partir de las marcas de hora, nunca se digitan): *espera* = inicio − creación; *picking* = fin − inicio; *ciclo total* = empaque − creación; *líneas por hora* = líneas recogidas ÷ tiempo de picking.
+- **Tiempo objetivo:** cada almacén tiene un parámetro de horas objetivo por prioridad. Su cumplimiento es un indicador; el valor no se escribe en el código.
+- Un faltante registra la **demanda no atendida** (§6.1) y deja la orden en `con_faltante` hasta que Gerencia o el supervisor decidan despachar parcial o esperar.
+- El descuento de existencia y el costo de venta se registran al **confirmar la salida de mercancía** (§8), no al crear el picking.
+- El almacenista solo ve las órdenes de sus almacenes (`usuario_almacen`).
+
+**Transporte y despacho**
+```sql
+create table transportista (id uuid primary key default gen_random_uuid(), tercero_id uuid references tercero(id), propio boolean not null default false, activo boolean not null default true);
+create table vehiculo (id uuid primary key default gen_random_uuid(), transportista_id uuid not null references transportista(id), placa text not null unique, capacidad_kg numeric(10,2), activo boolean not null default true);
+create table transporte (
+  id uuid primary key default gen_random_uuid(),
+  serie varchar(4) not null, numero bigint not null,                   -- numeración correlativa (§3.5)
+  estado text not null default 'planificado' check (estado in ('planificado','cargado','en_ruta','entregado','cerrado','anulado')),
+  transportista_id uuid not null references transportista(id), vehiculo_id uuid references vehiculo(id), chofer text,
+  fecha_programada date not null,
+  salida_at timestamptz, cierre_at timestamptz,
+  flete_usd numeric(14,2) not null default 0,
+  unique (serie, numero)
+);
+create table transporte_parada (
+  id uuid primary key default gen_random_uuid(),
+  transporte_id uuid not null references transporte(id),
+  nota_entrega_id uuid not null references documento_venta(id),
+  orden smallint not null, llegada_at timestamptz, entregada_at timestamptz,
+  recibido_por text, incidencia text
+);
+```
+- **Crear transporte:** Almacén agrupa las notas de entrega con picking completo, asigna transportista, vehículo, chofer y orden de paradas. Una nota de entrega solo puede estar en un transporte activo.
+- **Constancia de entrega:** cada parada admite un adjunto (§4.2) con la nota firmada.
+- **Flete:** el costo del transporte se registra como gasto de venta (§12.1, cuenta 6.1) mediante el motor contable, con el `flete_usd` del transporte cerrado.
+- **Indicadores:** cumplimiento de la fecha programada, tiempo de tránsito y entregas con incidencia.
+- **Validar con el asesor tributario** qué documento debe acompañar la mercancía durante el traslado (guía de despacho o la propia factura o nota de entrega).
+
+### 6.5 CRM y postventa (módulo CR)
+Amplía la relación con el cliente antes y después de la venta. Usa los terceros y clientes de la §5.1 y no duplica sus datos.
+
+```sql
+create table contacto (
+  id uuid primary key default gen_random_uuid(),
+  tercero_id uuid not null references tercero(id),
+  nombre text not null, cargo text, telefono text, correo text, principal boolean not null default false, activo boolean not null default true
+);
+create table oportunidad (
+  id uuid primary key default gen_random_uuid(),
+  tercero_id uuid not null references tercero(id),          -- prospecto o cliente
+  vendedor_id uuid not null references vendedor(id),
+  etapa text not null default 'prospecto' check (etapa in ('prospecto','calificada','cotizada','negociacion','ganada','perdida')),
+  monto_estimado_usd numeric(14,2) not null default 0,
+  cierre_estimado date, motivo_perdida text,
+  cotizacion_id uuid references documento_venta(id),        -- se enlaza al cotizar
+  created_at timestamptz not null default now(), cerrada_at timestamptz
+);
+create table actividad_crm (
+  id uuid primary key default gen_random_uuid(),
+  tercero_id uuid not null references tercero(id), oportunidad_id uuid references oportunidad(id),
+  tipo text not null check (tipo in ('visita','llamada','mensaje','correo','tarea')),
+  usuario_id uuid not null references usuario(id),
+  fecha timestamptz not null, resultado text, proxima_accion text, proxima_fecha date
+);
+create table caso_postventa (
+  id uuid primary key default gen_random_uuid(),
+  tercero_id uuid not null references tercero(id), documento_venta_id uuid references documento_venta(id),
+  tipo text not null check (tipo in ('reclamo','garantia','devolucion','consulta')),
+  estado text not null default 'abierto' check (estado in ('abierto','en_analisis','resuelto','cerrado')),
+  responsable_id uuid references usuario(id), descripcion text not null, causa text, solucion text,
+  abierto_at timestamptz not null default now(), resuelto_at timestamptz
+);
+```
+**Reglas**
+1. Un **prospecto** es un tercero que aún no es cliente. Al ganar la primera oportunidad se convierte en cliente por el mismo proceso de alta con aprobación de Gerencia (§5.5). No se puede pedir ni facturar a un prospecto.
+2. Las **etapas** de una oportunidad avanzan una a una; pasar a `cotizada` exige enlazar una cotización, y `ganada` genera el pedido desde ella. `perdida` exige motivo.
+3. Las **probabilidades por etapa** (para el pronóstico del embudo) son parámetros editables, no valores fijos en el código.
+4. **Un vendedor ve solo sus prospectos, oportunidades y actividades** (seguridad por fila); el supervisor ve las de su equipo.
+5. Un caso de tipo `devolucion` no mueve inventario: origina la **NC por devolución** de la §6.2, con su aprobación del supervisor.
+6. **Indicadores:** embudo por etapa, tasa de conversión, valor ponderado del embudo, actividades por vendedor, clientes sin contacto en N días (parámetro), y tiempo de resolución de casos.
+7. Los datos de contacto son personales: no van en URLs ni en registros de error (AGENTS.md §6).
+
 ---
 
 ## 7. Compras: de la orden al pago (Procure-to-Pay)
@@ -585,7 +759,7 @@ create table existencia (                   -- saldo por producto y almacén; se
 Ningún movimiento se registra a mano: cada uno lo genera un documento (recepción, nota de entrega, factura, NC, transferencia, ajuste aprobado, conteo inicial). El tipo `apertura` se usa solo para el conteo físico del día de arranque (§14).
 
 ### 8.2 Método de costo
-- **Costo promedio ponderado móvil (perpetuo)** en USD, por producto (o por producto y sucursal, ver §16).
+- **Costo promedio ponderado móvil (perpetuo)** en USD, **uno por producto para toda la empresa** (decisión 5, tomada).
   - Cada entrada recalcula: *(valor existente + valor de la entrada) ÷ (cantidad existente + cantidad de la entrada)*.
   - Cada salida se valoriza al promedio vigente.
   - Es el método más usado en distribución y el que mejor absorbe los gastos de importación prorrateados.
@@ -596,7 +770,14 @@ Ningún movimiento se registra a mano: cada uno lo genera un documento (recepci�
 - **Transferencias** entre almacenes o sucursales con estado en tránsito.
 - **Toma física** por ciclos (clase ABC), con congelamiento del conteo y ajuste aprobado. Los faltantes y sobrantes van a una cuenta de gasto específica.
 - **Reservas** por pedido aprobado, **punto de reorden** y **sugerido de compra**. El sugerido usa la velocidad de venta ajustada por los días con existencia, la cobertura deseada y lo pendiente en tránsito y en producción, todo calculado con los movimientos registrados en el ERP.
-- **Órdenes de producción o ensamblaje:** consumo de componentes → entrada del producto terminado al costo de los consumos.
+- **Órdenes de producción o ensamblaje:** ver §8.4.
+
+### 8.4 Producción o ensamblaje (módulo PP)
+Se adopta el alcance de **órdenes simples** (decisión 12). No hay listas de materiales ni planificación de capacidad.
+- La orden indica el producto terminado, la cantidad, el almacén y los componentes con su cantidad. Estados: `borrador`, `liberada`, `en_proceso`, `terminada`, `anulada`.
+- Al terminar: salida de los componentes al costo promedio vigente y entrada del producto terminado a la suma de esos costos (más mano de obra o gastos si Gerencia los asigna). Todo en una sola transacción y con su asiento del motor contable.
+- No se consume más de la existencia disponible ni se termina una orden sin todos sus componentes.
+- Si el negocio llega a requerir listas de materiales, se agrega como ampliación y se actualiza esta sección.
 
 ---
 
@@ -696,15 +877,29 @@ create table liquidacion_comision (
 
 > Todo lo de esta sección es **parametrizable con vigencia** y debe validarlo el asesor tributario. Las providencias citadas vienen de la investigación a septiembre de 2026 (§17).
 
+### 11.0 Condición fiscal configurable
+La condición fiscal de la empresa **no es una decisión del código: es configuración**. Vive en `empresa` (§4.2) y la edita el Administrador, con registro en `audit_log`:
+
+| Campo | Efecto en el sistema |
+|---|---|
+| `contribuyente_especial` | Activa el calendario de declaraciones por quincena y las obligaciones de contribuyente especial (§11.4) |
+| `agente_retencion_iva` | Al pagar a un proveedor se calcula la retención de IVA y se emite su comprobante; si no, esas pantallas y asientos no se activan |
+| `agente_retencion_islr` | Al pagar se calcula la retención de ISLR según el concepto del proveedor y se genera el comprobante |
+| `agente_percepcion_igtf` | Al cobrar en divisas se percibe el IGTF (§11.3); si no, el IGTF no se cobra al cliente |
+
+- **Toda regla fiscal consulta estos campos** (los servicios y las reglas contables de la §12.3); ninguna lo da por supuesto.
+- Un cambio de condición fiscal **aplica hacia adelante**: los documentos ya emitidos conservan la condición con que se emitieron.
+- Cada documento emitido guarda si se aplicó retención o percepción, para poder reconstruir el libro y el asiento.
+
 ### 11.1 Emisión de documentos fiscales
 - **Facturación digital:** la Providencia SNAT/2024/000102 (G.O. 43.032, 19-12-2024) regula la emisión por medios digitales. Es obligatoria para quienes venden exclusivamente por medios electrónicos y para contribuyentes con máquina fiscal que también operan en línea. En los demás casos es optativa.
   - Exige una **imprenta digital autorizada** que asigne el **número de control**, único y consecutivo (Providencia SNAT/2024/000121).
   - La factura debe llevar la fecha y hora en formato `DDMMAAAA HH.MM.SS`.
   - Hay que conservar y dar acceso a las facturas por **10 años**.
   - Hay que tener un **procedimiento de contingencia**: documentos con la marca "contingencia" que se registran después.
-- **Máquina fiscal o formas libres:** Providencia 0071, como alternativa si se sigue facturando en tienda.
+- **Decisión 4 (tomada):** el ERP emite por **imprenta digital**. La máquina fiscal (Providencia 0071) queda fuera del alcance; el adaptador se diseña con una interfaz que permitiría agregarla después.
 - **Diseño del ERP:**
-  - Un adaptador `ServicioNumeroControl` con dos implementaciones: imprenta digital (API) y máquina fiscal.
+  - Un adaptador `ServicioNumeroControl` con la implementación de imprenta digital (API), detrás de una interfaz.
   - El número de control se guarda en el documento y nunca se reutiliza.
   - La factura en PDF se genera con todos los campos obligatorios: denominación "Factura", número, número de control, datos y RIF del emisor y del adquiriente, fecha y hora, descripción, base e IVA por alícuota, IGTF por separado y datos de la imprenta.
 - **Facturas en divisas:** muestran el monto en la moneda de la operación y su equivalente en Bs a la tasa BCV del día. Así lo hace hoy la práctica del mercado; hay que confirmarlo con el asesor.
@@ -868,6 +1063,11 @@ Las reglas viven en una tabla `regla_contable` (evento, condición, cuenta del d
 | Pago de comisiones | Comisiones por pagar | Banco · Retenciones de ISLR por enterar |
 | Ajuste de inventario negativo o positivo | Faltantes de inventario / Inventario | Inventario / Sobrantes |
 | Revaluación de partidas en divisas al cierre (si la política lo exige) | Partidas en divisas o diferencial | Diferencial o partidas en divisas |
+| Terminar orden de producción | Inventario (producto terminado) | Inventario (componentes) |
+| Flete de transporte cerrado | Gastos de venta: fletes | CxP (transportista) o Banco |
+| Adquisición de activo fijo | Activo fijo (según categoría) · IVA crédito fiscal | CxP proveedores |
+| Depreciación mensual | Gasto de depreciación | Depreciación acumulada |
+| Baja o venta de activo fijo | Depreciación acumulada · Pérdida por baja (o Banco / CxC) | Activo fijo · Ganancia por venta |
 | Cierre del ejercicio | Cuentas de ingreso | Cuentas de costo y gasto · Resultado del ejercicio |
 
 ### 12.4 Cierre mensual (checklist del sistema)
@@ -914,6 +1114,14 @@ Todos se generan **desde el mayor**, por periodo y comparativos, en **VES (legal
 
 **Reexpresión por inflación:** la BA VEN-NIF 2 regula el ajuste por inflación en entornos hiperinflacionarios. Si aplica o no a la empresa en cada ejercicio es una **decisión del contador** (§16). El modelo lo soporta mediante asientos de ajuste por periodo con INPC parametrizado.
 
+### 12.6 Activos fijos (FI-AA)
+- `activo_fijo`: código único, categoría (con su cuenta de activo, de depreciación acumulada y de gasto), fecha de adquisición, costo en VES y USD, vida útil en meses, valor residual, método (línea recta), estado (`activo`, `depreciado`, `dado_de_baja`) y ubicación o responsable.
+- **Depreciación mensual** calculada por el sistema en el cierre (§12.4) y contabilizada por el motor. Un activo no se deprecia por debajo de su valor residual ni en periodos cerrados.
+- **Alta** desde una factura de compra marcada como activo fijo, o desde el asiento de apertura (§14.3) con su depreciación acumulada al día de arranque.
+- **Baja o venta:** documento con aprobación (§4.5); depreciación hasta la fecha y asiento de ganancia o pérdida.
+- Cuadre: el auxiliar de activos (costo y depreciación acumulada) debe cuadrar con las cuentas del mayor.
+- Los métodos de depreciación fiscal y la vida útil por categoría los define el contador (§16).
+
 ---
 
 ## 13. Hoja de ruta por fases
@@ -924,12 +1132,12 @@ El ERP se construye y se prueba en un **entorno de pruebas** con datos de prueba
 |---|---|---|
 | **0. Fundaciones** | Repositorio nuevo, integración continua, migraciones de esquema versionadas. Usuarios, roles y auditoría. Sucursales, monedas y proceso diario de tasa BCV. Parámetros fiscales con vigencia, numeradores, plan de cuentas, periodos, mayor con triggers de integridad y motor de reglas contables | La base se crea desde cero solo con scripts. Un asiento que no cuadra se rechaza en la base de datos. No se puede contabilizar en un periodo cerrado. Todas las rutas exigen sesión |
 | **1. Maestros** | Terceros, clientes, proveedores, vendedores, productos, referencias cruzadas, listas de precio, almacenes, bancos, metas y adjuntos, con validaciones de alta (RIF, duplicados, aprobación de crédito) | No se puede crear un tercero con RIF inválido o repetido. Ningún código duplicado. Un maestro con movimientos no se puede borrar |
-| **2. Ventas, CxC, inventario y emisión fiscal** | Pedido, nota de entrega, factura con **número de control** (imprenta digital o máquina fiscal) y contingencia, NC/ND, cobros y aplicaciones, retenciones recibidas, pronto pago, movimientos de inventario, costo promedio y existencias | Auxiliar de CxC = mayor. Existencias = mayor de inventario. Asientos automáticos probados por regla (§12.3). Factura fiscal válida de punta a punta en el entorno de pruebas del proveedor de imprenta |
-| **3. Compras, CxP, gastos y tesorería** | Orden de compra, recepción, factura con conciliación a tres vías, importaciones y costo en destino, pagos, IGTF, gastos y caja chica, cuentas bancarias y conciliación | Auxiliar de CxP = mayor. Una factura fuera de tolerancia no se puede pagar. Conciliación bancaria de prueba cerrada sin diferencias |
+| **2. Ventas, logística, CxC, inventario y emisión fiscal** | Flujo de trabajo y aprobaciones (§4.5) con migración de las aprobaciones existentes, pedido, nota de entrega, picking con tiempos y transporte (§6.4), factura con **número de control** (imprenta digital o máquina fiscal) y contingencia, NC/ND, cobros y aplicaciones, retenciones recibidas, pronto pago, movimientos de inventario, costo promedio y existencias | Auxiliar de CxC = mayor. Existencias = mayor de inventario. Asientos automáticos probados por regla (§12.3). Factura fiscal válida de punta a punta en el entorno de pruebas del proveedor de imprenta |
+| **3. Compras, CxP, gastos, tesorería y producción** | Orden de compra, órdenes de producción simples (§8.4), recepción, factura con conciliación a tres vías, importaciones y costo en destino, pagos, IGTF, gastos y caja chica, cuentas bancarias y conciliación | Auxiliar de CxP = mayor. Una factura fuera de tolerancia no se puede pagar. Conciliación bancaria de prueba cerrada sin diferencias |
 | **4. Fiscal** | Libros de compras y ventas, comprobantes y declaraciones de retención de IVA e ISLR, IGTF | Libros de un mes de prueba validados por el contador. Comprobantes con formato y numeración correctos |
 | **5. Arranque en producción** | Configuración del día 0, registro de saldos iniciales como operaciones (§14), capacitación por rol y acompañamiento de la primera semana | Checklist de §14.6 completo y firmado por Gerencia y el contador |
-| **6. Comisiones, estados financieros y reportes** | Planes de comisión, devengo, reversión y liquidación. Estados financieros completos, cierre mensual e indicadores comerciales (§12.5). Puede entregarse durante el primer mes de operación, porque trabaja sobre los datos ya registrados | Primer cierre mensual completo en el ERP, con estados financieros revisados por el contador |
-| **7. Portal de clientes (opcional)** | Pedidos y envío de comprobantes de pago por parte de los clientes, con acceso limitado a sus propios documentos | Un cliente no puede ver datos de otro (prueba de seguridad por fila) |
+| **6. Comisiones, estados financieros y reportes** | Planes de comisión, devengo, reversión y liquidación. Activos fijos y depreciación (§12.6). Estados financieros completos, cierre mensual e indicadores comerciales (§12.5). Puede entregarse durante el primer mes de operación, porque trabaja sobre los datos ya registrados | Primer cierre mensual completo en el ERP, con estados financieros revisados por el contador |
+| **7. CRM y portal de clientes (portal opcional)** | CRM y postventa (§6.5): prospectos, contactos, oportunidades, actividades y casos. Portal: pedidos y envío de comprobantes de pago por parte de los clientes, con acceso limitado a sus propios documentos | Un vendedor no ve el CRM de otro y un prospecto no puede facturarse. Un cliente no puede ver datos de otro (prueba de seguridad por fila) |
 | **8. Analítica avanzada** | Cuando haya al menos 12 meses de operación: pronóstico de ventas por producto de marca y por código común, conciliado entre ambos niveles; elasticidad de precio por segmento (categoría, marca, línea de calidad, lista); efecto de cada promoción frente a la venta esperada sin ella; calendario de feriados, quincenas y temporadas. Usa solo datos registrados en el ERP (código común, precio de lista y precio cobrado, promoción, costo, existencia diaria y demanda no atendida) | Cada modelo se valida contra meses reales que no usó para ajustarse, con su error publicado. Ningún pronóstico se muestra sin su margen de error. Sin historia suficiente, la pantalla lo dice y no muestra cifras |
 
 **Reportes:** los módulos de reportes que replican el dashboard se entregan a medida que existen sus datos: Metas en la Fase 1; Inicio, Clientes, Productos, Vendedores, Cobranzas y Devoluciones en la Fase 2; Inventario completo y kardex en la Fase 3. El detalle está en [spec_reportes.md §13](spec_reportes.md#13-entrega-por-fases-y-criterios-de-aceptación).
@@ -1017,16 +1225,19 @@ Estas decisiones cambian el diseño y deben tomarlas Gerencia y el contador **an
 
 1. **Política contable de moneda:** ¿libros legales solo en VES con USD como moneda de reporte (recomendado), o también libros auxiliares en USD? ¿Se revalúan las partidas en divisas al cierre de cada mes?
 2. **Tasa de referencia:** confirmar la BCV oficial para todo registro legal. Hoy `pagos_detalle` y `bancos_mov` traen tasas distintas para el mismo día (~330 contra 702 el 07-01-2026). Hay que decidir cómo se registra la tasa real de las compras y ventas de divisas.
-3. **Condición fiscal de la empresa:** ¿es contribuyente especial? Eso define si es agente de retención de IVA y de percepción de IGTF, y el calendario de declaraciones.
-4. **Facturación:** ¿imprenta digital (cuál proveedor autorizado) o máquina fiscal? ¿Se mantiene la dualidad de facturas fiscales en Bs y notas de entrega en USD, o todo pasa a factura fiscal en divisas con su equivalente en Bs?
-5. **Costo promedio:** ¿uno por producto para toda la empresa, o uno por producto y sucursal?
+3. ✅ **Condición fiscal de la empresa (decidida 25-09-2026):** es un conjunto de campos configurables en `empresa` y el sistema se comporta según ellos (§11.0). Falta que el asesor tributario confirme los valores con que se configura.
+4. ✅ **Facturación (decidida 25-09-2026):** imprenta digital (§11.1). Quedan abiertas la decisión 13 (proveedor) y la 14 (dualidad Bs/USD).
+5. ✅ **Costo promedio (decidida 25-09-2026):** ponderado móvil, uno por producto para toda la empresa (§8.2).
 6. **Comisiones:** base cobrada (recomendada) o facturada, tramos por meta, porcentaje por grupo o marca, penalización por días de cobro y política de reversión.
 7. **Reexpresión por inflación (BA VEN-NIF 2):** ¿aplica en el ejercicio?
 8. **Fecha de arranque:** se recomienda el primer día de un mes, para que el primer cierre contable y las primeras declaraciones queden completas en el ERP.
 9. **Numeración de facturas al arrancar:** ¿continúa la secuencia del sistema actual o empieza una serie nueva? Depende de la imprenta digital o la máquina fiscal y debe validarla el asesor tributario.
 10. **Creación del catálogo de productos:** durante el conteo inicial (recomendado) o con la plantilla de carga masiva del ERP llenada por el personal (§14.4).
 11. **Convivencia con el sistema actual:** arranque directo, registrando todo solo en el ERP desde el día 1 (recomendado), o un periodo corto de doble registro con fecha de fin fija.
-12. **Alcance de producción o ensamblaje:** ¿basta con órdenes simples o hacen falta listas de materiales?
+12. ✅ **Producción o ensamblaje (decidida 25-09-2026):** módulo PP con órdenes simples, sin listas de materiales (§8.4).
+13. **Proveedor de imprenta digital:** ¿cuál proveedor autorizado por el SENIAT? Define la integración y la numeración de control.
+14. **Dualidad de documentos:** ¿se mantienen facturas fiscales en Bs y notas de entrega en USD, o todo pasa a factura fiscal en divisas con su equivalente en Bs?
+15. **Activos fijos:** categorías, vida útil y método de depreciación fiscal y contable, definidos por el contador (§12.6).
 
 ---
 

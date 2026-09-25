@@ -38,6 +38,8 @@ export const MODULOS: Modulo[] = [
       { texto: 'Vendedores', href: '/maestros/vendedores', roles: ROLES_VEN_TODOS },
       { texto: 'Pedidos de venta', fase: 2 },
       { texto: 'Notas de entrega', fase: 2 },
+      { texto: 'Picking y empaque', fase: 2 },
+      { texto: 'Transportes y despachos', fase: 2 },
       { texto: 'Facturas de venta', fase: 2 },
       { texto: 'Notas de crédito y débito', fase: 2 },
       { texto: 'Devoluciones', fase: 2 },
@@ -60,6 +62,12 @@ export const MODULOS: Modulo[] = [
     ],
   },
   {
+    codigo: 'PP',
+    nombre: 'Producción',
+    descripcion: 'Órdenes de producción o ensamblaje simples, sin listas de materiales.',
+    items: [{ texto: 'Órdenes de producción', fase: 3 }],
+  },
+  {
     codigo: 'FI',
     nombre: 'Contabilidad Financiera',
     descripcion: 'Mayor general, periodos, auxiliares de cuentas por cobrar y por pagar, y estados financieros.',
@@ -70,6 +78,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Plan de cuentas', href: '/contabilidad/plan-de-cuentas', roles: CONTABLES },
       { texto: 'Cuentas por cobrar y cobros', fase: 2 },
       { texto: 'Cuentas por pagar y pagos', fase: 3 },
+      { texto: 'Activos fijos y depreciación', fase: 6 },
       { texto: 'Estados financieros', fase: 6 },
       { texto: 'Cierre mensual', fase: 6 },
     ],
@@ -96,9 +105,20 @@ export const MODULOS: Modulo[] = [
     ],
   },
   {
+    codigo: 'CR',
+    nombre: 'CRM y Postventa',
+    descripcion: 'Prospectos, contactos, oportunidades, actividades y casos de postventa.',
+    items: [
+      { texto: 'Prospectos y contactos', fase: 7 },
+      { texto: 'Oportunidades', fase: 7 },
+      { texto: 'Actividades y visitas', fase: 7 },
+      { texto: 'Casos de postventa', fase: 7 },
+    ],
+  },
+  {
     codigo: 'FX',
     nombre: 'Fiscal Venezuela',
-    descripcion: 'Parámetros fiscales, libros, retenciones de IVA e ISLR e IGTF.',
+    descripcion: 'Condición fiscal configurable, parámetros fiscales, libros, retenciones de IVA e ISLR e IGTF.',
     items: [
       { texto: 'Parámetros fiscales', href: '/configuracion/parametros-fiscales', roles: CONTABLES },
       { texto: 'Conceptos de ISLR', href: '/configuracion/conceptos-islr', roles: [...CONTABLES, 'compras'] },
@@ -125,11 +145,14 @@ export const MODULOS: Modulo[] = [
   {
     codigo: 'BC',
     nombre: 'Administración del Sistema',
-    descripcion: 'Empresa, usuarios y roles, tasas de cambio y auditoría.',
+    descripcion: 'Empresa y condición fiscal, usuarios y roles, tasas de cambio, auditoría y flujo de trabajo.',
     items: [
       { texto: 'Tasas de cambio', href: '/configuracion/tasas', roles: ['tesoreria', ...CONTABLES] },
       { texto: 'Empresa y sucursales', href: '/configuracion/empresa', roles: ['administrador'] },
       { texto: 'Usuarios y roles', href: '/configuracion/usuarios', roles: ['administrador'] },
+      { texto: 'Auditoría', fase: 1, roles: ['administrador', 'auditor', 'gerencia'] },
+      { texto: 'Bandeja de aprobaciones', fase: 2 },
+      { texto: 'Definición de flujos', fase: 2, roles: ['administrador', 'gerencia'] },
     ],
   },
 ];
