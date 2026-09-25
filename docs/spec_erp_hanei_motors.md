@@ -211,6 +211,7 @@ flowchart TB
 | Liquidación de comisiones | Sistema | Gerencia | …es el vendedor beneficiario |
 
 - **`audit_log`**: se escribe por trigger en las tablas críticas, con estado anterior y nuevo en `jsonb`.
+  - **Consulta** (Administrador, Auditor y Gerencia): pantalla de solo lectura en Configuración → Auditoría, del más reciente al más antiguo, con filtros por fecha, usuario, entidad, acción y registro (historial de un registro), y el detalle campo por campo de lo que cambió. Los filtros nunca son texto libre sobre el contenido, para que ningún dato personal viaje en la dirección de la página.
 
 ```sql
 create table usuario (

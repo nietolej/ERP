@@ -1,4 +1,5 @@
 import type { Rol } from '@/lib/auth/constantes';
+import { ROLES_VEN_AUDITORIA } from '@/lib/auditoria';
 import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
 import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
@@ -152,7 +153,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Tasas de cambio', href: '/configuracion/tasas', roles: ['tesoreria', ...CONTABLES] },
       { texto: 'Empresa y sucursales', href: '/configuracion/empresa', roles: ['administrador'] },
       { texto: 'Usuarios y roles', href: '/configuracion/usuarios', roles: ['administrador'] },
-      { texto: 'Auditoría', fase: 1, roles: ['administrador', 'auditor', 'gerencia'] },
+      { texto: 'Auditoría', href: '/configuracion/auditoria', roles: ROLES_VEN_AUDITORIA },
       { texto: 'Bandeja de aprobaciones', fase: 2 },
       { texto: 'Definición de flujos', fase: 2, roles: ['administrador', 'gerencia'] },
     ],
