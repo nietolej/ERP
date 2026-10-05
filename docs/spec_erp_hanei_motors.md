@@ -505,7 +505,24 @@ create table promocion (
 );
 ```
 
-- **Demanda no atendida:** cuando un pedido no se despacha completo por falta de existencia, la cantidad no despachada se registra (producto, cliente, fecha, cantidad). Junto con la existencia diaria por producto y almacén (§8), permite separar "no se vendió" de "no había", y es obligatoria para pronosticar bien.
+- **Demanda no atendida:** cuando un pedido no se despacha completo por falta de existencia, la cantidad no despachada se registra (producto, cliente, fecha, cantidad). Junto con la existencia diaria por producto y almacén (§8), permite separar "no se vendió" de "no había", y es obligatoria para pronosticar bien. **Implementado:** la tabla `demanda_no_atendida` se llena **una sola vez**, cuando el pedido se aprueba y reserva y no alcanzó la existencia; reservar después el saldo que llegó no la modifica ni la repite.
+
+**Motivos y datos para decidir (migración 0019, ver [catalogo_decisiones.md](catalogo_decisiones.md))**
+- Catálogo `motivo` (descuento, devolución, anulación, venta perdida, merma) que administra Gerencia; un motivo no se borra y los que usa el sistema no se desactivan.
+- **Descuento:** toda línea con descuento lleva motivo (la base lo exige). El descuento pactado con el cliente lleva el motivo automático `DESCUENTO_CLIENTE`; cualquier otro exige que quien vende elija uno.
+- **Anulación:** todo documento anulado guarda un motivo del catálogo (`anulado_motivo_id`) además de su detalle; "Otro" exige el detalle.
+- **Ventas perdidas:** `demanda_no_atendida` acepta registros manuales sin documento (precio, plazo, condición de pago) además de los que el sistema crea por falta de existencia; ambos llevan motivo.
+- **Historial de cartera:** `cliente_vendedor_historial` conserva qué vendedor tuvo cada cliente y desde cuándo (`fn_vendedor_de_cliente`).
+
+**Cómo quedó el pedido y la nota de entrega (migración 0017)**
+- Ambos son `documento_venta`; esta migración habilita solo los tipos `pedido` y `nota_entrega`. La factura, las NC y ND y la apertura se agregan con su propia migración.
+- Un borrador no tiene número (`numero` es nulo): el numerador lo asigna al emitir, así que los borradores eliminados no dejan huecos. Al emitir también se congelan la tasa BCV del día, la base, el IVA y los totales; el documento emitido no se edita ni se borra, solo se anula con motivo.
+- `situacion` (solo pedidos emitidos): `retenido_credito` espera la decisión de Gerencia por el flujo `pedido_credito`; `aprobado` ya reservó existencia.
+- Cada línea guarda la alícuota vigente (`alicuota_pct`). `promocion_id` y la tabla `promocion` se agregan cuando se construyan las promociones.
+- La nota de entrega se genera desde un pedido aprobado con **lo que hay reservado** y todavía no figura en otra nota; conserva precio, descuento e IVA del pedido y toma su propia tasa del día. Se anula mientras la mercancía no haya salido del almacén, y entonces la reserva vuelve al pedido.
+- Las reservas viven en `reserva_inventario` (estados `activa`, `en_nota`, `consumida`, `liberada`); `existencia.reservado` es su suma y no se edita a mano.
+- **Crédito:** solo se valida si la condición de pago del cliente tiene plazo (días > 0); un cliente de contado paga al entregar y no usa el límite. Lo comprometido es lo pendiente de entregar en pedidos aprobados más las notas de entrega vigentes; las cuentas por cobrar y la mora (días de mora máximos) se suman cuando exista `partida_cxc`.
+- Un pedido emitido que excede el límite queda retenido sin reservar; Gerencia (otra persona distinta de quien lo emitió) lo aprueba o lo rechaza con motivo, y al rechazar se anula.
 
 ### 6.2 Reglas de negocio
 1. **Precio:** según el nivel del cliente (A, B, D) y la lista vigente en la fecha. Un descuento por encima del máximo de su rol requiere aprobación.
@@ -520,6 +537,15 @@ create table promocion (
 
    Una NC nunca supera el saldo pendiente de la factura, salvo aprobación.
 8. **Anulación:** solo de documentos del periodo abierto y sin cobros aplicados. Revierte el asiento, el inventario y la partida abierta.
+
+**Cómo quedó la factura de venta (migración 0021)**
+- Va en **bolívares** (decisión 14). Se genera desde una o más notas de entrega **despachadas** de un mismo cliente: el precio en USD de cada línea se convierte a la tasa BCV del día de la factura (`round(precio USD × tasa, 4)`), y la base, el IVA y el total se calculan con las alícuotas vigentes **a la fecha de la factura** y se guardan. Una nota se factura completa y una sola vez (`documento_venta.factura_id`); el costo promedio que tenía la línea al despachar se conserva para el margen.
+- **Número de factura** correlativo y sin huecos (numerador `factura`, serie A). **Número de control:** se pide al servicio de imprenta con el número ya asignado. Si el servicio falla o no existe, la factura queda emitida en **contingencia** con su motivo y se le asigna el control después (es lo único que cambia en una factura emitida). La base exige control o contingencia con motivo.
+- **Imprenta (decisión 13 pendiente):** interfaz `ServicioNumeroControl` con un **simulador** (`00-00000001…`, sin validez fiscal) para desarrollo; en producción el simulador no existe y, sin proveedor real, las facturas van a contingencia. Los documentos con número simulado se marcan como PRUEBA en pantalla y en la vista de impresión.
+- Cada factura abre su `partida_cxc` (vencimiento = fecha + días de la condición de pago del cliente) y su asiento por el motor: **Debe** CxC comerciales (total), **Haber** Ventas de mercancía (base + exento) e IVA débito fiscal. El saldo de la partida solo cambia con un cobro, una nota de crédito o la anulación.
+- **Anular** (solo sin cobros ni notas de crédito aplicados): asiento inverso a la fecha de la factura (si su periodo está cerrado, no se anula), partida anulada y notas de entrega libres para facturarse otra vez. El número anulado no se reutiliza y sigue en el libro como anulado.
+- El crédito del cliente (§6.2, regla 2) ahora cuenta las cuentas por cobrar abiertas, las notas de entrega aún sin facturar y lo pendiente de entregar en pedidos aprobados. **Pendiente:** los días máximos de mora (necesitan su parámetro) y el IGTF, que se calcula al cobrar.
+- Pruebas: auxiliar de CxC igual al mayor en VES y USD, asiento de cada regla (`factura_venta`, `anulacion_factura`) y numeración de facturas concurrente contra PostgreSQL real.
 
 ### 6.3 Cuentas por cobrar y cobranzas
 ```sql
@@ -595,6 +621,14 @@ create table orden_picking_linea (
 - Un faltante registra la **demanda no atendida** (§6.1) y deja la orden en `con_faltante` hasta que Gerencia o el supervisor decidan despachar parcial o esperar.
 - El descuento de existencia y el costo de venta se registran al **confirmar la salida de mercancía** (§8), no al crear el picking.
 - El almacenista solo ve las órdenes de sus almacenes (`usuario_almacen`).
+
+**Cómo quedó el picking y la salida de mercancía (migración 0018)**
+- El picking se activa por almacén (`almacen.usa_picking`); en el mostrador puede apagarse y la salida se confirma directo desde la nota de entrega. Al generar la nota se crea la orden con sus productos inventariables; la orden lleva un número correlativo (`numerador` `picking`).
+- Estados y transiciones validados en la base de datos: `pendiente → asignada → en_proceso → completa | con_faltante`; `con_faltante` vuelve a `en_proceso` (esperar) o se cierra con el despacho parcial; cualquier orden vigente puede pasar a `cancelada` al anular la nota. El empaque (`empacada_at`) solo se registra con la orden completa.
+- Las marcas de hora las pone la base de datos. Espera, picking, ciclo total, líneas por hora y cumplimiento del objetivo salen de la vista `vw_picking_tiempos`. Las horas objetivo por prioridad (1 a 5) están en `almacen_picking_objetivo` y las fija Gerencia en la pantalla del almacén.
+- **Faltante:** cada línea no recogida completa exige su motivo. Con la orden en `con_faltante`, Gerencia o el Supervisor de ventas deciden. *Esperar* la reabre. *Despachar parcial* registra la demanda no atendida por lo que faltó, anula la nota, emite otra con lo realmente recogido y mueve la **misma** orden a la nota nueva, completa y con sus tiempos originales. Lo que faltó deja de estar reservado: la diferencia con la existencia del sistema se corrige con un conteo.
+- **Salida de mercancía** (`confirmarSalida`): exige el picking completo y empacado (si el almacén lo usa), consume las reservas, registra un movimiento `salida_venta` por línea al costo promedio vigente, guarda ese costo en la línea (`costo_unitario_usd`) y deja la nota como despachada (`salida_at`). El asiento sale del motor con el evento `salida_venta`: **Debe** Costo de ventas (5.1.01), **Haber** Inventario de mercancía (1.3.01), en USD a la tasa BCV del día. Todo ocurre en una sola transacción; si el periodo está cerrado, nada se guarda. Una nota despachada no se anula: se corrige con una devolución.
+- **Pendiente de esta sección:** transporte y despacho (transportistas, vehículos, paradas, flete y constancia de entrega).
 
 **Transporte y despacho**
 ```sql
@@ -735,13 +769,23 @@ create table existencia (                   -- saldo por producto y almacén; se
   almacen_id  uuid references almacen(id),
   cantidad    numeric(14,4) not null default 0,
   reservado   numeric(14,4) not null default 0,
-  costo_promedio_usd numeric(16,4) not null default 0,
   primary key (producto_id, almacen_id),
   check (reservado >= 0 and reservado <= greatest(cantidad, 0))
+);
+
+create table producto_costo (               -- costo promedio ponderado móvil: uno por producto para toda la empresa (decisión 5)
+  producto_id        uuid primary key references producto(id),
+  cantidad           numeric(14,4) not null default 0,
+  valor_usd          numeric(18,2) not null default 0,
+  costo_promedio_usd numeric(16,4) not null default 0 check (costo_promedio_usd >= 0)
 );
 -- "Sin existencia negativa en almacenes comerciales" se valida con un TRIGGER:
 -- Postgres no admite subconsultas dentro de CHECK.
 ```
+**Existencia y costo al cierre de cada día (migración 0019):** `existencia_diaria` (por producto y almacén) y `costo_diario` (por producto) guardan el último valor de cada día. Los escriben solo los triggers de existencia y de costo, así que no dependen de un proceso programado; un día sin movimientos conserva el valor anterior (`fn_existencia_al`). `fn_dias_con_existencia` cuenta los días con existencia para vender, que es el denominador de la velocidad de venta ajustada (§8.3). Antes del primer registro de un producto no hay dato y esos días no se cuentan.
+
+**Reglas en la base de datos (migración 0017):** un movimiento nunca se edita ni se borra; la existencia (`cantidad` y `reservado`) solo cambia por un movimiento o una reserva, nunca a mano; las salidas se valorizan al promedio vigente y la que vacía el producto se lleva todo el valor restante para no dejar centavos huérfanos; un almacén comercial no admite existencia negativa y ningún movimiento puede dejar la existencia por debajo de lo reservado.
+
 Ningún movimiento se registra a mano: cada uno lo genera un documento (recepción, nota de entrega, factura, NC, transferencia, ajuste aprobado, conteo inicial). El tipo `apertura` se usa solo para el conteo físico del día de arranque (§14).
 
 ### 8.2 Método de costo
@@ -755,6 +799,7 @@ Ningún movimiento se registra a mano: cada uno lo genera un documento (recepci�
 ### 8.3 Procesos
 - **Transferencias** entre almacenes o sucursales con estado en tránsito.
 - **Toma física** por ciclos (clase ABC), con congelamiento del conteo y ajuste aprobado. Los faltantes y sobrantes van a una cuenta de gasto específica.
+- **Ajuste de inventario (migración 0020):** Almacén cuenta y agrega lo contado de cada producto; cada línea guarda lo que decía el sistema al contar, lo contado y, si hay diferencia, su motivo del catálogo de mermas. Al enviarlo recibe su número y queda pendiente: Gerencia lo aprueba o lo rechaza por el motor de flujo, y **nunca** lo aprueba quien lo creó ni quien hizo el conteo (la base de datos lo exige). Al aprobar se aplica la **diferencia** de cada línea (no el saldo del día de la aprobación, para no perder movimientos intermedios) con movimientos `ajuste_negativo` al costo promedio vigente y `ajuste_positivo` al costo promedio, o al costo indicado si el producto todavía no tiene. Su asiento sale del motor: faltante, Debe 5.1.02 y Haber Inventario; sobrante, Debe Inventario y Haber 5.1.02, en USD a la tasa del día. Un faltante no puede dejar la existencia por debajo de lo reservado.
 - **Reservas** por pedido aprobado, **punto de reorden** y **sugerido de compra**. El sugerido usa la velocidad de venta ajustada por los días con existencia, la cobertura deseada y lo pendiente en tránsito y en producción, todo calculado con los movimientos registrados en el ERP.
 - **Órdenes de producción o ensamblaje:** ver §8.4.
 
@@ -1209,10 +1254,10 @@ El catálogo actual tiene cerca de 3.000 artículos. Hay dos formas de crearlo e
 
 Estas decisiones cambian el diseño y deben tomarlas Gerencia y el contador **antes de la Fase 2**:
 
-1. **Política contable de moneda:** ¿libros legales solo en VES con USD como moneda de reporte (recomendado), o también libros auxiliares en USD? ¿Se revalúan las partidas en divisas al cierre de cada mes?
+1. ✅ **Política contable de moneda (decidida 05-10-2026):** los libros se llevan en VES y en USD (§3.4). Sigue abierto si se revalúan las partidas en divisas al cierre de cada mes.
 2. **Tasa de referencia:** confirmar la BCV oficial para todo registro legal. Hoy `pagos_detalle` y `bancos_mov` traen tasas distintas para el mismo día (~330 contra 702 el 07-01-2026). Hay que decidir cómo se registra la tasa real de las compras y ventas de divisas.
 3. ✅ **Condición fiscal de la empresa (decidida 25-09-2026):** es un conjunto de campos configurables en `empresa` y el sistema se comporta según ellos (§11.0). Falta que el asesor tributario confirme los valores con que se configura.
-4. ✅ **Facturación (decidida 25-09-2026):** imprenta digital (§11.1). Quedan abiertas la decisión 13 (proveedor) y la 14 (dualidad Bs/USD).
+4. ✅ **Facturación (decidida 25-09-2026):** imprenta digital (§11.1). Queda abierta la decisión 13 (proveedor); la 14 está decidida.
 5. ✅ **Costo promedio (decidida 25-09-2026):** ponderado móvil, uno por producto para toda la empresa (§8.2).
 6. **Comisiones:** base cobrada (recomendada) o facturada, tramos por meta, porcentaje por grupo o marca, penalización por días de cobro y política de reversión.
 7. **Reexpresión por inflación (BA VEN-NIF 2):** ¿aplica en el ejercicio?
@@ -1221,8 +1266,8 @@ Estas decisiones cambian el diseño y deben tomarlas Gerencia y el contador **an
 10. **Creación del catálogo de productos:** durante el conteo inicial (recomendado) o con la plantilla de carga masiva del ERP llenada por el personal (§14.4).
 11. **Convivencia con el sistema actual:** arranque directo, registrando todo solo en el ERP desde el día 1 (recomendado), o un periodo corto de doble registro con fecha de fin fija.
 12. ✅ **Producción o ensamblaje (decidida 25-09-2026):** módulo PP con órdenes simples, sin listas de materiales (§8.4).
-13. **Proveedor de imprenta digital:** ¿cuál proveedor autorizado por el SENIAT? Define la integración y la numeración de control.
-14. **Dualidad de documentos:** ¿se mantienen facturas fiscales en Bs y notas de entrega en USD, o todo pasa a factura fiscal en divisas con su equivalente en Bs?
+13. **Proveedor de imprenta digital:** ¿cuál proveedor autorizado por el SENIAT? Define la integración y la numeración de control. **Pendiente (05-10-2026):** aún no hay proveedor; se construye `ServicioNumeroControl` con un simulador para pruebas y la emisión fiscal real espera la contratación.
+14. ✅ **Dualidad de documentos (decidida 05-10-2026):** se mantienen facturas fiscales en Bs y notas de entrega en USD.
 15. **Activos fijos:** categorías, vida útil y método de depreciación fiscal y contable, definidos por el contador (§12.6).
 
 ---

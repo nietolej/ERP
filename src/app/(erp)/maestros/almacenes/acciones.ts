@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
-import { actualizarAlmacen, asignarUsuarios, crearAlmacen, type DatosAlmacen } from '@/lib/maestros/almacenes';
+import { actualizarAlmacen, asignarUsuarios, crearAlmacen, fijarObjetivosPicking, type DatosAlmacen } from '@/lib/maestros/almacenes';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -14,6 +14,7 @@ const leer = (fd: FormData): DatosAlmacen => ({
   sucursalId: UUID.test(texto(fd, 'sucursal_id')) ? texto(fd, 'sucursal_id') : '',
   esComercial: fd.get('es_comercial') === 'on',
   permiteVenta: fd.get('permite_venta') === 'on',
+  usaPicking: fd.get('usa_picking') === 'on',
 });
 
 export async function crearAlmacenAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
@@ -51,6 +52,20 @@ export async function asignarUsuariosAccion(_: EstadoAccion, fd: FormData): Prom
     await conUsuario(u.id, (tx) => asignarUsuarios(tx, id, usuarios));
     revalidatePath(`/maestros/almacenes/${id}`);
     return { ok: 'Usuarios asignados.' };
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+}
+
+export async function fijarObjetivosPickingAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  try {
+    const u = await autorizar('gerencia');
+    const id = texto(fd, 'id');
+    if (!UUID.test(id)) return { error: 'Almacén inválido.' };
+    const horas = [1, 2, 3, 4, 5].map((p) => texto(fd, `horas_${p}`));
+    await conUsuario(u.id, (tx) => fijarObjetivosPicking(tx, id, horas));
+    revalidatePath(`/maestros/almacenes/${id}`);
+    return { ok: 'Objetivos de picking guardados.' };
   } catch (e) {
     return { error: mensajeDeError(e) };
   }

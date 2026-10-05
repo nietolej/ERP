@@ -31,6 +31,11 @@ describe('migraciones', () => {
       '0014_adjuntos.sql',
       '0015_maestros_referenciados.sql',
       '0016_flujo_trabajo.sql',
+      '0017_inventario_pedidos.sql',
+      '0018_picking_salida.sql',
+      '0019_datos_para_decidir.sql',
+      '0020_ajuste_inventario.sql',
+      '0021_factura_cxc.sql',
     ]);
   });
 

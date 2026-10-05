@@ -12,6 +12,8 @@ export interface DatosAlmacen {
   sucursalId: string;
   esComercial: boolean;
   permiteVenta: boolean;
+  /** El picking se activa por almacén: el mostrador puede despachar sin él (§6.4). Por defecto, sí. */
+  usaPicking?: boolean;
 }
 
 function validar(d: DatosAlmacen): void {
@@ -29,17 +31,18 @@ export async function crearAlmacen(tx: Db, codigo: string, d: DatosAlmacen): Pro
   const { rows: previo } = await tx.query('select 1 from almacen where codigo = $1', [c]);
   if (previo.length) throw new ErrorMaestro(`Ya existe el almacén ${c}.`);
   const { rows } = await tx.query<{ id: string }>(
-    'insert into almacen (codigo, nombre, sucursal_id, es_comercial, permite_venta) values ($1, $2, $3, $4, $5) returning id',
-    [c, d.nombre.trim(), d.sucursalId, d.esComercial, d.permiteVenta]);
+    'insert into almacen (codigo, nombre, sucursal_id, es_comercial, permite_venta, usa_picking) values ($1, $2, $3, $4, $5, $6) returning id',
+    [c, d.nombre.trim(), d.sucursalId, d.esComercial, d.permiteVenta, d.usaPicking ?? true]);
   return rows[0].id;
 }
 
 export async function actualizarAlmacen(tx: Db, id: string, d: DatosAlmacen & { activo: boolean }): Promise<void> {
   validar(d);
   const { rows } = await tx.query(
-    `update almacen set nombre = $2, sucursal_id = $3, es_comercial = $4, permite_venta = $5, activo = $6
+    `update almacen set nombre = $2, sucursal_id = $3, es_comercial = $4, permite_venta = $5, activo = $6,
+            usa_picking = coalesce($7::boolean, usa_picking)
       where id = $1 returning id`,
-    [id, d.nombre.trim(), d.sucursalId, d.esComercial, d.permiteVenta, d.activo]);
+    [id, d.nombre.trim(), d.sucursalId, d.esComercial, d.permiteVenta, d.activo, d.usaPicking ?? null]);
   if (!rows[0]) throw new ErrorMaestro('El almacén no existe.');
 }
 
@@ -61,4 +64,25 @@ export async function almacenesVisibles(db: Db, usuario: { id: string; roles: re
       : 'select id from almacen where $1::uuid is not null',
     [usuario.id]);
   return rows.map((r) => r.id);
+}
+
+/**
+ * Horas objetivo de picking por prioridad (1 = más urgente a 5). Un valor vacío quita el objetivo de esa prioridad.
+ * Es un parámetro del almacén: el cumplimiento se mide en vw_picking_tiempos.
+ */
+export async function fijarObjetivosPicking(tx: Db, almacenId: string, horas: string[]): Promise<void> {
+  if (horas.length !== 5) throw new ErrorMaestro('Indique el objetivo de cada una de las 5 prioridades (puede dejarlo vacío).');
+  const { rows } = await tx.query('select 1 from almacen where id = $1', [almacenId]);
+  if (!rows.length) throw new ErrorMaestro('El almacén no existe.');
+  for (const [i, h] of horas.entries()) {
+    const v = h.trim().replace(',', '.');
+    if (v === '') {
+      await tx.query('delete from almacen_picking_objetivo where almacen_id = $1 and prioridad = $2', [almacenId, i + 1]);
+      continue;
+    }
+    if (!/^\d{1,4}(\.\d{1,2})?$/.test(v) || Number(v) <= 0) throw new ErrorMaestro(`Prioridad ${i + 1}: las horas objetivo deben ser un número mayor que cero, con hasta 2 decimales.`);
+    await tx.query(
+      `insert into almacen_picking_objetivo (almacen_id, prioridad, horas) values ($1, $2, $3)
+       on conflict (almacen_id, prioridad) do update set horas = excluded.horas`, [almacenId, i + 1, v]);
+  }
 }

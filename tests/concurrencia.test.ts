@@ -103,4 +103,33 @@ describe('concurrencia de numeración (PostgreSQL real)', () => {
     expect(new Set(numeros).size).toBe(N);
     expect(numeros.at(-1)! - numeros[0]).toBe(N - 1);
   });
+
+  it('facturas emitidas en paralelo reciben números de factura únicos, correlativos y sin huecos', async () => {
+    const usuario = await usuarioDePrueba(db, 'facturador@prueba.test');
+    const sucursal = (await db.query<{ id: string }>(`insert into sucursal (codigo, nombre) values ('BQTO', 'Barquisimeto') returning id`)).rows[0].id;
+    const almacen = (await db.query<{ id: string }>(
+      `insert into almacen (codigo, nombre, sucursal_id) values ('01', 'Principal', $1) returning id`, [sucursal])).rows[0].id;
+    const tercero = (await db.query<{ id: string }>(
+      `insert into tercero (rif, razon_social, tipo_persona) values ('J-00000010-7', 'Cliente de prueba, C.A.', 'J') returning id`)).rows[0].id;
+    await db.query(`insert into cliente (tercero_id) values ($1)`, [tercero]);
+    const alicuota = (await db.query<{ id: string }>(`select id from alicuota_iva where codigo = 'GENERAL'`)).rows[0].id;
+    const producto = (await db.query<{ id: string }>(
+      `insert into producto (codigo, descripcion, alicuota_iva_id) values ('PF-001', 'Pastilla de prueba', $1) returning id`, [alicuota])).rows[0].id;
+
+    const emitir = () => db.transaction(async (tx) => {
+      await tx.query("select set_config('app.usuario_id', $1, true)", [usuario]);
+      const { rows } = await tx.query<{ id: string }>(
+        `insert into documento_venta (tipo, sucursal_id, almacen_id, cliente_id, moneda, tasa, created_by)
+         values ('factura', $1, $2, $3, 'VES', 40, $4) returning id`, [sucursal, almacen, tercero, usuario]);
+      await tx.query(
+        `insert into documento_venta_linea (documento_id, linea, producto_id, descripcion, cantidad, precio_unitario, alicuota_iva_id)
+         values ($1, 1, $2, 'Pastilla', 1, 10, $3)`, [rows[0].id, producto, alicuota]);
+      const { rows: e } = await tx.query<{ numero: string }>(
+        `update documento_venta set estado = 'emitido', contingencia = true, contingencia_motivo = 'Prueba' where id = $1 returning numero::text`, [rows[0].id]);
+      await tx.query('select pg_sleep(0.02)');
+      return Number(e[0].numero);
+    });
+    const numeros = (await Promise.all(Array.from({ length: N }, emitir))).sort((a, b) => a - b);
+    expect(numeros).toEqual(Array.from({ length: N }, (_, i) => i + 1));
+  });
 });

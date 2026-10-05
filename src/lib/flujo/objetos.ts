@@ -1,9 +1,11 @@
 import { aprobarAsiento } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
+import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
 import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
 import { aprobarCambio, aprobarProveedor, rechazarCambio } from '@/lib/maestros/proveedores';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { aprobarPedidoCredito, rechazarPedidoCredito } from '@/lib/ventas/pedidos';
 import { decidirAprobacion, type Decision, type Manejador, type ResultadoDecision } from './flujo';
 
 /**
@@ -48,6 +50,16 @@ export const MANEJADOR_META_LOTE: Manejador<void> = {
   alRechazar: (tx, id, usuario, motivo) => rechazarLoteMetas(tx, id, usuario, motivo),
 };
 
+export const MANEJADOR_PEDIDO_CREDITO: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarPedidoCredito(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarPedidoCredito(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_AJUSTE_INVENTARIO: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aplicarAjuste(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarAjuste(tx, id, usuario, motivo),
+};
+
 export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
   cliente: {
     etiqueta: 'Alta de cliente',
@@ -82,6 +94,22 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
     ruta: (id) => `/contabilidad/asientos/${id}`,
     resumenes: (db, ids) => consulta(db, `select id::text as id, descripcion as texto from asiento where id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_ASIENTO,
+  },
+  pedido_credito: {
+    etiqueta: 'Pedido retenido por crédito',
+    ruta: (id) => `/ventas/pedidos/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select d.id::text as id, 'Pedido ' || d.numero || ' · ' || c.codigo || ' · US$ ' || d.total_usd as texto
+         from documento_venta d join cliente c on c.tercero_id = d.cliente_id where d.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_PEDIDO_CREDITO,
+  },
+  ajuste_inventario: {
+    etiqueta: 'Ajuste de inventario',
+    ruta: (id) => `/inventario/ajustes/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select a.id::text as id, 'Ajuste ' || a.numero || ' · almacén ' || al.codigo as texto
+         from ajuste_inventario a join almacen al on al.id = a.almacen_id where a.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_AJUSTE_INVENTARIO,
   },
   meta_lote: {
     etiqueta: 'Lote de metas de venta',

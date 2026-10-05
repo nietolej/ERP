@@ -3,6 +3,11 @@ import { ROLES_VEN_AUDITORIA } from '@/lib/auditoria';
 import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
 import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
+import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
+import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
+import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
+import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
+import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
 
 /**
  * Mapa de módulos del ERP, al estilo SAP. Es la única fuente de la navegación:
@@ -39,12 +44,13 @@ export const MODULOS: Modulo[] = [
     items: [
       { texto: 'Clientes', href: '/maestros/clientes', roles: ROLES_VEN_CLIENTES },
       { texto: 'Vendedores', href: '/maestros/vendedores', roles: ROLES_VEN_TODOS },
-      { texto: 'Pedidos de venta', fase: 2 },
-      { texto: 'Notas de entrega', fase: 2 },
-      { texto: 'Picking y empaque', fase: 2 },
+      { texto: 'Pedidos de venta', href: '/ventas/pedidos', roles: [...ROLES_VEN_VENTAS] },
+      { texto: 'Notas de entrega', href: '/ventas/notas-entrega', roles: [...ROLES_VEN_VENTAS] },
+      { texto: 'Picking y empaque', href: '/almacen/picking', roles: [...ROLES_VEN_PICKING] },
       { texto: 'Transportes y despachos', fase: 2 },
-      { texto: 'Facturas de venta', fase: 2 },
+      { texto: 'Facturas de venta', href: '/ventas/facturas', roles: [...ROLES_VEN_FACTURAS] },
       { texto: 'Notas de crédito y débito', fase: 2 },
+      { texto: 'Ventas perdidas', href: '/ventas/perdidas', roles: [...ROLES_VEN_VENTAS] },
       { texto: 'Devoluciones', fase: 2 },
       { texto: 'Portal de clientes', fase: 7 },
     ],
@@ -57,7 +63,9 @@ export const MODULOS: Modulo[] = [
       { texto: 'Productos', href: '/maestros/productos', roles: OPERATIVOS },
       { texto: 'Almacenes', href: '/maestros/almacenes', roles: OPERATIVOS },
       { texto: 'Proveedores', href: '/maestros/proveedores', roles: ROLES_COMPRAS },
-      { texto: 'Movimientos de inventario', fase: 2 },
+      { texto: 'Existencias', href: '/inventario/existencias', roles: [...ROLES_VEN_EXISTENCIAS] },
+      { texto: 'Ajustes de inventario', href: '/inventario/ajustes', roles: [...ROLES_VEN_AJUSTES] },
+      { texto: 'Kardex de movimientos', fase: 2 },
       { texto: 'Órdenes de compra', fase: 3 },
       { texto: 'Recepciones de mercancía', fase: 3 },
       { texto: 'Facturas de proveedor', fase: 3 },
@@ -154,6 +162,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Empresa y sucursales', href: '/configuracion/empresa', roles: ['administrador'] },
       { texto: 'Usuarios y roles', href: '/configuracion/usuarios', roles: ['administrador'] },
       { texto: 'Auditoría', href: '/configuracion/auditoria', roles: ROLES_VEN_AUDITORIA },
+      { texto: 'Motivos (descuentos, anulaciones…)', href: '/configuracion/motivos', roles: [...ROLES_MOTIVOS] },
       { texto: 'Bandeja de aprobaciones', href: '/aprobaciones' },
       { texto: 'Definición de flujos', href: '/configuracion/flujos', roles: ['administrador', 'gerencia', 'auditor'] },
     ],
