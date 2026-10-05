@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation';
 import { getDb } from '@/lib/db';
 import { COOKIE_SESION, type Rol } from './constantes';
 import { tieneRol } from './permisos';
-import { usuarioDeSesion, type UsuarioSesion } from './sesiones';
+import { COOKIE_USUARIO_DEV, sinLogin } from './constantes';
+import { asegurarUsuarioDesarrollo } from './modo-desarrollo';
+import { cargarUsuario, usuarioDeSesion, type UsuarioSesion } from './sesiones';
 
 /**
  * Capa de acceso a datos (DAL): la verificación de sesión real, contra la base de datos.
@@ -14,6 +16,13 @@ import { usuarioDeSesion, type UsuarioSesion } from './sesiones';
  */
 
 export const obtenerUsuario = cache(async (): Promise<UsuarioSesion | null> => {
+  // Solo desarrollo local (ERP_SIN_LOGIN=1, nunca en producción): ver modo-desarrollo.ts.
+  if (sinLogin()) {
+    const db = await getDb();
+    const elegido = (await cookies()).get(COOKIE_USUARIO_DEV)?.value;
+    const u = elegido ? await cargarUsuario(db, elegido) : null;
+    return u ?? asegurarUsuarioDesarrollo(db);
+  }
   const token = (await cookies()).get(COOKIE_SESION)?.value;
   if (!token) return null;
   return usuarioDeSesion(await getDb(), token);

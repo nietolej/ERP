@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { COOKIE_SESION } from '@/lib/auth/constantes';
+import { COOKIE_SESION, sinLogin } from '@/lib/auth/constantes';
 
 /**
  * Chequeo rápido en todas las rutas (incluidas las API): sin cookie de sesión,
@@ -9,7 +9,8 @@ const RUTAS_PUBLICAS = new Set(['/login']);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (RUTAS_PUBLICAS.has(pathname) || req.cookies.has(COOKIE_SESION)) {
+  // Modo sin login: solo desarrollo local (ERP_SIN_LOGIN=1); con NODE_ENV=production nunca se activa.
+  if (sinLogin() || RUTAS_PUBLICAS.has(pathname) || req.cookies.has(COOKIE_SESION)) {
     return NextResponse.next();
   }
   if (pathname.startsWith('/api/')) {

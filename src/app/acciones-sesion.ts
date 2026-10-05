@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { hashClave, problemasDeClave, verificarClave } from '@/lib/auth/clave';
-import { COOKIE_SESION } from '@/lib/auth/constantes';
+import { COOKIE_SESION, sinLogin } from '@/lib/auth/constantes';
 import { exigirSesion } from '@/lib/auth/dal';
 import { VENTANA_MINUTOS } from '@/lib/auth/limite';
 import { autenticarConLimite, crearSesion, eliminarSesion, eliminarSesionesDeUsuario } from '@/lib/auth/sesiones';
@@ -32,6 +32,8 @@ async function guardarCookie(token: string, expira: Date) {
 }
 
 export async function iniciarSesion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  // Modo sin login (solo desarrollo): se entra aunque los campos estén vacíos.
+  if (sinLogin()) redirect('/');
   const email = texto(fd, 'email');
   const clave = typeof fd.get('clave') === 'string' ? (fd.get('clave') as string) : '';
   if (!email || !clave) return { error: 'Ingrese su correo y su clave.' };
