@@ -71,6 +71,29 @@ describe('productos, precios y almacenes (§5.3)', () => {
     await esperarError(db.transaction((tx) => actualizarProducto(tx, id, { ...d1, pesoKg: 'mucho' })), 'peso');
   });
 
+  it('R-U/R-V: el empaque guarda unidades, peso y dimensiones, y la base calcula el volumen', async () => {
+    const empaque = { empaqueUnidad: 'cja', unidadesPorEmpaque: '12', empaquePesoKg: '9.5', empaqueLargoCm: '40', empaqueAnchoCm: '30', empaqueAltoCm: '20' };
+    const d1 = await datos('Bujía iridio', { pesoKg: '0.05', ...empaque });
+    const id = await db.transaction((tx) => crearProducto(tx, almacenista, 'EMP-001', d1));
+    const { rows } = await db.query<{ empaque_unidad: string; empaque_volumen_m3: string; volumen_unitario_m3: string }>(
+      'select empaque_unidad, empaque_volumen_m3, volumen_unitario_m3 from producto where id = $1', [id]);
+    expect(rows[0].empaque_unidad).toBe('CJA');
+    expect(Number(rows[0].empaque_volumen_m3)).toBeCloseTo(0.024, 9);     // 40×30×20 cm
+    expect(Number(rows[0].volumen_unitario_m3)).toBeCloseTo(0.002, 9);    // ÷ 12 unidades
+
+    const d2 = await datos('Sin medidas');
+    const sin = await db.transaction((tx) => crearProducto(tx, almacenista, 'EMP-002', d2));
+    const r2 = await db.query<{ u: string; v: string | null }>('select unidades_por_empaque as u, volumen_unitario_m3 as v from producto where id = $1', [sin]);
+    expect(Number(r2.rows[0].u)).toBe(1);
+    expect(r2.rows[0].v).toBeNull();
+
+    const base = await datos('Medidas incompletas', { ...empaque, empaqueAltoCm: '' });
+    await esperarError(db.transaction((tx) => crearProducto(tx, almacenista, 'EMP-003', base)), 'largo, ancho y alto');
+    await esperarError(db.transaction((tx) => crearProducto(tx, almacenista, 'EMP-003', { ...base, empaqueAltoCm: '0' })), 'mayores que cero');
+    await esperarError(db.transaction((tx) => crearProducto(tx, almacenista, 'EMP-003', { ...base, empaqueAltoCm: '5', unidadesPorEmpaque: '0' })), 'por empaque');
+    await esperarError(db.query(`update producto set empaque_alto_cm = null where id = $1`, [id]), 'producto_empaque_dimensiones_completas');
+  });
+
   it('catálogos, referencias cruzadas y búsqueda por referencia sin guiones o por descripción sin acentos', async () => {
     const grupo = await db.transaction((tx) => crearCatalogo(tx, 'grupo_producto', 'tucson', 'Hyundai Tucson'));
     const marca = await db.transaction((tx) => crearCatalogo(tx, 'marca', 'mobis', 'Mobis'));

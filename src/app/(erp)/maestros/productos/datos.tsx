@@ -36,6 +36,10 @@ export interface ValoresProducto {
   descripcion: string; codigo_comun: string | null; grupo_id: string | null; marca_id: string | null; unidad: string;
   alicuota_iva_id: string; inventariable: boolean; codigo_alterno: string | null; peso_kg: string | null;
   linea_calidad: string | null; pais_origen: string | null;
+  empaque_unidad: string | null; unidades_por_empaque: string; empaque_peso_kg: string | null;
+  empaque_largo_cm: string | null; empaque_ancho_cm: string | null; empaque_alto_cm: string | null;
+  /** Calculado por la base: volumen de una unidad de venta (m³). */
+  volumen_unitario_m3: string | null;
 }
 
 /** Campos del producto (sin el código), para el alta y la edición. */
@@ -98,15 +102,45 @@ export function CamposProducto({ op, v, soloLectura }: { op: OpcionesProducto; v
           {op.alicuotas.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
         </select>
       </Campo>
-      <Campo etiqueta="Unidad">
+      <Campo etiqueta="Unidad de medida" ayuda="Unidad en que se vende y se lleva el inventario (UND, JGO, PAR, LT…).">
         <input name="unidad" defaultValue={v?.unidad ?? 'UND'} required maxLength={10} className="campo uppercase" />
       </Campo>
-      <Campo etiqueta="Peso (kg)">
+      <Campo etiqueta="Peso por unidad (kg)" ayuda="Base para repartir flete y gastos de importación por peso.">
         <input name="peso_kg" defaultValue={v?.peso_kg ?? ''} inputMode="decimal" className="campo text-right tabular-nums" />
       </Campo>
       <Campo etiqueta="Código alterno">
         <input name="codigo_alterno" defaultValue={v?.codigo_alterno ?? ''} maxLength={30} className="campo font-mono uppercase" />
       </Campo>
+      <div className="sm:col-span-3 rounded-lg border border-borde bg-white/[0.02] p-4">
+        <p className="mb-3 text-sm text-texto-2">
+          <b className="text-texto">Empaque:</b> al comprar, el flete, el seguro y los gastos de importación se reparten entre los productos
+          por valor, peso, volumen o cantidad. El volumen se calcula con las medidas del empaque.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Campo etiqueta="Unidad de empaque" ayuda="CJA, BLT, PQT… Vacío si va suelto.">
+            <input name="empaque_unidad" defaultValue={v?.empaque_unidad ?? ''} maxLength={10} className="campo uppercase" />
+          </Campo>
+          <Campo etiqueta="Unidades por empaque">
+            <input name="unidades_por_empaque" defaultValue={v?.unidades_por_empaque ?? '1'} inputMode="decimal" className="campo text-right tabular-nums" />
+          </Campo>
+          <Campo etiqueta="Peso del empaque (kg)">
+            <input name="empaque_peso_kg" defaultValue={v?.empaque_peso_kg ?? ''} inputMode="decimal" className="campo text-right tabular-nums" />
+          </Campo>
+          <div className="hidden sm:block" />
+          <Campo etiqueta="Largo (cm)">
+            <input name="empaque_largo_cm" defaultValue={v?.empaque_largo_cm ?? ''} inputMode="decimal" className="campo text-right tabular-nums" />
+          </Campo>
+          <Campo etiqueta="Ancho (cm)">
+            <input name="empaque_ancho_cm" defaultValue={v?.empaque_ancho_cm ?? ''} inputMode="decimal" className="campo text-right tabular-nums" />
+          </Campo>
+          <Campo etiqueta="Alto (cm)">
+            <input name="empaque_alto_cm" defaultValue={v?.empaque_alto_cm ?? ''} inputMode="decimal" className="campo text-right tabular-nums" />
+          </Campo>
+          <Campo etiqueta="Volumen por unidad (m³)" ayuda="Calculado: largo × ancho × alto ÷ unidades por empaque.">
+            <input readOnly value={v?.volumen_unitario_m3 ? Number(v.volumen_unitario_m3).toFixed(6) : '—'} className="campo text-right tabular-nums opacity-70" />
+          </Campo>
+        </div>
+      </div>
       <label className="flex items-center gap-2 self-end pb-2 text-sm">
         <input type="checkbox" name="inventariable" defaultChecked={v?.inventariable ?? true} /> Lleva inventario
       </label>

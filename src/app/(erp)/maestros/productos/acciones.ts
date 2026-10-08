@@ -33,6 +33,12 @@ async function leer(tx: Db, fd: FormData): Promise<DatosProducto> {
     pesoKg: texto(fd, 'peso_kg'),
     lineaCalidad: texto(fd, 'linea_calidad') || null,
     paisOrigen: texto(fd, 'pais_origen').toUpperCase() || null,
+    empaqueUnidad: texto(fd, 'empaque_unidad'),
+    unidadesPorEmpaque: texto(fd, 'unidades_por_empaque'),
+    empaquePesoKg: texto(fd, 'empaque_peso_kg'),
+    empaqueLargoCm: texto(fd, 'empaque_largo_cm'),
+    empaqueAnchoCm: texto(fd, 'empaque_ancho_cm'),
+    empaqueAltoCm: texto(fd, 'empaque_alto_cm'),
   };
 }
 

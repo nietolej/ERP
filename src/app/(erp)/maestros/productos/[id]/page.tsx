@@ -24,7 +24,8 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
   }>(
     `select p.codigo, b.codigo as codigo_comun, b.id as base_id, fn_categoria_ruta(p.categoria_id) as categoria,
             p.descripcion, p.grupo_id, p.marca_id, p.unidad, p.alicuota_iva_id, p.inventariable,
-            p.codigo_alterno, p.peso_kg, p.linea_calidad, p.pais_origen, p.estado, u.nombre as creador, p.created_at
+            p.codigo_alterno, p.peso_kg, p.linea_calidad, p.pais_origen, p.empaque_unidad, p.unidades_por_empaque, p.empaque_peso_kg,
+            p.empaque_largo_cm, p.empaque_ancho_cm, p.empaque_alto_cm, p.volumen_unitario_m3, p.estado, u.nombre as creador, p.created_at
        from producto p
        left join producto_base b on b.id = p.producto_base_id
        left join usuario u on u.id = p.created_by where p.id = $1`, [id]);

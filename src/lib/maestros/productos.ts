@@ -8,6 +8,8 @@ import { ErrorMaestro } from './terceros';
  *   en todas sus marcas: así se analiza por artículo y por artículo-marca (pronósticos, elasticidad).
  * - La alícuota de IVA es una categoría: el porcentaje sale de parametro_fiscal por fecha.
  * - Los precios de las listas A, B y D (USD) tienen vigencia y no se editan: se registra uno nuevo.
+ * - Unidad, peso y empaque (unidades por empaque, peso bruto, largo×ancho×alto) alimentan el reparto de flete y gastos
+ *   de importación por peso, volumen o cantidad (§7.2); el volumen lo calcula la base.
  * - El costo no es una lista de precio: sale del inventario (§8, Fase 2).
  */
 
@@ -22,6 +24,8 @@ const CODIGO_PRODUCTO = /^[A-Z0-9][A-Z0-9\-./]{0,29}$/;
 const CODIGO_CATALOGO = /^[A-Z0-9][A-Z0-9 ._-]{0,19}$/;
 const UNIDAD = /^[A-Z]{1,10}$/;
 const PESO = /^\d{1,7}(\.\d{1,3})?$/;
+const CANTIDAD = /^\d{1,9}(\.\d{1,3})?$/;
+const DIMENSION = /^\d{1,6}(\.\d{1,2})?$/;
 const PRECIO = /^\d{1,12}(\.\d{1,2})?$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -46,6 +50,16 @@ export interface DatosProducto {
   pesoKg?: string;
   lineaCalidad?: string | null;
   paisOrigen?: string | null;
+  /** Unidad de empaque (CJA, BLT, PQT…); vacío = se maneja suelto. */
+  empaqueUnidad?: string;
+  /** Unidades de venta por empaque (por defecto 1). */
+  unidadesPorEmpaque?: string;
+  /** Peso bruto del empaque completo en kg. */
+  empaquePesoKg?: string;
+  /** Dimensiones del empaque en cm: las tres juntas o ninguna. */
+  empaqueLargoCm?: string;
+  empaqueAnchoCm?: string;
+  empaqueAltoCm?: string;
 }
 
 /** Normaliza un código: mayúsculas, sin espacios. */
@@ -59,6 +73,16 @@ function validar(d: DatosProducto): void {
   if (!UNIDAD.test(d.unidad.trim().toUpperCase())) errores.push('La unidad debe ser una abreviatura en letras (UND, JGO, PAR, LT…).');
   if (!d.alicuotaIvaId) errores.push('Seleccione la alícuota de IVA.');
   if (d.pesoKg?.trim() && !PESO.test(d.pesoKg.trim())) errores.push('El peso debe ser un número en kg con hasta 3 decimales.');
+  if (d.empaqueUnidad?.trim() && !UNIDAD.test(d.empaqueUnidad.trim().toUpperCase())) errores.push('La unidad de empaque debe ser una abreviatura en letras (CJA, BLT, PQT…).');
+  const porEmpaque = d.unidadesPorEmpaque?.trim();
+  if (porEmpaque && (!CANTIDAD.test(porEmpaque) || Number(porEmpaque) <= 0)) errores.push('Las unidades por empaque deben ser un número mayor que cero, con hasta 3 decimales.');
+  const pesoEmp = d.empaquePesoKg?.trim();
+  if (pesoEmp && (!PESO.test(pesoEmp) || Number(pesoEmp) <= 0)) errores.push('El peso del empaque debe ser un número en kg mayor que cero, con hasta 3 decimales.');
+  const dims = [d.empaqueLargoCm, d.empaqueAnchoCm, d.empaqueAltoCm].map((x) => x?.trim() ?? '');
+  if (dims.some(Boolean)) {
+    if (!dims.every(Boolean)) errores.push('Indique largo, ancho y alto del empaque, o deje las tres medidas vacías.');
+    else if (!dims.every((x) => DIMENSION.test(x) && Number(x) > 0)) errores.push('Las medidas del empaque son números en cm mayores que cero, con hasta 2 decimales.');
+  }
   if (d.codigoAlterno?.trim() && !CODIGO_PRODUCTO.test(normalizarCodigo(d.codigoAlterno))) {
     errores.push('El código alterno admite letras, números, guiones, puntos y barras.');
   }
@@ -79,6 +103,8 @@ const valores = (d: DatosProducto) => [
   d.descripcion.trim(), d.productoBaseId, d.grupoId || null, d.marcaId || null, d.unidad.trim().toUpperCase(),
   d.alicuotaIvaId, d.inventariable, d.codigoAlterno?.trim() ? normalizarCodigo(d.codigoAlterno) : null,
   d.pesoKg?.trim() || null, d.lineaCalidad || null, d.paisOrigen || null,
+  d.empaqueUnidad?.trim().toUpperCase() || null, d.unidadesPorEmpaque?.trim() || '1', d.empaquePesoKg?.trim() || null,
+  d.empaqueLargoCm?.trim() || null, d.empaqueAnchoCm?.trim() || null, d.empaqueAltoCm?.trim() || null,
 ];
 
 export async function crearProducto(tx: Db, usuarioId: string, codigo: string, d: DatosProducto): Promise<string> {
@@ -92,8 +118,9 @@ export async function crearProducto(tx: Db, usuarioId: string, codigo: string, d
   await exigirMarcaUnica(tx, d);
   const { rows } = await tx.query<{ id: string }>(
     `insert into producto (codigo, descripcion, producto_base_id, grupo_id, marca_id, unidad, alicuota_iva_id, inventariable,
-                           codigo_alterno, peso_kg, linea_calidad, pais_origen, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning id`,
+                           codigo_alterno, peso_kg, linea_calidad, pais_origen,
+                           empaque_unidad, unidades_por_empaque, empaque_peso_kg, empaque_largo_cm, empaque_ancho_cm, empaque_alto_cm, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) returning id`,
     [c, ...valores(d), usuarioId]);
   return rows[0].id;
 }
@@ -103,7 +130,9 @@ export async function actualizarProducto(tx: Db, id: string, d: DatosProducto): 
   await exigirMarcaUnica(tx, d, id);
   const { rows } = await tx.query<{ id: string }>(
     `update producto set descripcion = $2, producto_base_id = $3, grupo_id = $4, marca_id = $5, unidad = $6,
-            alicuota_iva_id = $7, inventariable = $8, codigo_alterno = $9, peso_kg = $10, linea_calidad = $11, pais_origen = $12
+            alicuota_iva_id = $7, inventariable = $8, codigo_alterno = $9, peso_kg = $10, linea_calidad = $11, pais_origen = $12,
+            empaque_unidad = $13, unidades_por_empaque = $14, empaque_peso_kg = $15,
+            empaque_largo_cm = $16, empaque_ancho_cm = $17, empaque_alto_cm = $18
       where id = $1 returning id`,
     [id, ...valores(d)]);
   if (!rows[0]) throw new ErrorMaestro('El producto no existe.');
