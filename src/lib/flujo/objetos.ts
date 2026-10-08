@@ -1,5 +1,6 @@
 import { aprobarAsiento } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
+import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
@@ -66,6 +67,11 @@ export const MANEJADOR_ORDEN_COMPRA: Manejador<void> = {
   alRechazar: (tx, id, usuario, motivo) => rechazarOrden(tx, id, usuario, motivo),
 };
 
+export const MANEJADOR_FACTURA_COMPRA: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarFactura(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarFactura(tx, id, usuario, motivo),
+};
+
 export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
   cliente: {
     etiqueta: 'Alta de cliente',
@@ -124,6 +130,14 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select d.id::text as id, 'Orden ' || d.numero || ' · ' || p.codigo || ' · US$ ' || d.total_usd as texto
          from documento_compra d join proveedor p on p.tercero_id = d.proveedor_id where d.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_ORDEN_COMPRA,
+  },
+  factura_compra: {
+    etiqueta: 'Factura de compra retenida',
+    ruta: (id) => `/compras/facturas/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select f.id::text as id, 'Factura ' || f.numero_factura || ' · ' || p.codigo || ' · US$ ' || f.total_usd as texto
+         from factura_compra f join proveedor p on p.tercero_id = f.proveedor_id where f.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_FACTURA_COMPRA,
   },
   meta_lote: {
     etiqueta: 'Lote de metas de venta',

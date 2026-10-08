@@ -38,6 +38,8 @@ describe('migraciones', () => {
       '0021_factura_cxc.sql',
       '0022_medidas_empaque_producto.sql',
       '0023_orden_compra_recepcion.sql',
+      '0024_factura_compra_cxp.sql',
+      '0025_gastos_importacion.sql',
     ]);
   });
 

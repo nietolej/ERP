@@ -71,7 +71,7 @@ describe('flujo de trabajo y aprobaciones (§4.5)', () => {
     const porTipo = Object.fromEntries(defs.map((d) => [d.objeto_tipo, d.pasos.map((p) => p.rol_aprobador)]));
     expect(porTipo).toEqual({
       cliente: ['gerencia'], proveedor: ['gerencia'], proveedor_cambio: ['gerencia'], asiento_manual: ['jefe_contabilidad'], meta_lote: ['gerencia'],
-      pedido_credito: ['gerencia'], ajuste_inventario: ['gerencia'], orden_compra: ['gerencia'],
+      pedido_credito: ['gerencia'], ajuste_inventario: ['gerencia'], orden_compra: ['gerencia'], factura_compra: ['gerencia'],
     });
     expect(defs.every((d) => d.activo && d.pasos.every((p) => p.distinto_del_creador))).toBe(true);
   });

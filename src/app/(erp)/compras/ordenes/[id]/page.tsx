@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import { Aviso, Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
+import { ROLES_REGISTRAN_FACTURA } from '@/lib/compras/facturas';
 import { NOMBRE_CRITERIO } from '@/lib/compras/costo-destino';
 import { NOMBRE_ESTADO_ORDEN, ROLES_COMPRAN, ROLES_VEN_COMPRAS, detalleOrden } from '@/lib/compras/ordenes';
 import { ROLES_RECIBEN } from '@/lib/compras/recepciones';
@@ -151,6 +152,12 @@ export default async function OrdenPage({ params }: { params: Promise<{ id: stri
             <BotonEnviar>Registrar recepción</BotonEnviar>
           </Formulario>
         </Panel>
+      )}
+
+      {d.estado === 'aprobada' && d.recepciones.length > 0 && tieneRol(u, ROLES_REGISTRAN_FACTURA) && (
+        <div className="mt-5">
+          <Link href={`/compras/facturas/nueva?orden=${id}`} className="text-sm text-acento hover:underline">Registrar la factura del proveedor de esta orden →</Link>
+        </div>
       )}
 
       {puedeDecidir && (
