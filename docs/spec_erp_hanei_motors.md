@@ -737,6 +737,12 @@ flowchart LR
    - Se genera el **comprobante** con numeración propia y se reduce la partida por pagar.
 5. **Duplicados:** se bloquea una factura con el mismo proveedor, número y monto.
 
+**Construido (migración 0023): orden de compra y recepción.**
+- **Orden de compra** (`documento_compra`, tipo `orden_compra`): la arma Compras en borrador (proveedor activo, almacén de recepción, moneda, productos con cantidad y precio, fecha de entrega prometida). Al enviarla recibe su número, la base calcula el total y su equivalente en USD a la tasa BCV del día, y queda `pendiente`. La aprueba Gerencia por el motor de flujo (`orden_compra`), **nunca quien la creó** (la base lo exige). Enviada no se edita ni se borra: se aprueba, se rechaza con motivo o se anula con motivo (no se anula si ya tiene mercancía recibida). Hoy toda orden pasa por Gerencia; el umbral por monto se define en Configuración → Flujos.
+- **Criterio de reparto:** cada orden guarda cómo se repartirán los gastos de importación (valor, peso, volumen o cantidad). Con peso o volumen, todos sus productos deben tener esa medida en el maestro (§5.3) o la orden no se envía. El cálculo exacto a centavos está en `repartirCosto` (`src/lib/compras/costo-destino.ts`), listo para la factura de gastos.
+- **Recepción** (tipo `recepcion`): solo contra una orden aprobada y del almacén del usuario (Almacén o Gerencia). Se indica lo realmente recibido de cada línea, sin pasar de lo pendiente (se valida con la orden bloqueada, para que dos recepciones simultáneas no se pasen). En una sola transacción: entrada de inventario por línea al precio de la orden convertido a USD (precio × tasa de la moneda ÷ tasa del USD, del día de la recepción), costo promedio y asiento `recepcion_compra` (Debe inventario 1.3.01, Haber mercancía recibida no facturada 2.1.02). Una recepción emitida no se edita ni se anula.
+- **Pendiente de la Fase 3:** factura de compra con conciliación a tres vías, gastos de importación (factura de servicios) y su prorrateo al costo, devolución a proveedor, retenciones, CxP, pagos, gastos, tesorería, conciliación bancaria y producción.
+
 ### 7.3 Cuentas por pagar y pagos
 - `partida_cxp`, `pago` y `aplicacion_pago`, simétricos a CxC.
 - **Programación de pagos** por vencimiento, con aprobación de Gerencia y descuentos por pronto pago del proveedor.

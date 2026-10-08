@@ -3,6 +3,7 @@ import { ROLES_VEN_AUDITORIA } from '@/lib/auditoria';
 import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
 import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
+import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
 import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
 import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
@@ -66,8 +67,8 @@ export const MODULOS: Modulo[] = [
       { texto: 'Existencias', href: '/inventario/existencias', roles: [...ROLES_VEN_EXISTENCIAS] },
       { texto: 'Ajustes de inventario', href: '/inventario/ajustes', roles: [...ROLES_VEN_AJUSTES] },
       { texto: 'Kardex de movimientos', fase: 2 },
-      { texto: 'Órdenes de compra', fase: 3 },
-      { texto: 'Recepciones de mercancía', fase: 3 },
+      { texto: 'Órdenes de compra', href: '/compras/ordenes', roles: [...ROLES_VEN_COMPRAS] },
+      { texto: 'Recepciones de mercancía', href: '/compras/recepciones', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Facturas de proveedor', fase: 3 },
       { texto: 'Importaciones y costo en destino', fase: 3 },
     ],

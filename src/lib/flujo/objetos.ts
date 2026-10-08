@@ -1,5 +1,6 @@
 import { aprobarAsiento } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
+import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
 import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
@@ -60,6 +61,11 @@ export const MANEJADOR_AJUSTE_INVENTARIO: Manejador<void> = {
   alRechazar: (tx, id, usuario, motivo) => rechazarAjuste(tx, id, usuario, motivo),
 };
 
+export const MANEJADOR_ORDEN_COMPRA: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarOrden(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarOrden(tx, id, usuario, motivo),
+};
+
 export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
   cliente: {
     etiqueta: 'Alta de cliente',
@@ -110,6 +116,14 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select a.id::text as id, 'Ajuste ' || a.numero || ' · almacén ' || al.codigo as texto
          from ajuste_inventario a join almacen al on al.id = a.almacen_id where a.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_AJUSTE_INVENTARIO,
+  },
+  orden_compra: {
+    etiqueta: 'Orden de compra',
+    ruta: (id) => `/compras/ordenes/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select d.id::text as id, 'Orden ' || d.numero || ' · ' || p.codigo || ' · US$ ' || d.total_usd as texto
+         from documento_compra d join proveedor p on p.tercero_id = d.proveedor_id where d.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_ORDEN_COMPRA,
   },
   meta_lote: {
     etiqueta: 'Lote de metas de venta',

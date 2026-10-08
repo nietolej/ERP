@@ -36,6 +36,8 @@ describe('migraciones', () => {
       '0019_datos_para_decidir.sql',
       '0020_ajuste_inventario.sql',
       '0021_factura_cxc.sql',
+      '0022_medidas_empaque_producto.sql',
+      '0023_orden_compra_recepcion.sql',
     ]);
   });
 
