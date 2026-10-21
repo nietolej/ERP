@@ -9,6 +9,7 @@ import { monto, tasa } from '@/lib/formato';
 import { listarMotivos } from '@/lib/maestros/motivos';
 import { verTodosLosDocumentos } from '@/lib/ventas/pedidos';
 import { ROLES_FACTURAN, ROLES_VEN_FACTURAS, detalleFactura } from '@/lib/ventas/facturas';
+import { ROLES_CREAN_NOTAS, notasDeFactura } from '@/lib/ventas/notas';
 import { anularFacturaAccion, asignarControlAccion } from '../acciones';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,6 +28,8 @@ export default async function FacturaPage({ params }: { params: Promise<{ id: st
   const sinCobros = f.saldo !== null && Number(f.saldo) === Number(f.total);
   const motivos = emitida && factura ? (await listarMotivos(db, { tipo: 'anulacion', soloActivos: true })).filter((m) => !m.sistema) : [];
   const simulada = f.imprenta === PROVEEDOR_SIMULADO;
+  const notas = await notasDeFactura(db, id);
+  const puedeNotas = tieneRol(u, [...ROLES_CREAN_NOTAS]);
 
   return (
     <>
@@ -118,9 +121,35 @@ export default async function FacturaPage({ params }: { params: Promise<{ id: st
         </dl>
       </Panel>
 
+      {emitida && (
+        <Panel titulo="Notas de crédito y débito" className="mt-5">
+          {notas.length > 0 ? (
+            <ul className="mb-3 divide-y divide-borde text-sm">
+              {notas.map((n) => (
+                <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <Link href={`/ventas/notas/${n.id}`} className="text-acento hover:underline">
+                    {n.tipo === 'nota_credito' ? 'Nota de crédito' : 'Nota de débito'} <span className="font-mono">{n.numero ?? '(borrador)'}</span>
+                  </Link>
+                  <span className="text-texto-2">
+                    {n.estado === 'emitido' ? 'Emitida' : n.situacion === 'pendiente_aprobacion' ? 'Por aprobar' : n.situacion === 'aprobada' ? 'Por emitir' : n.situacion === 'rechazada' ? 'Rechazada' : 'Borrador'}
+                    {' · '}Bs. {monto(n.total)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mb-3 text-sm text-texto-2">Esta factura no tiene notas.</p>}
+          {puedeNotas && (
+            <div className="flex gap-4 text-sm">
+              <Link href={`/ventas/notas/nueva?factura=${id}&tipo=credito`} className="text-acento hover:underline">Nueva nota de crédito</Link>
+              <Link href={`/ventas/notas/nueva?factura=${id}&tipo=debito`} className="text-acento hover:underline">Nueva nota de débito</Link>
+            </div>
+          )}
+        </Panel>
+      )}
+
       {emitida && factura && (
         <Panel titulo="Anular la factura" className="mt-5">
-          {sinCobros ? (
+          {sinCobros && !notas.some((n) => n.estado !== 'anulado') ? (
             <Formulario accion={anularFacturaAccion} className="space-y-3">
               <input type="hidden" name="id" value={id} />
               <p className="max-w-xl text-sm text-texto-2">
@@ -139,7 +168,7 @@ export default async function FacturaPage({ params }: { params: Promise<{ id: st
               <BotonEnviar variante="peligro">Anular factura</BotonEnviar>
             </Formulario>
           ) : (
-            <Aviso>Esta factura tiene cobros o notas de crédito aplicados: no se anula, se corrige con una nota de crédito.</Aviso>
+            <Aviso>Esta factura tiene cobros o notas aplicados: no se anula, se corrige con una nota de crédito.</Aviso>
           )}
         </Panel>
       )}

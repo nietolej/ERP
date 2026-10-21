@@ -475,7 +475,8 @@ create table documento_venta (
   cliente_id      uuid not null references cliente(tercero_id),
   vendedor_id     uuid references vendedor(id),
   documento_origen_id uuid references documento_venta(id),   -- NC/ND → factura; factura → nota de entrega
-  motivo_nc       text check (motivo_nc in ('devolucion','pronto_pago','descuento_comercial','ajuste_precio','anulacion')),
+  motivo_nc       text check (motivo_nc in ('devolucion','pronto_pago','descuento_comercial','ajuste_precio','intereses','otro')),  -- NC: las cuatro primeras; ND: ajuste_precio, intereses, otro
+  motivo_nc_id    uuid references motivo(id),               -- motivo del catálogo (devolución o descuento) de la NC
   fecha_emision   timestamptz not null,
   fecha_vencimiento date,
   moneda          char(3) not null references moneda(codigo),
@@ -578,7 +579,7 @@ create table promocion_alcance (                         -- a qué aplica: produ
    - **Devolución:** reingresa mercancía al inventario al costo original de la línea.
    - **Pronto pago o descuento comercial:** no mueve inventario.
 
-   Una NC nunca supera el saldo pendiente de la factura, salvo aprobación.
+   Una NC nunca supera el saldo pendiente de la factura (no hay «saldo a favor» todavía: si la factura ya se cobró, devolver el dinero queda pendiente). Las notas de débito (intereses, ajuste de precio, otros) también referencian la factura y abren su propia cuenta por cobrar.
 8. **Anulación:** solo de documentos del periodo abierto y sin cobros aplicados. Revierte el asiento, el inventario y la partida abierta.
 
 **Cómo quedó la factura de venta (migración 0021)**
@@ -589,6 +590,15 @@ create table promocion_alcance (                         -- a qué aplica: produ
 - **Anular** (solo sin cobros ni notas de crédito aplicados): asiento inverso a la fecha de la factura (si su periodo está cerrado, no se anula), partida anulada y notas de entrega libres para facturarse otra vez. El número anulado no se reutiliza y sigue en el libro como anulado.
 - El crédito del cliente (§6.2, regla 2) ahora cuenta las cuentas por cobrar abiertas, las notas de entrega aún sin facturar y lo pendiente de entregar en pedidos aprobados. **Pendiente:** los días máximos de mora (necesitan su parámetro) y el IGTF, que se calcula al cobrar.
 - Pruebas: auxiliar de CxC igual al mayor en VES y USD, asiento de cada regla (`factura_venta`, `anulacion_factura`) y numeración de facturas concurrente contra PostgreSQL real.
+
+**Cómo quedaron las notas de crédito y débito (migración 0029)**
+- Son `documento_venta` de tipo `nota_credito` y `nota_debito`, siempre sobre una **factura emitida** del mismo cliente y **en bolívares** con los precios, el costo y la alícuota de la línea de la factura (el IVA no cambia aunque la alícuota haya cambiado después). Numeradores propios `nota_credito` y `nota_debito` (serie A), correlativos y sin huecos; el número de control se pide igual que a la factura (con contingencia).
+- **Clases de NC:** *devolución* (por línea y cantidad, hasta lo facturado menos lo ya devuelto en otras NC vivas; motivo del catálogo de devoluciones), *pronto pago* (porcentaje; usa el motivo de sistema `PRONTO_PAGO`), *descuento comercial* (porcentaje con motivo del catálogo de descuentos) y *ajuste de precio*. Los porcentajes se aplican sobre el precio neto de cada línea de la factura (todas o las marcadas). **Motivos de ND:** intereses, ajuste de precio y otros; sus líneas son productos del maestro con precio manual en Bs.
+- **Aprobación (motor de flujo, §4.5):** toda nota pasa por `borrador → pendiente_aprobacion → aprobada | rechazada`. Aprueba el **Supervisor de ventas**, distinto de quien la creó (lo exige la base de datos, no solo la pantalla); el rechazo pide motivo. **Crean** Ventas, Supervisor de ventas, Facturación y Gerencia; **emiten** Facturación y Gerencia, y solo una nota aprobada. Cada vendedor solo ve y crea notas de su cartera, salvo los roles que ven todos los documentos.
+- **Emitir una NC:** reduce el saldo de la partida de la factura (nunca por encima del saldo abierto); el valor en USD que reduce es proporcional al USD del saldo de la factura, para que el auxiliar siga igual al mayor en VES y en USD. Asiento: Debe *Devoluciones en ventas* (o *Descuentos en ventas*) e IVA débito fiscal, Haber CxC comerciales. **Si es devolución:** movimiento de inventario `devolucion_cliente` al **costo de la línea original** y asiento `reingreso_devolucion` (Debe Inventario, Haber Costo de ventas).
+- **Emitir una ND:** abre una `partida_cxc` (vencimiento indicado o fecha + días de la condición del cliente) y el asiento Debe CxC comerciales; Haber Ventas (ajuste de precio) u *Otros ingresos* (intereses y otros) e IVA débito fiscal. Se cobra como cualquier factura.
+- **Una nota emitida no se edita ni se anula**: se corrige con otra nota. Una factura con notas vivas no se anula. **Pendiente:** saldo a favor y reintegro del dinero cuando la factura ya se cobró, la propuesta automática de la NC por pronto pago al cobrar, y la reversión de comisiones por NC (Fase 6).
+- Pruebas: cada regla (`nota_credito_devolucion`, `nota_credito_descuento`, `nota_debito_ajuste`, `nota_debito_otros`, `reingreso_devolucion`) verifica su asiento; límites de devolución; segregación de aprobador; protecciones de la base; numeración y roles; y el auxiliar de CxC igual al mayor en VES y USD al final.
 
 ### 6.3 Cuentas por cobrar y cobranzas
 ```sql
@@ -658,7 +668,7 @@ create table aplicacion_cobro (                -- inmutable; el saldo de la part
 - **Anticipos:** el anticipo se contabiliza en *Anticipos de clientes* (pasivo) por su valor en los libros. Después se aplica a una o varias facturas del cliente: sale del pasivo a ese valor, entra a cuentas por cobrar al valor de la factura y la diferencia, en bolívares y en USD, va al diferencial cambiario. El saldo de la factura se calcula a la tasa BCV de la fecha de la aplicación.
 - **Anular un cobro** (con motivo, mientras no esté conciliado y no tenga un anticipo ya aplicado): asiento de reverso, las facturas recuperan su saldo y el número queda anulado. Con un anticipo aplicado después, primero se corrigen esas aplicaciones con una nota de crédito. Una factura con cobros aplicados no se anula.
 - **Auxiliar contra mayor:** la suma de `saldo` de las partidas abiertas es igual al saldo de *Cuentas por cobrar comerciales* y la suma de `saldo_usd`, al saldo en USD, al centavo. Los anticipos pendientes suman igual a *Anticipos de clientes*. La pantalla lo muestra y la prueba lo exige.
-- **Pendiente de esta sección:** IGTF percibido en el cobro (`genera_igtf` ya está en el instrumento), retenciones recibidas de IVA e ISLR, descuento por pronto pago (la NC que el sistema propone) y las notas de crédito y débito. Cada uno se suma a este mismo flujo.
+- **Pendiente de esta sección:** IGTF percibido en el cobro (`genera_igtf` ya está en el instrumento), retenciones recibidas de IVA e ISLR, y la propuesta automática de la NC por pronto pago (las notas de crédito y débito ya existen, §6.2). Cada uno se suma a este mismo flujo.
 - **Reportes de cobranza del ERP:** antigüedad de saldos por días desde la emisión y desde el vencimiento (pantalla *Cuentas por cobrar*), días de pago ponderados por monto (`fecha_cobro − fecha_factura`), % cobrado a tiempo y efectividad de cobro, calculados sobre los cobros registrados en el ERP.
 
 **Criterios de aceptación de Ventas y CxC**
@@ -1221,6 +1231,8 @@ Las reglas viven en una tabla `regla_contable` (evento, condición, cuenta del d
 | NC por devolución | Devoluciones en ventas (base) · IVA débito fiscal (IVA) | CxC comerciales |
 | Reingreso de la devolución al inventario | Inventario | Costo de ventas |
 | NC por pronto pago o descuento comercial | Descuentos en ventas · IVA débito fiscal (si la NC lo discrimina) | CxC comerciales |
+| Nota de débito: ajuste de precio | CxC comerciales | Ventas · IVA débito fiscal |
+| Nota de débito: intereses y otros | CxC comerciales | Otros ingresos · IVA débito fiscal |
 | Cobro (eventos `cobro` y `aplicacion_anticipo`) | Banco o caja (monto a la tasa del cobro) · Pérdida cambiaria | CxC (monto a la tasa de la factura) · Anticipos de clientes (si queda saldo) · Ganancia cambiaria |
 | IGTF percibido en el cobro | Banco o caja | IGTF percibido por enterar |
 | Retención de IVA recibida | IVA retenido por clientes | CxC comerciales |

@@ -119,7 +119,7 @@ export async function facturarNotas(tx: Db, u: Usuario, notaIds: string[], opcio
 }
 
 /** Pide el número de control; si el servicio falla o no existe, devuelve el motivo de la contingencia. */
-async function pedirControl(
+export async function pedirControl(
   tx: Db, servicio: ServicioNumeroControl | undefined, s: Parameters<ServicioNumeroControl['solicitar']>[1],
 ): Promise<{ numeroControl: string | null; proveedor?: string; motivo?: string }> {
   try {
@@ -176,6 +176,9 @@ export async function anularFactura(tx: Db, u: Usuario, id: string, motivo: Moti
   if (!p[0] || !new Decimal(p[0].saldo).equals(p[0].monto_original)) {
     throw new ErrorMaestro('La factura tiene cobros o notas de crédito aplicados: no se anula.');
   }
+  const { rows: notas } = await tx.query(
+    `select 1 from documento_venta where documento_origen_id = $1 and tipo in ('nota_credito', 'nota_debito') and estado <> 'anulado' limit 1`, [id]);
+  if (notas.length) throw new ErrorMaestro('La factura tiene notas de crédito o de débito: no se anula, se corrige con otra nota.');
 
   await tx.query(`select set_config('app.cxc_interno', '1', true)`);
   await tx.query(`update partida_cxc set estado = 'anulada', saldo = 0 where id = $1`, [p[0].id]);

@@ -8,6 +8,7 @@ import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajust
 import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
 import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
 import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
+import { ROLES_VEN_NOTAS } from '@/lib/ventas/notas';
 import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
 import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
 import { ROLES_VEN_COBROS } from '@/lib/ventas/cobros';
@@ -57,10 +58,9 @@ export const MODULOS: Modulo[] = [
       { texto: 'Transportes y despachos', href: '/ventas/transportes', roles: [...ROLES_VEN_TRANSPORTE] },
       { texto: 'Transportistas y vehículos', href: '/maestros/transportistas', roles: [...ROLES_VEN_TRANSPORTISTAS] },
       { texto: 'Facturas de venta', href: '/ventas/facturas', roles: [...ROLES_VEN_FACTURAS] },
-      { texto: 'Notas de crédito y débito', fase: 2 },
+      { texto: 'Notas de crédito y débito', href: '/ventas/notas', roles: [...ROLES_VEN_NOTAS] },
       { texto: 'Promociones', href: '/ventas/promociones', roles: [...ROLES_VEN_PROMOCIONES] },
       { texto: 'Ventas perdidas', href: '/ventas/perdidas', roles: [...ROLES_VEN_VENTAS] },
-      { texto: 'Devoluciones', fase: 2 },
       { texto: 'Portal de clientes', fase: 7 },
     ],
   },

@@ -8,6 +8,7 @@ import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
 import { aprobarCambio, aprobarProveedor, rechazarCambio } from '@/lib/maestros/proveedores';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { aprobarPedidoCredito, rechazarPedidoCredito } from '@/lib/ventas/pedidos';
+import { aprobarNota, rechazarNota } from '@/lib/ventas/notas';
 import { aprobarPromocion, rechazarPromocion } from '@/lib/ventas/promociones';
 import { decidirAprobacion, type Decision, type Manejador, type ResultadoDecision } from './flujo';
 
@@ -77,6 +78,17 @@ export const MANEJADOR_PROMOCION: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarPromocion(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarPromocion(tx, id, usuario, motivo),
 };
+
+export const MANEJADOR_NOTA: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarNota(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarNota(tx, id, usuario, motivo),
+};
+
+const resumenNota = (db: Db, ids: string[]) => consulta(db,
+  `select d.id::text as id, case when d.tipo = 'nota_credito' then 'Nota de crédito' else 'Nota de débito' end || ' sobre la factura ' || f.serie || '-' || f.numero
+          || ' · ' || c.codigo || ' · Bs. ' || d.total as texto
+     from documento_venta d join documento_venta f on f.id = d.documento_origen_id join cliente c on c.tercero_id = d.cliente_id
+    where d.id = any($1::uuid[])`, ids);
 
 export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
   cliente: {
@@ -152,6 +164,8 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select id::text as id, codigo || ' · ' || nombre as texto from promocion where id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_PROMOCION,
   },
+  nota_credito: { etiqueta: 'Nota de crédito', ruta: (id) => `/ventas/notas/${id}`, resumenes: resumenNota, manejador: MANEJADOR_NOTA },
+  nota_debito: { etiqueta: 'Nota de débito', ruta: (id) => `/ventas/notas/${id}`, resumenes: resumenNota, manejador: MANEJADOR_NOTA },
   meta_lote: {
     etiqueta: 'Lote de metas de venta',
     ruta: (id) => `/metas/lote/${id}`,
