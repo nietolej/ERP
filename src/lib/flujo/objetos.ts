@@ -8,6 +8,7 @@ import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
 import { aprobarCambio, aprobarProveedor, rechazarCambio } from '@/lib/maestros/proveedores';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { aprobarPedidoCredito, rechazarPedidoCredito } from '@/lib/ventas/pedidos';
+import { aprobarPromocion, rechazarPromocion } from '@/lib/ventas/promociones';
 import { decidirAprobacion, type Decision, type Manejador, type ResultadoDecision } from './flujo';
 
 /**
@@ -70,6 +71,11 @@ export const MANEJADOR_ORDEN_COMPRA: Manejador<void> = {
 export const MANEJADOR_FACTURA_COMPRA: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarFactura(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarFactura(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_PROMOCION: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarPromocion(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarPromocion(tx, id, usuario, motivo),
 };
 
 export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
@@ -138,6 +144,13 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select f.id::text as id, 'Factura ' || f.numero_factura || ' · ' || p.codigo || ' · US$ ' || f.total_usd as texto
          from factura_compra f join proveedor p on p.tercero_id = f.proveedor_id where f.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_FACTURA_COMPRA,
+  },
+  promocion: {
+    etiqueta: 'Promoción',
+    ruta: (id) => `/ventas/promociones/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select id::text as id, codigo || ' · ' || nombre as texto from promocion where id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_PROMOCION,
   },
   meta_lote: {
     etiqueta: 'Lote de metas de venta',

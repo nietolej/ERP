@@ -74,10 +74,10 @@ export async function facturarNotas(tx: Db, u: Usuario, notaIds: string[], opcio
 
   await tx.query(
     `insert into documento_venta_linea (documento_id, linea, producto_id, descripcion, cantidad, precio_unitario, descuento_pct, alicuota_iva_id,
-                                        producto_base_id, lista_precio, precio_lista, costo_unitario_usd, linea_origen_id, motivo_descuento_id)
+                                        producto_base_id, lista_precio, precio_lista, costo_unitario_usd, linea_origen_id, motivo_descuento_id, promocion_id)
      select $1, (row_number() over (order by n.numero, nl.linea))::int, nl.producto_id, nl.descripcion, nl.cantidad,
             round(nl.precio_unitario * $3::numeric, 4), nl.descuento_pct, nl.alicuota_iva_id, nl.producto_base_id, nl.lista_precio,
-            round(nl.precio_lista * $3::numeric, 4), nl.costo_unitario_usd, nl.id, nl.motivo_descuento_id
+            round(nl.precio_lista * $3::numeric, 4), nl.costo_unitario_usd, nl.id, nl.motivo_descuento_id, nl.promocion_id
        from documento_venta_linea nl join documento_venta n on n.id = nl.documento_id
       where n.id = any($2::uuid[])`, [facturaId, ids, tasa]);
   await tx.query('select fn_venta_calcular($1)', [facturaId]);

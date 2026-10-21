@@ -518,19 +518,26 @@ create table documento_venta_linea (
   unique (documento_id, linea)
 );
 
--- Promociones: qué se ofreció, a quién y cuándo. Base del análisis de promociones (Fase 8).
+-- Promociones: qué se ofreció, a quién y cuándo. Base del análisis de promociones (Fase 8). Migración 0027.
 create table promocion (
-  id            uuid primary key default gen_random_uuid(),
-  codigo        varchar(20) not null unique,
-  nombre        text not null,
-  tipo          text not null check (tipo in ('descuento_pct','precio_especial','cantidad','combo')),
-  vigente_desde date not null,
-  vigente_hasta date not null,
-  alcance       jsonb not null,        -- productos, códigos comunes, categorías, marcas, clientes o zonas
-  descuento_pct numeric(5,2),
-  aprobado_por  uuid references usuario(id),
-  created_by    uuid not null,
-  check (vigente_hasta >= vigente_desde)
+  id              uuid primary key default gen_random_uuid(),
+  codigo          varchar(10) not null unique,           -- PRM0001, asignado por el numerador
+  nombre          text not null, descripcion text,
+  tipo            text not null check (tipo in ('descuento_pct','precio_especial')),
+  descuento_pct   numeric(5,2),                          -- solo 'descuento_pct'
+  cantidad_minima numeric(14,4),                         -- compra mínima por línea; vacío = sin mínimo
+  vigente_desde   date not null,
+  vigente_hasta   date not null,
+  estado          text not null default 'borrador' check (estado in ('borrador','pendiente','aprobada','rechazada','anulada')),
+  aprobado_por    uuid references usuario(id),           -- Gerencia, distinta de quien la creó
+  created_by      uuid not null references usuario(id)
+);
+create table promocion_alcance (                         -- a qué aplica: productos y, si se quiere, clientes
+  id uuid primary key default gen_random_uuid(),
+  promocion_id uuid not null references promocion(id),
+  tipo text not null check (tipo in ('producto','codigo_comun','categoria','marca','cliente')),
+  entidad_id uuid not null,
+  precio_especial_usd numeric(14,2)                      -- solo 'precio_especial', por producto
 );
 ```
 
@@ -547,7 +554,14 @@ create table promocion (
 - Ambos son `documento_venta`; esta migración habilita solo los tipos `pedido` y `nota_entrega`. La factura, las NC y ND y la apertura se agregan con su propia migración.
 - Un borrador no tiene número (`numero` es nulo): el numerador lo asigna al emitir, así que los borradores eliminados no dejan huecos. Al emitir también se congelan la tasa BCV del día, la base, el IVA y los totales; el documento emitido no se edita ni se borra, solo se anula con motivo.
 - `situacion` (solo pedidos emitidos): `retenido_credito` espera la decisión de Gerencia por el flujo `pedido_credito`; `aprobado` ya reservó existencia.
-- Cada línea guarda la alícuota vigente (`alicuota_pct`). `promocion_id` y la tabla `promocion` se agregan cuando se construyan las promociones.
+- Cada línea guarda la alícuota vigente (`alicuota_pct`).
+
+**Promociones (migración 0027)**
+- **Tipos:** `descuento_pct` (un porcentaje) y `precio_especial` (un precio fijo por producto). Las promociones de cantidad son un descuento con `cantidad_minima`. El tipo «combo» de la versión anterior de esta especificación no se construyó: queda para cuando el negocio defina cómo se arman los combos.
+- **Alcance** (`promocion_alcance`): aplica a un producto si coincide con algún elemento de producto del alcance: el producto, su código común, su categoría (la indicada o cualquier subcategoría) o su marca. Si el alcance incluye clientes, solo aplica a esos clientes; sin clientes, a todos. Una promoción de precio especial solo se arma con productos concretos (cada uno con su precio) y, si se quiere, clientes. El alcance de cada tipo se valida contra su catálogo.
+- **Ciclo de vida:** nace en `borrador` (se arma y se edita), se envía a aprobación (`pendiente`, motor de flujo §4.5) y **Gerencia, distinta de quien la creó, la aprueba o la rechaza con motivo**. Una promoción enviada no se edita; una `aprobada` se anula con motivo o vence por fecha. Una promoción no se borra. Las crean Gerencia y el Supervisor de ventas.
+- **Cómo se aplica en el pedido:** al agregar o cambiar una línea sin descuento escrito a mano, la base busca la mejor promoción aprobada, vigente hoy, con la compra mínima cumplida y que alcance al producto y al cliente. **El descuento pactado con el cliente y la promoción no se acumulan:** gana el que deja el menor precio neto; la línea guarda la promoción (`promocion_id`), el descuento (con el motivo del sistema `PROMOCION`) o el precio especial, y siempre el precio de lista. Un descuento escrito a mano manda y deja la línea sin promoción. La base rechaza ligar una línea a una promoción no aprobada, no vigente, que no alcance al producto o al cliente, o cuyo descuento o precio no coincida.
+- La promoción viaja del pedido a la nota de entrega y a la factura. La vista `vw_promocion_aplicada` mide lo que cada una movió (notas de entrega vigentes, en USD): líneas, unidades, venta a precio de lista, lo cobrado y el descuento otorgado. El efecto frente a la venta esperada sin la promoción se mide en la Fase 8.
 - La nota de entrega se genera desde un pedido aprobado con **lo que hay reservado** y todavía no figura en otra nota; conserva precio, descuento e IVA del pedido y toma su propia tasa del día. Se anula mientras la mercancía no haya salido del almacén, y entonces la reserva vuelve al pedido.
 - Las reservas viven en `reserva_inventario` (estados `activa`, `en_nota`, `consumida`, `liberada`); `existencia.reservado` es su suma y no se edita a mano.
 - **Crédito:** solo se valida si la condición de pago del cliente tiene plazo (días > 0); un cliente de contado paga al entregar y no usa el límite. Lo comprometido es lo pendiente de entregar en pedidos aprobados más las notas de entrega vigentes; las cuentas por cobrar y la mora (días de mora máximos) se suman cuando exista `partida_cxc`.
@@ -896,6 +910,10 @@ Ningún movimiento se registra a mano: cada uno lo genera un documento (recepci�
 - **Transferencias** entre almacenes o sucursales con estado en tránsito.
 - **Toma física** por ciclos (clase ABC), con congelamiento del conteo y ajuste aprobado. Los faltantes y sobrantes van a una cuenta de gasto específica.
 - **Ajuste de inventario (migración 0020):** Almacén cuenta y agrega lo contado de cada producto; cada línea guarda lo que decía el sistema al contar, lo contado y, si hay diferencia, su motivo del catálogo de mermas. Al enviarlo recibe su número y queda pendiente: Gerencia lo aprueba o lo rechaza por el motor de flujo, y **nunca** lo aprueba quien lo creó ni quien hizo el conteo (la base de datos lo exige). Al aprobar se aplica la **diferencia** de cada línea (no el saldo del día de la aprobación, para no perder movimientos intermedios) con movimientos `ajuste_negativo` al costo promedio vigente y `ajuste_positivo` al costo promedio, o al costo indicado si el producto todavía no tiene. Su asiento sale del motor: faltante, Debe 5.1.02 y Haber Inventario; sobrante, Debe Inventario y Haber 5.1.02, en USD a la tasa del día. Un faltante no puede dejar la existencia por debajo de lo reservado.
+- **Disponibilidad y velocidad de venta (migración 0027):** `fn_disponibilidad(desde, hasta)` calcula, para cada producto con registro de existencia, los días del periodo, los **días con existencia** (existencia de los almacenes que venden mayor que cero al cierre del día), los **días sin existencia**, el % de disponibilidad, las unidades vendidas (salidas por venta menos devoluciones de clientes), la **velocidad básica** (÷ días del periodo) y la **ajustada** (÷ días con existencia), la existencia comercial al cierre, la **cobertura en días**, la **venta perdida estimada** (días sin existencia × velocidad ajustada, en unidades y a precio de la lista A vigente al cierre) y el **estado de salud**. Se calcula por tramos entre un cambio de existencia y el siguiente, no día por día, y debe coincidir con `fn_dias_con_existencia` (se prueba). Antes del primer registro del producto no hay dato: el periodo cuenta desde ahí. La vista `vw_disponibilidad` aplica la ventana vigente (`VENTANA_VELOCIDAD_DIAS`, 90 por defecto) terminada hoy.
+  - **Estados de salud** (en este orden de prioridad): `RIESGO_QUIEBRE` (existencia ≤ 0 o cobertura menor al mínimo), `DEMANDA_REPRIMIDA` (disponibilidad menor al mínimo con velocidad ajustada mayor a la indicada), `SOBRESTOCK` (cobertura mayor al máximo con ventas), `SIN_ROTACION` (hay existencia y no se vendió nada en el periodo) y `SALUDABLE`. `SIN_ROTACION` se agregó a los cuatro de spec_reportes §9.1: sin él, la existencia que no se vende aparecía como saludable.
+  - **Parámetros** (`parametro_inventario`, valores de referencia que Gerencia debe confirmar; aún sin pantalla para editarlos): `VENTANA_VELOCIDAD_DIAS` 90, `COBERTURA_RIESGO_DIAS` 15, `DISPONIBILIDAD_REPRIMIDA` 60 %, `VELOCIDAD_REPRIMIDA` 0,1 unidades por día y `COBERTURA_SOBRESTOCK_DIAS` 180. Sin un parámetro, el cálculo falla: nunca se inventa un umbral.
+  - **Pantalla:** Inventario → Disponibilidad y velocidad de venta (`/reportes/inventario`), primera pestaña del módulo M6 de [spec_reportes.md](spec_reportes.md).
 - **Reservas** por pedido aprobado, **punto de reorden** y **sugerido de compra**. El sugerido usa la velocidad de venta ajustada por los días con existencia, la cobertura deseada y lo pendiente en tránsito y en producción, todo calculado con los movimientos registrados en el ERP.
 - **Órdenes de producción o ensamblaje:** ver §8.4.
 

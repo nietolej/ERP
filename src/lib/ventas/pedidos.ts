@@ -5,6 +5,7 @@ import { cancelarSolicitud, solicitarAprobacion } from '@/lib/flujo/flujo';
 import { motivoSistema, textoDeAnulacion, type MotivoDocumento } from '@/lib/maestros/motivos';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { cancelarOrdenDeNota, crearOrdenPicking } from './picking';
+import { promocionParaLinea } from './promociones';
 
 /**
  * Pedido de venta y nota de entrega (§6.1, §6.2). Ambos son `documento_venta`; la base de datos
@@ -117,8 +118,28 @@ async function motivoDeDescuento(tx: Db, pct: Decimal, descuentoCliente: string,
 }
 
 /**
+ * Precio, descuento y promoción con que queda una línea cuando nadie escribió un descuento a mano: parte del descuento pactado
+ * con el cliente y lo cambia por la mejor promoción vigente si esta deja un precio neto menor (no se acumulan; §6.2).
+ */
+async function precioAutomatico(
+  tx: Db, d: { productoId: string; clienteId: string; cantidad: string; precioLista: string; descuentoCliente: string },
+): Promise<{ precioUnitario: string; descuentoPct: string; promocionId: string | null }> {
+  const { rows } = await tx.query<{ hoy: string }>(`select ((now() at time zone 'America/Caracas')::date)::text as hoy`);
+  const promo = await promocionParaLinea(tx, { productoId: d.productoId, clienteId: d.clienteId, fecha: rows[0].hoy, cantidad: d.cantidad, precioLista: d.precioLista });
+  const netoCliente = new Decimal(d.precioLista).times(new Decimal(100).minus(d.descuentoCliente)).div(100);
+  if (promo && new Decimal(promo.precioNeto).lt(netoCliente)) {
+    return { precioUnitario: promo.precioUnitario, descuentoPct: promo.descuentoPct, promocionId: promo.promocionId };
+  }
+  return { precioUnitario: d.precioLista, descuentoPct: d.descuentoCliente, promocionId: null };
+}
+
+/** Motivo de una línea con promoción: el del sistema si hay descuento; sin descuento (precio especial) no lleva motivo. */
+const motivoDePromocion = (tx: Db, descuentoPct: string) =>
+  new Decimal(descuentoPct).isZero() ? Promise.resolve(null) : motivoSistema(tx, 'descuento', 'PROMOCION');
+
+/**
  * Agrega un producto. El precio sale de la lista del nivel del cliente vigente hoy; no se escribe a mano.
- * El descuento por defecto es el del cliente.
+ * El descuento por defecto es el del cliente, o el de la mejor promoción vigente si deja un precio menor.
  */
 export async function agregarLinea(
   tx: Db, u: Usuario, pedidoId: string, d: { productoId: string; cantidad: string; descuentoPct?: string; motivoDescuentoId?: string },
@@ -145,15 +166,21 @@ export async function agregarLinea(
   const { rows: previa } = await tx.query('select 1 from documento_venta_linea where documento_id = $1 and producto_id = $2', [pedidoId, d.productoId]);
   if (previa.length) throw new ErrorMaestro('Ese producto ya está en el pedido: cambie su cantidad.');
 
-  const descuento = d.descuentoPct?.trim() || p.descuento_cliente;
-  const motivo = await motivoDeDescuento(tx, new Decimal(descuento), p.descuento_cliente, d.motivoDescuentoId);
+  // Un descuento escrito a mano manda: sin promoción. Si no, se aplica la mejor promoción vigente.
+  const manual = d.descuentoPct?.trim() ? d.descuentoPct.trim() : null;
+  const auto = manual
+    ? { precioUnitario: p.precio, descuentoPct: manual, promocionId: null as string | null }
+    : await precioAutomatico(tx, { productoId: d.productoId, clienteId: doc.cliente_id, cantidad, precioLista: p.precio, descuentoCliente: p.descuento_cliente });
+  const motivo = auto.promocionId
+    ? await motivoDePromocion(tx, auto.descuentoPct)
+    : await motivoDeDescuento(tx, new Decimal(auto.descuentoPct), p.descuento_cliente, d.motivoDescuentoId);
   await tx.query(
     `insert into documento_venta_linea (documento_id, linea, producto_id, descripcion, cantidad, precio_unitario, descuento_pct,
-                                        alicuota_iva_id, producto_base_id, lista_precio, precio_lista, motivo_descuento_id)
+                                        alicuota_iva_id, producto_base_id, lista_precio, precio_lista, motivo_descuento_id, promocion_id)
      values ($1, (select coalesce(max(linea), 0) + 1 from documento_venta_linea where documento_id = $1),
-             $2, $3, $4, $5, $6, $7, $8, $9, $5, $10)`,
-    [pedidoId, d.productoId, p.descripcion, cantidad, p.precio, descuento,
-     p.alicuota_iva_id, p.producto_base_id, p.nivel, motivo]);
+             $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [pedidoId, d.productoId, p.descripcion, cantidad, auto.precioUnitario, auto.descuentoPct,
+     p.alicuota_iva_id, p.producto_base_id, p.nivel, p.precio, motivo, auto.promocionId]);
   await tx.query('select fn_venta_calcular($1)', [pedidoId]);
 }
 
@@ -165,20 +192,39 @@ export async function cambiarLinea(
   if (!CANTIDAD.test(cantidad) || new Decimal(cantidad).lte(0)) throw new ErrorMaestro('La cantidad debe ser mayor que cero, con hasta 4 decimales.');
   const descuento = d.descuentoPct?.trim();
   if (descuento && (!PORCENTAJE.test(descuento) || new Decimal(descuento).gt(100))) throw new ErrorMaestro('El descuento debe ser un porcentaje entre 0 y 100.');
-  const { rows: actual } = await tx.query<{ descuento_pct: string; motivo_descuento_id: string | null; descuento_cliente: string }>(
-    `select l.descuento_pct::text, l.motivo_descuento_id, c.descuento_pct::text as descuento_cliente
+  const { rows: actual } = await tx.query<{
+    descuento_pct: string; motivo_descuento_id: string | null; descuento_cliente: string; producto_id: string;
+    precio_lista: string; precio_unitario: string; promocion_id: string | null;
+  }>(
+    `select l.descuento_pct::text, l.motivo_descuento_id, c.descuento_pct::text as descuento_cliente, l.producto_id,
+            l.precio_lista::text, l.precio_unitario::text, l.promocion_id
        from documento_venta_linea l join cliente c on c.tercero_id = $3 where l.id = $2 and l.documento_id = $1`, [pedidoId, lineaId, doc.cliente_id]);
-  if (!actual[0]) throw new ErrorMaestro('La línea no existe.');
-  // Si el descuento no cambia, conserva su motivo; si cambia, el nuevo descuento necesita el suyo.
-  let pct = actual[0].descuento_pct;
-  let motivo = actual[0].motivo_descuento_id;
+  const a = actual[0];
+  if (!a) throw new ErrorMaestro('La línea no existe.');
+  // Si el descuento no cambia, conserva su motivo; si cambia, el nuevo descuento necesita el suyo y deja de ser de una promoción.
+  let pct = a.descuento_pct;
+  let precio = a.precio_unitario;
+  let motivo = a.motivo_descuento_id;
+  let promocionId = a.promocion_id;
   if (descuento && !new Decimal(descuento).equals(pct)) {
     pct = new Decimal(descuento).toFixed(2);
-    motivo = await motivoDeDescuento(tx, new Decimal(pct), actual[0].descuento_cliente, d.motivoDescuentoId);
+    precio = a.precio_lista;
+    promocionId = null;
+    motivo = await motivoDeDescuento(tx, new Decimal(pct), a.descuento_cliente, d.motivoDescuentoId);
+  } else if (a.promocion_id || new Decimal(a.descuento_pct).equals(a.descuento_cliente)) {
+    // La línea no tiene un descuento escrito a mano: con la nueva cantidad se vuelve a buscar la mejor promoción.
+    const auto = await precioAutomatico(tx, { productoId: a.producto_id, clienteId: doc.cliente_id, cantidad, precioLista: a.precio_lista, descuentoCliente: a.descuento_cliente });
+    precio = auto.precioUnitario;
+    pct = auto.descuentoPct;
+    promocionId = auto.promocionId;
+    motivo = auto.promocionId
+      ? await motivoDePromocion(tx, pct)
+      : await motivoDeDescuento(tx, new Decimal(pct), a.descuento_cliente);
   }
   await tx.query(
-    `update documento_venta_linea set cantidad = $3, descuento_pct = $4, motivo_descuento_id = $5 where id = $2 and documento_id = $1`,
-    [pedidoId, lineaId, cantidad, pct, motivo]);
+    `update documento_venta_linea set cantidad = $3, precio_unitario = $4, descuento_pct = $5, motivo_descuento_id = $6, promocion_id = $7
+      where id = $2 and documento_id = $1`,
+    [pedidoId, lineaId, cantidad, precio, pct, motivo, promocionId]);
   await tx.query('select fn_venta_calcular($1)', [pedidoId]);
 }
 
@@ -350,10 +396,10 @@ export async function crearNotaDesdeReservas(
   for (const [lineaPedido, cantidad] of porLinea) {
     const { rows } = await tx.query<{ id: string }>(
       `insert into documento_venta_linea (documento_id, linea, producto_id, descripcion, cantidad, precio_unitario, descuento_pct,
-                                          alicuota_iva_id, producto_base_id, lista_precio, precio_lista, linea_origen_id, motivo_descuento_id)
+                                          alicuota_iva_id, producto_base_id, lista_precio, precio_lista, linea_origen_id, motivo_descuento_id, promocion_id)
        select $1, (select coalesce(max(linea), 0) + 1 from documento_venta_linea where documento_id = $1),
               producto_id, descripcion, $3, precio_unitario, descuento_pct, alicuota_iva_id, producto_base_id, lista_precio, precio_lista, id,
-              motivo_descuento_id
+              motivo_descuento_id, promocion_id
          from documento_venta_linea where id = $2 returning id`, [notaId, lineaPedido, cantidad.toString()]);
     lineaDeNota.set(lineaPedido, rows[0].id);
   }

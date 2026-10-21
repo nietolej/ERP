@@ -361,11 +361,14 @@ Todas las pestañas se pueden exportar a CSV.
 | Pendiente en producción | Cantidad de órdenes de producción abiertas menos lo ya entregado |
 | Sugerido de compra | max(0, ⌈velocidad ajustada × días de cobertura − (stock comercial + tránsito + producción)⌉). Días de cobertura: **parámetro**, 90 por defecto |
 
-**Estado de salud** (umbrales configurables):
+**Estado de salud** (umbrales configurables en `parametro_inventario`; en este orden de prioridad):
 1. **RIESGO_QUIEBRE**: stock comercial ≤ 0 o cobertura menor a 15 días.
 2. **DEMANDA_REPRIMIDA**: disponibilidad menor al 60 % y velocidad ajustada mayor a 0,1 unidades por día.
 3. **SOBRESTOCK**: cobertura mayor a 6 meses con velocidad mayor a 0.
-4. **SALUDABLE**: el resto.
+4. **SIN_ROTACION**: hay existencia y no se vendió nada en el periodo.
+5. **SALUDABLE**: el resto.
+
+*Entregado (migración 0027):* los indicadores de esta tabla, salvo el pendiente en tránsito y en producción y el sugerido de compra, salen de `fn_disponibilidad` y se muestran en `/reportes/inventario`. Las unidades vendidas son las salidas por venta menos las devoluciones de clientes del kardex. Detalle en la especificación principal, §8.3.
 
 ### 9.2 Pestañas
 - **"Velocidad Ajustada & Salud de Stock"**: matriz con código y descripción, grupo, stock actual, DIS, velocidad básica, velocidad ajustada, cobertura real, venta perdida y estado de salud. Ordenable; por defecto, por venta perdida descendente.

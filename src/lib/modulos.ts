@@ -5,10 +5,12 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
+import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
 import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
 import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
 import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
 import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
+import { ROLES_VEN_PROMOCIONES } from '@/lib/ventas/promociones';
 import { ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
 import { ROLES_VEN_TRANSPORTISTAS } from '@/lib/maestros/transportistas';
 
@@ -54,6 +56,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Transportistas y vehículos', href: '/maestros/transportistas', roles: [...ROLES_VEN_TRANSPORTISTAS] },
       { texto: 'Facturas de venta', href: '/ventas/facturas', roles: [...ROLES_VEN_FACTURAS] },
       { texto: 'Notas de crédito y débito', fase: 2 },
+      { texto: 'Promociones', href: '/ventas/promociones', roles: [...ROLES_VEN_PROMOCIONES] },
       { texto: 'Ventas perdidas', href: '/ventas/perdidas', roles: [...ROLES_VEN_VENTAS] },
       { texto: 'Devoluciones', fase: 2 },
       { texto: 'Portal de clientes', fase: 7 },
@@ -69,6 +72,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Proveedores', href: '/maestros/proveedores', roles: ROLES_COMPRAS },
       { texto: 'Existencias', href: '/inventario/existencias', roles: [...ROLES_VEN_EXISTENCIAS] },
       { texto: 'Ajustes de inventario', href: '/inventario/ajustes', roles: [...ROLES_VEN_AJUSTES] },
+      { texto: 'Disponibilidad y velocidad de venta', href: '/reportes/inventario', roles: [...ROLES_VEN_DISPONIBILIDAD] },
       { texto: 'Kardex de movimientos', fase: 2 },
       { texto: 'Órdenes de compra', href: '/compras/ordenes', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Recepciones de mercancía', href: '/compras/recepciones', roles: [...ROLES_VEN_COMPRAS] },
