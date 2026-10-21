@@ -14,6 +14,11 @@ import type { Db } from '@/lib/db/tipos';
  * - Importes en VES y USD con decimales exactos; la tasa del día sale de `fn_tasa`.
  * - Si el redondeo a centavos deja una diferencia, se agrega una línea a la cuenta
  *   de redondeo configurada. Diferencias mayores indican reglas mal definidas y fallan.
+ *
+ * Dos extensiones para los cobros (migración 0028), donde los importes dependen de valores históricos:
+ * - `cuentas`: una regla puede apuntar a una cuenta variable (p. ej. el banco donde entró el cobro).
+ * - `importesDobles`: un importe puede traer su valor en VES y en USD ya calculado (la parte de una cuenta por cobrar
+ *   cancelada vale lo que valía su factura, no lo que vale hoy). Esas líneas no se convierten a la tasa del día.
  */
 
 export interface EventoContable {
@@ -26,6 +31,10 @@ export interface EventoContable {
   moneda: string;
   /** Importes en la moneda original, como texto decimal ('116.00'). */
   importes: Record<string, string>;
+  /** Cuentas de las reglas con cuenta variable (`cuenta_variable`), por nombre. */
+  cuentas?: Record<string, string>;
+  /** Importes con su valor en VES y USD ya calculado, por la clave del importe. `original` es solo informativo. */
+  importesDobles?: Record<string, { ves: string; usd: string; original?: string }>;
   terceroId?: string;
   centroCostoId?: string;
   usuarioId: string;
@@ -40,7 +49,8 @@ export interface ResultadoContable {
 interface Regla {
   orden: number;
   lado: 'D' | 'H';
-  cuenta_id: string;
+  cuenta_id: string | null;
+  cuenta_variable: string | null;
   importe: string;
   glosa: string | null;
 }
@@ -53,6 +63,8 @@ export interface LineaOriginal {
   glosa: string | null;
   centroCostoId?: string | null;
   terceroId?: string | null;
+  /** Valor ya calculado en VES y USD: no se convierte. */
+  explicito?: { ves: Decimal; usd: Decimal };
 }
 
 export interface Tasas {
@@ -77,7 +89,7 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
   }
 
   const { rows: reglas } = await tx.query<Regla>(
-    `select orden, lado, cuenta_id, importe, glosa
+    `select orden, lado, cuenta_id, cuenta_variable, importe, glosa
        from regla_contable where evento = $1 and activa order by orden`,
     [ev.evento],
   );
@@ -88,6 +100,25 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
   const tasas = await tasasDelDia(tx, ev.moneda, ev.fecha);
   const lineas: LineaOriginal[] = [];
   for (const r of reglas) {
+    let cuentaId = r.cuenta_id;
+    if (!cuentaId) {
+      cuentaId = ev.cuentas?.[r.cuenta_variable ?? ''] ?? null;
+      if (!cuentaId) throw new ErrorContable(`El evento "${ev.evento}" no trae la cuenta "${r.cuenta_variable}" que pide la regla ${r.orden}`);
+    }
+    const doble = ev.importesDobles?.[r.importe];
+    if (doble) {
+      const ves = new Decimal(doble.ves);
+      const usd = new Decimal(doble.usd);
+      if (ves.isNegative() || usd.isNegative()) {
+        throw new ErrorContable(`El importe "${r.importe}" es negativo (VES ${doble.ves}, USD ${doble.usd}); las reglas usan importes positivos`);
+      }
+      if (ves.isZero() && usd.isZero()) continue;
+      lineas.push({
+        cuentaId, lado: r.lado, original: new Decimal(doble.original ?? '0'), glosa: r.glosa,
+        centroCostoId: ev.centroCostoId, terceroId: ev.terceroId, explicito: { ves, usd },
+      });
+      continue;
+    }
     const texto = ev.importes[r.importe];
     if (texto === undefined) {
       throw new ErrorContable(`El evento "${ev.evento}" no trae el importe "${r.importe}" que pide la regla ${r.orden}`);
@@ -98,13 +129,14 @@ export async function contabilizar(tx: Db, ev: EventoContable): Promise<Resultad
     }
     if (original.isZero()) continue;
     lineas.push({
-      cuentaId: r.cuenta_id, lado: r.lado, original, glosa: r.glosa,
+      cuentaId, lado: r.lado, original, glosa: r.glosa,
       centroCostoId: ev.centroCostoId, terceroId: ev.terceroId,
     });
   }
 
-  // Las reglas deben cuadrar en la moneda original: si no, están mal definidas.
-  if (!cuadraEnOriginal(lineas)) {
+  // Las reglas deben cuadrar en la moneda original: si no, están mal definidas. Con importes dobles (valores históricos
+  // distintos de los del día) el cuadre se exige en VES y USD, que lo verifica insertarLineasConvertidas y la base de datos.
+  if (!lineas.some((l) => l.explicito) && !cuadraEnOriginal(lineas)) {
     const { debe, haber } = sumasOriginales(lineas);
     throw new ErrorContable(`Las reglas del evento "${ev.evento}" no cuadran: debe ${debe} ≠ haber ${haber}`);
   }
@@ -153,6 +185,7 @@ export async function insertarLineasConvertidas(
   tx: Db, asientoId: string, moneda: string, tasas: Tasas, lineas: LineaOriginal[],
 ): Promise<void> {
   const convertidas = lineas.map((l) => {
+    if (l.explicito) return { ...l, ves: l.explicito.ves, usd: l.explicito.usd };
     const ves = dos(l.original.times(tasas.moneda));
     const usd = moneda === 'USD' ? dos(l.original) : dos(ves.dividedBy(tasas.usd));
     return { ...l, ves, usd };

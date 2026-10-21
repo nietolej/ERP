@@ -42,6 +42,7 @@ describe('migraciones', () => {
       '0025_gastos_importacion.sql',
       '0026_transporte.sql',
       '0027_disponibilidad_promociones.sql',
+      '0028_cobros.sql',
     ]);
   });
 

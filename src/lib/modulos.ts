@@ -10,6 +10,8 @@ import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
 import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
 import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
 import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
+import { ROLES_VEN_COBROS } from '@/lib/ventas/cobros';
+import { ROLES_VEN_CUENTAS } from '@/lib/maestros/cuentas-bancarias';
 import { ROLES_VEN_PROMOCIONES } from '@/lib/ventas/promociones';
 import { ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
 import { ROLES_VEN_TRANSPORTISTAS } from '@/lib/maestros/transportistas';
@@ -95,7 +97,8 @@ export const MODULOS: Modulo[] = [
       { texto: 'Balance de comprobación', href: '/contabilidad/balance', roles: CONTABLES },
       { texto: 'Periodos contables', href: '/contabilidad/periodos', roles: CONTABLES },
       { texto: 'Plan de cuentas', href: '/contabilidad/plan-de-cuentas', roles: CONTABLES },
-      { texto: 'Cuentas por cobrar y cobros', fase: 2 },
+      { texto: 'Cuentas por cobrar', href: '/cobranzas/cuentas', roles: [...ROLES_VEN_COBROS] },
+      { texto: 'Cobros', href: '/cobranzas/cobros', roles: [...ROLES_VEN_COBROS] },
       { texto: 'Cuentas por pagar', href: '/compras/cuentas-por-pagar', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Pagos a proveedores', fase: 3 },
       { texto: 'Activos fijos y depreciación', fase: 6 },
@@ -109,7 +112,7 @@ export const MODULOS: Modulo[] = [
     descripcion: 'Bancos, cuentas bancarias, caja chica, gastos y conciliación.',
     items: [
       { texto: 'Bancos', href: '/maestros/bancos', roles: ROLES_VEN_BANCOS },
-      { texto: 'Cuentas bancarias y caja', fase: 3 },
+      { texto: 'Cuentas bancarias y caja', href: '/tesoreria/cuentas', roles: [...ROLES_VEN_CUENTAS] },
       { texto: 'Gastos y caja chica', fase: 3 },
       { texto: 'Conciliación bancaria', fase: 3 },
     ],

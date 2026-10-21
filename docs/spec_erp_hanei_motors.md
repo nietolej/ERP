@@ -410,7 +410,7 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 
 ### 5.4 Otros maestros
 - **Transportistas, vehículos y tarifas** (§6.4): la flota propia y los proveedores de servicio de entrega. Un transportista de terceros es un **proveedor de tipo servicios, ya aprobado**, y lleva sus tarifas como dato maestro.
-- **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, moneda, cuenta contable, si es de custodia o en el exterior).
+- **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, tipo, moneda y su subcuenta contable propia, §6.3), con los **instrumentos de pago** (`instrumento_pago`).
 - **Plan de cuentas** (§12.1), **centros de costo** (sucursal, departamento) y **categorías de gasto** (§10.1).
 - **Conceptos ISLR** (Decreto 1.808) y **alícuotas de IVA**, con vigencia.
 - **Metas de venta**, cargadas por Gerencia o Supervisor de ventas (Excel o captura manual) y aprobadas por Gerencia en el ERP. Cada carga es un **lote** con número de versión, usuario y fecha, que nace `pendiente`; quien lo cargó no lo aprueba. La meta vigente de cada clave es la del último lote aprobado (vista `vw_meta_periodo`). Las filas de un lote no se editan: un cambio es un lote nuevo. Es todo o nada: si una fila tiene error no se guarda nada.
@@ -592,43 +592,74 @@ create table promocion_alcance (                         -- a qué aplica: produ
 
 ### 6.3 Cuentas por cobrar y cobranzas
 ```sql
-create table partida_cxc (            -- una por documento que genera deuda (factura, ND) o crédito (NC, anticipo)
+create table partida_cxc (            -- una por factura (y, cuando se construyan, por ND); la NC y el anticipo no abren partida: reducen o se aplican
   id uuid primary key default gen_random_uuid(),
   cliente_id uuid not null references cliente(tercero_id),
-  documento_id uuid unique references documento_venta(id),   -- factura, ND o NC
-  cobro_id uuid references cobro(id),                        -- anticipo: cobro sin factura
-  check ((documento_id is null) <> (cobro_id is null)),
+  documento_id uuid not null unique references documento_venta(id),
   fecha date not null, vencimiento date not null,
   moneda char(3) not null, tasa numeric(18,6) not null,
-  monto_original numeric(16,2) not null,
-  saldo numeric(16,2) not null,          -- se actualiza en la misma transacción que la aplicación
+  monto_original numeric(16,2) not null,      -- en la moneda de la factura (bolívares)
+  monto_usd numeric(16,2) not null,           -- su valor en USD a la tasa de la factura
+  saldo numeric(16,2) not null,               -- saldo en bolívares
+  saldo_usd numeric(16,2) not null,           -- lo que queda de su valor en USD, a la tasa de la factura (migración 0028)
   estado text not null check (estado in ('abierta','cancelada','anulada'))
+);
+
+create table instrumento_pago (               -- cómo pagó el cliente: transferencia, pago móvil, efectivo, Zelle, USDT, punto de venta, cheque
+  id uuid primary key default gen_random_uuid(),
+  codigo varchar(20) not null unique, nombre text not null,
+  genera_igtf boolean not null default false,  -- lo usará el IGTF (Fase 3 y 4)
+  activo boolean not null default true
+);
+
+create table cuenta_bancaria (                -- cuentas de la empresa donde entra el dinero: bancos, cajas, custodia, exterior y USDT
+  id uuid primary key default gen_random_uuid(),
+  codigo varchar(10) not null unique,          -- CB0001, asignado por el numerador
+  nombre text not null, banco_id uuid references banco(id), numero text,
+  tipo text not null check (tipo in ('banco','caja','custodia','exterior','digital')),
+  moneda char(3) not null references moneda(codigo),
+  cuenta_contable_id uuid not null unique references cuenta_contable(id),   -- subcuenta propia, creada con la cuenta bancaria
+  activa boolean not null default true
 );
 
 create table cobro (
   id uuid primary key default gen_random_uuid(),
-  numero bigint not null unique, cliente_id uuid not null, fecha date not null,
+  numero bigint not null unique,               -- correlativo sin huecos
+  cliente_id uuid not null references cliente(tercero_id),
+  fecha date not null,                         -- fecha del cobro: hoy o anterior, nunca futura
   instrumento_id uuid not null references instrumento_pago(id),
-  cuenta_bancaria_id uuid references cuenta_bancaria(id),
-  referencia text, moneda char(3) not null, tasa numeric(18,6) not null,
+  cuenta_bancaria_id uuid not null references cuenta_bancaria(id),
+  referencia text,                             -- número de transferencia, de cheque, etc.; no se repite por cuenta
+  moneda char(3) not null, tasa numeric(18,6) not null,        -- tasa BCV de la fecha, la fija la base de datos
   monto numeric(16,2) not null check (monto > 0),
-  igtf_percibido numeric(16,2) not null default 0,
-  adjunto_id uuid references adjunto(id),        -- imagen o PDF del comprobante de pago (tabla de adjuntos del ERP)
+  monto_ves numeric(18,2) not null, monto_usd numeric(16,2) not null,   -- valor del cobro en los libros, congelado
+  por_aplicar numeric(16,2) not null,          -- anticipo: lo que aún no se ha aplicado a ninguna factura (en la moneda del cobro)
+  por_aplicar_ves numeric(18,2) not null, por_aplicar_usd numeric(16,2) not null,   -- su valor en los libros
   estado text not null default 'registrado' check (estado in ('registrado','conciliado','anulado'))
 );
 
-create table aplicacion_cobro (
-  cobro_id uuid not null references cobro(id),
-  partida_id uuid not null references partida_cxc(id),
-  monto_moneda_partida numeric(16,2) not null check (monto_moneda_partida > 0),
-  diferencial_cambiario_ves numeric(18,2) not null default 0,
-  primary key (cobro_id, partida_id)
+create table aplicacion_cobro (                -- inmutable; el saldo de la partida lo mueve el trigger de esta tabla
+  id uuid primary key default gen_random_uuid(),
+  cobro_id uuid not null references cobro(id), partida_id uuid not null references partida_cxc(id),
+  origen text not null check (origen in ('registro','anticipo')),   -- al registrar el cobro, o aplicando después un anticipo
+  fecha date not null, tasa numeric(18,6) not null,
+  monto_cobro numeric(16,2) not null check (monto_cobro > 0),        -- cuánto del cobro se aplica, en la moneda del cobro
+  monto_partida numeric(16,2) not null check (monto_partida > 0),    -- cuántos bolívares de la factura cancela
+  usd_partida numeric(16,2) not null,          -- cuántos USD (a la tasa de la factura) deja de deber la partida
+  base_ves numeric(18,2) not null, base_usd numeric(16,2) not null,  -- valor en los libros de lo cobrado que se aplica
+  revertida boolean not null default false
 );
 ```
-- **Retenciones recibidas:** si el cliente es agente de retención de IVA, al cobrar se registra su comprobante (75 % o 100 %). La retención reduce la partida y va a una cuenta de activo ("IVA retenido por clientes"), que se descuenta en la declaración.
-- **Descuento por pronto pago:** si el cobro total llega dentro del plazo de la condición de pago, el sistema **propone** la NC de pronto pago (hoy entre 10 % y 25 %). Queda emitida solo cuando el usuario la confirma.
-- **Anticipos:** un cobro sin factura crea una partida de crédito que se aplica después.
-- **Reportes de cobranza del ERP:** antigüedad de saldos por días desde la emisión y desde el vencimiento, días de pago ponderados por monto (`fecha_cobro − fecha_factura`), % cobrado a tiempo y efectividad de cobro, calculados sobre los cobros registrados en el ERP.
+- **Cuentas bancarias (Tesorería y Gerencia):** cada cuenta de la empresa tiene su **subcuenta contable propia**, que se crea con ella bajo la cuenta de agrupación que corresponde (caja 1.1.01, bancos en bolívares 1.1.02, divisas y custodia 1.1.03, activos digitales 1.1.04). La moneda de la cuenta es la de sus cobros. Una cuenta con movimientos no se borra: se inactiva. La conciliación bancaria (Fase 3) se apoya en ellas.
+- **Quién cobra:** Cobranzas, Tesorería y Gerencia registran y aplican cobros; **Facturación no** (quien factura no aplica cobros, §3.6). Ven los cobros además Supervisor de ventas, Contabilidad, Jefe de contabilidad y Auditor.
+- **Registrar un cobro** (una sola transacción: cobro, aplicaciones, saldos y asiento): se indica el cliente, la fecha, el instrumento, la cuenta donde entró, la referencia, el monto y a qué facturas se aplica. La moneda es la de la cuenta y la tasa es la BCV de la fecha (la fija la base de datos, no se digita). Lo que no se aplica queda como **anticipo** del cliente.
+- **Cómo se aplica:** la factura va en bolívares (decisión 14). Un cobro en bolívares cancela esos bolívares. Un cobro en divisas cancela `monto × tasa BCV de la fecha del cobro` bolívares. Si el cobro liquida el saldo de la factura, se cancela el saldo exacto (la tolerancia es un centavo de la divisa por la conversión). Una aplicación nunca supera el saldo de la factura ni lo que queda del cobro, y solo se aplica a facturas del mismo cliente.
+- **Diferencial cambiario:** cada factura conserva su valor en USD de la fecha de emisión (`saldo_usd`). Al cobrar, lo que sale de cuentas por cobrar va a su valor histórico y lo que entra al banco, al valor de la fecha del cobro; la diferencia en USD va a **pérdida o ganancia por diferencial cambiario** (§3.4). En bolívares no hay diferencia, salvo al aplicar un anticipo cuya conversión cambió.
+- **Anticipos:** el anticipo se contabiliza en *Anticipos de clientes* (pasivo) por su valor en los libros. Después se aplica a una o varias facturas del cliente: sale del pasivo a ese valor, entra a cuentas por cobrar al valor de la factura y la diferencia, en bolívares y en USD, va al diferencial cambiario. El saldo de la factura se calcula a la tasa BCV de la fecha de la aplicación.
+- **Anular un cobro** (con motivo, mientras no esté conciliado y no tenga un anticipo ya aplicado): asiento de reverso, las facturas recuperan su saldo y el número queda anulado. Con un anticipo aplicado después, primero se corrigen esas aplicaciones con una nota de crédito. Una factura con cobros aplicados no se anula.
+- **Auxiliar contra mayor:** la suma de `saldo` de las partidas abiertas es igual al saldo de *Cuentas por cobrar comerciales* y la suma de `saldo_usd`, al saldo en USD, al centavo. Los anticipos pendientes suman igual a *Anticipos de clientes*. La pantalla lo muestra y la prueba lo exige.
+- **Pendiente de esta sección:** IGTF percibido en el cobro (`genera_igtf` ya está en el instrumento), retenciones recibidas de IVA e ISLR, descuento por pronto pago (la NC que el sistema propone) y las notas de crédito y débito. Cada uno se suma a este mismo flujo.
+- **Reportes de cobranza del ERP:** antigüedad de saldos por días desde la emisión y desde el vencimiento (pantalla *Cuentas por cobrar*), días de pago ponderados por monto (`fecha_cobro − fecha_factura`), % cobrado a tiempo y efectividad de cobro, calculados sobre los cobros registrados en el ERP.
 
 **Criterios de aceptación de Ventas y CxC**
 - La suma de saldos de `partida_cxc` es igual al saldo de la cuenta de mayor "Cuentas por cobrar comerciales", **al centavo**, en VES y en USD.
@@ -1190,10 +1221,11 @@ Las reglas viven en una tabla `regla_contable` (evento, condición, cuenta del d
 | NC por devolución | Devoluciones en ventas (base) · IVA débito fiscal (IVA) | CxC comerciales |
 | Reingreso de la devolución al inventario | Inventario | Costo de ventas |
 | NC por pronto pago o descuento comercial | Descuentos en ventas · IVA débito fiscal (si la NC lo discrimina) | CxC comerciales |
-| Cobro | Banco o caja (monto a la tasa del cobro) | CxC (monto a la tasa de la factura) · **Ganancia o pérdida cambiaria** (diferencia) |
+| Cobro (eventos `cobro` y `aplicacion_anticipo`) | Banco o caja (monto a la tasa del cobro) · Pérdida cambiaria | CxC (monto a la tasa de la factura) · Anticipos de clientes (si queda saldo) · Ganancia cambiaria |
 | IGTF percibido en el cobro | Banco o caja | IGTF percibido por enterar |
 | Retención de IVA recibida | IVA retenido por clientes | CxC comerciales |
-| Anticipo de cliente | Banco | Anticipos de clientes |
+| Anticipo de cliente (la parte del cobro sin aplicar) | Banco | Anticipos de clientes |
+| Aplicación de un anticipo a una factura | Anticipos de clientes (a su valor en los libros) · Pérdida cambiaria (si la hay) | CxC comerciales (a su valor histórico) · Ganancia cambiaria (si la hay) |
 | Recepción de compra | Inventario | Mercancía recibida no facturada |
 | Factura de compra de mercancía | Mercancía recibida no facturada · IVA crédito fiscal | CxP proveedores |
 | Diferencia de precio en la factura de compra | Inventario o costo de ventas | Mercancía recibida no facturada (o al revés) |
