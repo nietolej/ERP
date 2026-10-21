@@ -4,7 +4,7 @@ El ERP se organiza en módulos con código de dos letras, como SAP. La navegaci�
 
 | Código | Módulo | Equivale en SAP | Contenido | Fases |
 |---|---|---|---|---|
-| **SD** | Ventas y Distribución | SD, LE-SHP, LE-TRA | Clientes, vendedores, pedidos, notas de entrega, **picking con tiempos, transporte y despacho** (§6.4), facturas, NC/ND, devoluciones | 1, 2, 7 |
+| **SD** | Ventas y Distribución | SD, LE-SHP, LE-TRA | Clientes, vendedores, pedidos, notas de entrega, **picking con tiempos, direcciones de entrega, transportistas, transporte y despacho** (§5.1, §6.4), facturas, NC/ND, devoluciones | 1, 2, 7 |
 | **MM** | Gestión de Materiales | MM, IM | Productos, almacenes, proveedores, movimientos de inventario, compras, recepciones, facturas de proveedor, importaciones | 1, 2, 3 |
 | **PP** | Producción | PP | Órdenes de producción o ensamblaje simples (§8.4) | 3 |
 | **FI** | Contabilidad Financiera | FI (GL, AR, AP, AA) | Asientos, periodos, plan de cuentas, balance, CxC y cobros, CxP y pagos, **activos fijos** (§12.6), estados financieros, cierre | 0, 2, 3, 6 |

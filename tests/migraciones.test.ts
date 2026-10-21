@@ -40,6 +40,7 @@ describe('migraciones', () => {
       '0023_orden_compra_recepcion.sql',
       '0024_factura_compra_cxp.sql',
       '0025_gastos_importacion.sql',
+      '0026_transporte.sql',
     ]);
   });
 

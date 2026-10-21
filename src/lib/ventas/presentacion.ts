@@ -33,3 +33,17 @@ export function duracion(segundos: string | null | undefined): string {
   const m = Math.floor((total % 3600) / 60);
   return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`;
 }
+
+const ESTADOS_TRANSPORTE: Record<string, { texto: string; tono: TonoDocumento }> = {
+  planificado: { texto: 'Planificado', tono: 'info' },
+  cargado: { texto: 'Cargado', tono: 'advertencia' },
+  en_ruta: { texto: 'En ruta', tono: 'advertencia' },
+  entregado: { texto: 'Entregado', tono: 'exito' },
+  cerrado: { texto: 'Cerrado', tono: 'exito' },
+  anulado: { texto: 'Anulado', tono: 'peligro' },
+};
+
+/** Texto y color del estado de un transporte. */
+export function etiquetaTransporte(estado: string): { texto: string; tono: TonoDocumento } {
+  return ESTADOS_TRANSPORTE[estado] ?? { texto: estado, tono: 'info' };
+}

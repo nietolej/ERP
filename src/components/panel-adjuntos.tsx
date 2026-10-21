@@ -12,8 +12,8 @@ const TIPO_LEGIBLE = { 'application/pdf': 'PDF', 'image/png': 'PNG', 'image/jpeg
  * Adjuntos de un registro (§4.2). El llamador ya verificó que el usuario puede ver el registro.
  * Los anulados solo se listan a Gerencia y Auditor, que son quienes pueden abrirlos.
  */
-export async function PanelAdjuntos({ tipo, entidadId, usuario, className }: {
-  tipo: TipoAdjuntable; entidadId: string; usuario: { id: string; roles: readonly string[] }; className?: string;
+export async function PanelAdjuntos({ tipo, entidadId, usuario, className, titulo = 'Adjuntos' }: {
+  tipo: TipoAdjuntable; entidadId: string; usuario: { id: string; roles: readonly string[] }; className?: string; titulo?: string;
 }) {
   const db = await getDb();
   const veAnulados = usuario.roles.some((r) => r === 'gerencia' || r === 'auditor');
@@ -24,7 +24,7 @@ export async function PanelAdjuntos({ tipo, entidadId, usuario, className }: {
   const esGerencia = usuario.roles.includes('gerencia');
 
   return (
-    <Panel titulo="Adjuntos" className={className}>
+    <Panel titulo={titulo} className={className}>
       <Tabla columnas={['Archivo', 'Tipo', { t: 'Tamaño', derecha: true }, 'Subido por', 'Estado', '']} vacio="Sin archivos adjuntos.">
         {adjuntos.map((a) => {
           const anulado = a.anulado_at !== null;

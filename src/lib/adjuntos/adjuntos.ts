@@ -4,7 +4,9 @@ import type { Db } from '@/lib/db/tipos';
 import { puedeVerCliente, ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import { ROLES_VEN_PRODUCTOS } from '@/lib/maestros/productos';
 import { ROLES_VEN_PROVEEDORES } from '@/lib/maestros/proveedores';
+import { almacenesVisibles } from '@/lib/maestros/almacenes';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ROLES_CONSTANCIA, ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
 import type { AlmacenArchivos } from './almacen';
 
 /**
@@ -14,7 +16,7 @@ import type { AlmacenArchivos } from './almacen';
  * - Un adjunto no se edita ni se borra: se anula con motivo (lo exige la base de datos).
  */
 
-export const TIPOS_ADJUNTABLES = ['cliente', 'proveedor', 'producto'] as const;
+export const TIPOS_ADJUNTABLES = ['cliente', 'proveedor', 'producto', 'transporte_parada'] as const;
 export type TipoAdjuntable = (typeof TIPOS_ADJUNTABLES)[number];
 
 export const MAX_BYTES_ADJUNTO = 5 * 1024 * 1024;
@@ -24,6 +26,7 @@ export const PERMISOS_ADJUNTO: Record<TipoAdjuntable, { ver: readonly Rol[]; agr
   cliente: { ver: ROLES_VEN_CLIENTES, agregar: ['facturacion', 'cobranzas', 'gerencia', 'supervisor_ventas', 'ventas'] },
   proveedor: { ver: ROLES_VEN_PROVEEDORES, agregar: ['compras', 'gerencia', 'tesoreria'] },
   producto: { ver: ROLES_VEN_PRODUCTOS, agregar: ['almacen', 'gerencia', 'compras'] },
+  transporte_parada: { ver: ROLES_VEN_TRANSPORTE, agregar: ROLES_CONSTANCIA },
 };
 
 type Usuario = { id: string; roles: readonly string[] };
@@ -32,7 +35,14 @@ const tieneAlguno = (u: Usuario, roles: readonly string[]) => u.roles.some((r) =
 /** ¿Puede ver los adjuntos de este registro? Un vendedor solo ve los de sus propios clientes (seguridad por fila). */
 export async function puedeVerAdjuntos(db: Db, u: Usuario, tipo: TipoAdjuntable, entidadId: string): Promise<boolean> {
   if (!tieneAlguno(u, PERMISOS_ADJUNTO[tipo].ver)) return false;
-  return tipo === 'cliente' ? puedeVerCliente(db, u, entidadId) : true;
+  if (tipo === 'cliente') return puedeVerCliente(db, u, entidadId);
+  if (tipo === 'transporte_parada') {
+    // La constancia de una entrega la ve quien ve el almacén de salida del transporte.
+    const { rows } = await db.query<{ almacen_id: string }>(
+      'select t.almacen_id from transporte_parada p join transporte t on t.id = p.transporte_id where p.id = $1', [entidadId]);
+    return rows[0] ? (await almacenesVisibles(db, u)).includes(rows[0].almacen_id) : false;
+  }
+  return true;
 }
 
 export async function puedeAgregarAdjuntos(db: Db, u: Usuario, tipo: TipoAdjuntable, entidadId: string): Promise<boolean> {

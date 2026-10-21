@@ -344,6 +344,34 @@ create table proveedor_cambio (
 );
 ```
 
+#### Direcciones de entrega del cliente
+Un cliente puede recibir en varios puntos (sede, sucursal, depósito). Cada punto es una **dirección de entrega** con ubicación geográfica y una ventana de recepción. La dirección fiscal del tercero no se usa para despachar.
+
+```sql
+create table cliente_direccion_entrega (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid not null references cliente(tercero_id),
+  nombre text not null,                                  -- "Sede principal", "Tienda Cabudare"
+  direccion text not null, ciudad text not null, entidad_federal text not null,
+  latitud numeric(9,6), longitud numeric(9,6),           -- ambas o ninguna; dentro del territorio venezolano
+  contacto_nombre text, contacto_telefono text,
+  minutos_descarga smallint not null default 15,         -- tiempo de servicio en la parada, para el ruteo
+  ventana_tipo text not null default 'blanda' check (ventana_tipo in ('blanda','dura')),
+  observaciones text,                                    -- restricciones: "no entra camión grande", "descarga por la calle lateral"
+  predeterminada boolean not null default false,         -- una sola vigente por cliente
+  activa boolean not null default true
+);
+create table cliente_direccion_ventana (                 -- horario de recepción, en hora de Caracas
+  id uuid primary key default gen_random_uuid(),
+  direccion_id uuid not null references cliente_direccion_entrega(id),
+  dia_semana smallint not null check (dia_semana between 1 and 7),   -- 1 = lunes … 7 = domingo
+  hora_desde time not null, hora_hasta time not null check (hora_hasta > hora_desde)
+);
+```
+- **Ubicación:** latitud y longitud se capturan juntas. La base rechaza coordenadas fuera de Venezuela (el error más común es invertir latitud y longitud). Una dirección sin coordenadas queda "sin ubicar": puede despacharse a mano, pero no entra en la optimización de rutas.
+- **Ventana de recepción:** varios rangos por día (por ejemplo, 8:00 a 12:00 y 14:00 a 17:00); no pueden solaparse. Sin ventana, el cliente recibe en cualquier hora. **La ventana es blanda por defecto**: el ruteo intenta respetarla y, si no cabe, la incumple con una penalización y marca la parada. Una dirección puede marcarse `dura` para casos en que el cliente no recibe fuera de su horario.
+- **Quién las mantiene:** Facturación, Supervisor de ventas y Gerencia en cualquier cliente; Ventas solo en los de su cartera. Una dirección no se borra: se inactiva.
+
 ### 5.2 Vendedores
 ```sql
 create table vendedor (
@@ -381,6 +409,7 @@ Las ventas de mostrador, de la "casa" o de uso administrativo se registran con u
 - **Segmentación para análisis:** todo producto nuevo pertenece a un código común. Así cada indicador se puede ver en dos niveles: el artículo completo (todas sus marcas) y cada producto de marca. Es la base de los pronósticos, la elasticidad de precio y el análisis de promociones (Fase 8).
 
 ### 5.4 Otros maestros
+- **Transportistas, vehículos y tarifas** (§6.4): la flota propia y los proveedores de servicio de entrega. Un transportista de terceros es un **proveedor de tipo servicios, ya aprobado**, y lleva sus tarifas como dato maestro.
 - **Bancos y cuentas bancarias:** `banco` (catálogo) y `cuenta_bancaria` (banco, número, moneda, cuenta contable, si es de custodia o en el exterior).
 - **Plan de cuentas** (§12.1), **centros de costo** (sucursal, departamento) y **categorías de gasto** (§10.1).
 - **Conceptos ISLR** (Decreto 1.808) y **alícuotas de IVA**, con vigencia.
@@ -628,35 +657,86 @@ create table orden_picking_linea (
 - Las marcas de hora las pone la base de datos. Espera, picking, ciclo total, líneas por hora y cumplimiento del objetivo salen de la vista `vw_picking_tiempos`. Las horas objetivo por prioridad (1 a 5) están en `almacen_picking_objetivo` y las fija Gerencia en la pantalla del almacén.
 - **Faltante:** cada línea no recogida completa exige su motivo. Con la orden en `con_faltante`, Gerencia o el Supervisor de ventas deciden. *Esperar* la reabre. *Despachar parcial* registra la demanda no atendida por lo que faltó, anula la nota, emite otra con lo realmente recogido y mueve la **misma** orden a la nota nueva, completa y con sus tiempos originales. Lo que faltó deja de estar reservado: la diferencia con la existencia del sistema se corrige con un conteo.
 - **Salida de mercancía** (`confirmarSalida`): exige el picking completo y empacado (si el almacén lo usa), consume las reservas, registra un movimiento `salida_venta` por línea al costo promedio vigente, guarda ese costo en la línea (`costo_unitario_usd`) y deja la nota como despachada (`salida_at`). El asiento sale del motor con el evento `salida_venta`: **Debe** Costo de ventas (5.1.01), **Haber** Inventario de mercancía (1.3.01), en USD a la tasa BCV del día. Todo ocurre en una sola transacción; si el periodo está cerrado, nada se guarda. Una nota despachada no se anula: se corrige con una devolución.
-- **Pendiente de esta sección:** transporte y despacho (transportistas, vehículos, paradas, flete y constancia de entrega).
-
 **Transporte y despacho**
+
+*Vías de distribución.* Una nota de entrega sale por una de estas vías, que en el ERP son tipos de transportista (`modalidad`):
+
+| Modalidad | Qué es | Vehículos | Cómo se cobra |
+|---|---|---|---|
+| `flota_propia` | Reparto con camiones o motos de la empresa, urbano o extraurbano | Sí, con capacidad y costo por km y por hora | Costo interno (combustible, chofer): no tiene tarifa |
+| `carga` | Transportista de carga contratado | Sí (los de ese transportista) | Tarifa por viaje, kg, m³ o bulto, según destino |
+| `encomienda` | Servicio de entrega de terceros (courier o encomienda nacional) | No: el servicio decide | Tarifa por kg o bulto, según destino |
+
+Un transportista de terceros (`carga` o `encomienda`) es un **proveedor de tipo servicios, ya aprobado** (§5.1): hereda su alta con aprobación de Gerencia y sus datos fiscales, y la factura de su servicio entrará por cuentas por pagar. La flota propia no tiene proveedor.
+
 ```sql
-create table transportista (id uuid primary key default gen_random_uuid(), tercero_id uuid references tercero(id), propio boolean not null default false, activo boolean not null default true);
-create table vehiculo (id uuid primary key default gen_random_uuid(), transportista_id uuid not null references transportista(id), placa text not null unique, capacidad_kg numeric(10,2), activo boolean not null default true);
+create table transportista (
+  id uuid primary key default gen_random_uuid(),
+  codigo varchar(10) not null unique,                       -- T00001, asignado por el numerador
+  nombre text not null, modalidad text not null check (modalidad in ('flota_propia','carga','encomienda')),
+  proveedor_id uuid references proveedor(tercero_id),       -- obligatorio si no es flota propia; no cambia
+  contacto_telefono text, observaciones text, activo boolean not null default true,
+  check ((modalidad = 'flota_propia') = (proveedor_id is null))
+);
+create table vehiculo (
+  id uuid primary key default gen_random_uuid(),
+  transportista_id uuid not null references transportista(id),      -- no aplica a 'encomienda'
+  placa varchar(10) not null unique, descripcion text not null,
+  capacidad_kg numeric(10,2), capacidad_m3 numeric(8,3),
+  costo_km_usd numeric(10,4), costo_hora_usd numeric(10,2),         -- parámetros del ruteo (Etapa C)
+  activo boolean not null default true
+);
+create table transportista_tarifa (                          -- se agrega una nueva con su vigencia: no se edita ni se borra
+  id uuid primary key default gen_random_uuid(),
+  transportista_id uuid not null references transportista(id),
+  entidad_federal text, ciudad text,                         -- destino; vacío = cualquier destino
+  unidad_cobro text not null check (unidad_cobro in ('por_viaje','por_kg','por_m3','por_bulto')),
+  moneda char(3) not null references moneda(codigo), monto numeric(14,4) not null check (monto >= 0),
+  minimo numeric(14,2) not null default 0,
+  vigente_desde date not null, vigente_hasta date
+);
 create table transporte (
   id uuid primary key default gen_random_uuid(),
-  serie varchar(4) not null, numero bigint not null,                   -- numeración correlativa (§3.5)
+  serie varchar(4) not null default 'A', numero bigint not null,       -- correlativo, sin huecos (§3.3); lo conserva si se anula
   estado text not null default 'planificado' check (estado in ('planificado','cargado','en_ruta','entregado','cerrado','anulado')),
+  almacen_id uuid not null references almacen(id),                      -- punto de salida de todas sus notas
   transportista_id uuid not null references transportista(id), vehiculo_id uuid references vehiculo(id), chofer text,
   fecha_programada date not null,
-  salida_at timestamptz, cierre_at timestamptz,
+  cargado_at timestamptz, salida_at timestamptz, cierre_at timestamptz,  -- las pone la base de datos
   flete_usd numeric(14,2) not null default 0,
+  observaciones text, anulado_por uuid, anulado_at timestamptz, anulado_motivo text,
   unique (serie, numero)
 );
 create table transporte_parada (
   id uuid primary key default gen_random_uuid(),
   transporte_id uuid not null references transporte(id),
   nota_entrega_id uuid not null references documento_venta(id),
-  orden smallint not null, llegada_at timestamptz, entregada_at timestamptz,
-  recibido_por text, incidencia text
+  direccion_entrega_id uuid not null references cliente_direccion_entrega(id),
+  orden smallint not null,
+  llegada_at timestamptz,
+  resultado text check (resultado in ('entregada','no_entregada')), resultado_at timestamptz,
+  recibido_por text, incidencia text,
+  vigente boolean not null default true                                 -- una nota solo tiene una parada vigente
 );
 ```
-- **Crear transporte:** Almacén agrupa las notas de entrega con picking completo, asigna transportista, vehículo, chofer y orden de paradas. Una nota de entrega solo puede estar en un transporte activo.
+
+*Cómo funciona (Etapa A: transporte manual, migración 0026).*
+- **Crear transporte:** Almacén (de sus almacenes) o Gerencia crea el transporte con su almacén de salida, transportista, vehículo, chofer y fecha. Agrega paradas: cada una es una nota de entrega emitida del mismo almacén con su dirección de entrega (por defecto la predeterminada del cliente, que debe estar activa y ser de ese cliente). Si el almacén usa picking, la nota debe tener el picking completo y empacado. Una nota solo tiene una parada vigente: no puede estar en dos transportes a la vez.
+- **Estados** (validados en la base): `planificado → cargado → en_ruta → entregado → cerrado`. Solo un transporte `planificado` se anula (con motivo): una vez cargado, la mercancía ya salió del inventario.
+  - *Cargar* confirma la **salida de mercancía** de cada nota que aún no haya salido (la misma operación y el mismo asiento de §6.4 *Salida de mercancía*), y exige vehículo y chofer si la modalidad tiene vehículos.
+  - *Salir a ruta* pone la hora de salida. Cada parada registra su llegada y su resultado: `entregada` (con quien recibió) o `no_entregada` (con la incidencia). Las horas las pone la base de datos, nunca se digitan.
+  - Con todas las paradas resueltas el transporte pasa a `entregado`; al **cerrar** se registra el flete real (USD) y las paradas no entregadas quedan libres para planificarlas en otro transporte.
+- **Capacidad:** la pantalla suma peso y volumen de la carga con las medidas del producto (§5.3) y avisa si excede la capacidad del vehículo o si hay productos sin medidas. Es un aviso: en la Etapa C el ruteo la respeta como restricción.
 - **Constancia de entrega:** cada parada admite un adjunto (§4.2) con la nota firmada.
-- **Flete:** el costo del transporte se registra como gasto de venta (§12.1, cuenta 6.1) mediante el motor contable, con el `flete_usd` del transporte cerrado.
-- **Indicadores:** cumplimiento de la fecha programada, tiempo de tránsito y entregas con incidencia.
+- **Tarifas de terceros:** se cargan en la ficha del transportista, con vigencia por fecha y destino. No se editan: una nueva tarifa cierra la anterior y no puede solaparse con otra del mismo destino y unidad. La comparación de costos entre vías con estas tarifas (y con el costo por km y por hora de los vehículos propios) se hace en el sugerido de distribución (Etapa C); en la Etapa A las tarifas se consultan y se mantienen, pero el transporte no calcula todavía un flete estimado.
+- **Flete y contabilidad:** el `flete_usd` real queda en el transporte para los indicadores. Su gasto contable sale de **la factura del transportista** (cuentas por pagar, módulo de gastos de la Fase 3), no del transporte: la flota propia no tiene factura y sus costos se registran por sus propios gastos.
+- **Indicadores** (vista `vw_transporte_resumen`, calculados una sola vez): cumplimiento de la fecha programada, tiempo de tránsito, entregas con incidencia y llegadas dentro de la ventana de recepción del cliente.
 - **Validar con el asesor tributario** qué documento debe acompañar la mercancía durante el traslado (guía de despacho o la propia factura o nota de entrega).
+
+*Hoja de ruta de la optimización de rutas (Etapas B a D, aún no construidas).*
+1. **Etapa B:** mapa con Leaflet y OpenStreetMap para marcar la ubicación del cliente; distancias y horas de llegada por calles reales con OpenRouteService (plan gratuito: matriz y optimización con límite diario). El acceso va detrás de un `ServicioRutas` con proveedores intercambiables (se puede pasar a una instalación propia de OSRM y VROOM sin cambiar el resto). Solo se envían coordenadas, nunca nombres ni RIF. Orden sugerido de paradas con la ventana blanda como penalización.
+2. **Etapa C:** *sugerido de distribución* sobre las notas pendientes de despacho. Elige la vía de cada nota (flota propia urbana, flota propia extraurbana, transportista de carga, encomienda o retiro en mostrador) comparando costo estimado, capacidad, ventana de recepción y urgencia, y arma rutas por vehículo con capacidad y ventanas. Los pesos de los criterios (costo, kilómetros, puntualidad, prioridad) son parámetros que fija Gerencia, no valores del código. El usuario revisa y ajusta antes de confirmar, y al confirmar se crea el transporte de esta sección.
+3. **Etapa D:** calibración con las entregas reales (hora de llegada contra la estimada) para ajustar los tiempos de viaje y de descarga, e indicadores de cumplimiento de ventana.
 
 ### 6.5 CRM y postventa (módulo CR)
 Amplía la relación con el cliente antes y después de la venta. Usa los terceros y clientes de la §5.1 y no duplica sus datos.

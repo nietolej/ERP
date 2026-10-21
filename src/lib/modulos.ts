@@ -9,6 +9,8 @@ import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
 import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
 import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
 import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
+import { ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
+import { ROLES_VEN_TRANSPORTISTAS } from '@/lib/maestros/transportistas';
 
 /**
  * Mapa de módulos del ERP, al estilo SAP. Es la única fuente de la navegación:
@@ -48,7 +50,8 @@ export const MODULOS: Modulo[] = [
       { texto: 'Pedidos de venta', href: '/ventas/pedidos', roles: [...ROLES_VEN_VENTAS] },
       { texto: 'Notas de entrega', href: '/ventas/notas-entrega', roles: [...ROLES_VEN_VENTAS] },
       { texto: 'Picking y empaque', href: '/almacen/picking', roles: [...ROLES_VEN_PICKING] },
-      { texto: 'Transportes y despachos', fase: 2 },
+      { texto: 'Transportes y despachos', href: '/ventas/transportes', roles: [...ROLES_VEN_TRANSPORTE] },
+      { texto: 'Transportistas y vehículos', href: '/maestros/transportistas', roles: [...ROLES_VEN_TRANSPORTISTAS] },
       { texto: 'Facturas de venta', href: '/ventas/facturas', roles: [...ROLES_VEN_FACTURAS] },
       { texto: 'Notas de crédito y débito', fase: 2 },
       { texto: 'Ventas perdidas', href: '/ventas/perdidas', roles: [...ROLES_VEN_VENTAS] },

@@ -4,6 +4,7 @@ import { BotonEnviar, Formulario } from '@/components/formulario';
 import type { Opcion } from '@/components/formulario-cliente';
 import { Campo, Encabezado, Etiqueta, Panel } from '@/components/ui';
 import { PanelAdjuntos } from '@/components/panel-adjuntos';
+import { PanelDirecciones } from '@/components/panel-direcciones';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { getDb } from '@/lib/db';
@@ -159,6 +160,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
           </>
         )}
       </div>
+      <PanelDirecciones clienteId={id} usuario={u} className="mt-5" />
       <PanelAdjuntos tipo="cliente" entidadId={id} usuario={u} className="mt-5" />
     </>
   );
