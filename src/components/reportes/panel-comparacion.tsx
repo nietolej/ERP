@@ -56,7 +56,7 @@ export function PanelComparacion({ c }: { c: ComparacionPeriodos }) {
   );
 }
 
-function TarjetaComparada({ titulo, m, simbolo = '' }: { titulo: string; m: MetricaComparada; simbolo?: string }) {
+export function TarjetaComparada({ titulo, m, simbolo = '' }: { titulo: string; m: MetricaComparada; simbolo?: string }) {
   return (
     <div className="panel p-4">
       <p className="text-xs font-semibold uppercase tracking-wider text-texto-2">{titulo}</p>

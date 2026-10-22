@@ -9,7 +9,9 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisGrupos, catalogoProductos, detalleProductoAnio, kardexProducto, stockPorAlmacen } from '@/lib/reportes/productos';
+import {
+  analisisGrupos, catalogoProductos, comparativaMultianual, detalleProductoAnio, kardexProducto, stockPorAlmacen,
+} from '@/lib/reportes/productos';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -173,5 +175,17 @@ describe('M2 Productos: catálogo de artículos (spec_reportes §5.1, §2, §12)
       { tipo: 'Salida por venta', documento: 'A-1', cantidad: '-5.0000', stockAlmacen: '45.0000', stockTotal: '45.0000' },
       { tipo: 'Devolución de cliente', documento: 'A-1', cantidad: '2.0000', stockAlmacen: '47.0000', stockTotal: '47.0000' },
     ]);
+  });
+
+  it('la comparativa multianual contrasta un año vacío (A) contra el año con ventas (B)', async () => {
+    const anioActual = Number(hoy.slice(0, 4));
+    const c = await comparativaMultianual(db, aceite, anioActual - 1, anioActual);
+    expect(c.venta).toEqual({ a: '0.00', b: '100.00', variacionAbsoluta: '100.00', variacionPct: 100 });
+    expect(c.cantidad).toEqual({ a: '0.0000', b: '5.0000', variacionAbsoluta: '5.0000', variacionPct: 100 });
+    expect(c.pedidos).toEqual({ a: '0', b: '1', variacionAbsoluta: '1', variacionPct: 100 });
+    expect(c.devolucion).toEqual({ a: '0.00', b: '40.00', variacionAbsoluta: '40.00', variacionPct: 100 });
+    const mesHoy = Number(hoy.slice(5, 7));
+    expect(c.mensual.find((m) => m.mes === mesHoy)).toMatchObject({ ventaA: '0.00', ventaB: '100.00' });
+    expect(c.mensual.filter((m) => m.mes !== mesHoy).every((m) => m.ventaA === '0.00' && m.ventaB === '0.00')).toBe(true);
   });
 });

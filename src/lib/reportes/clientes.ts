@@ -305,7 +305,7 @@ export async function analisisHistorico(db: Db, f: Omit<FiltroClientes, 'anios'>
 export interface MetricaComparada { a: string; b: string; variacionAbsoluta: string; variacionPct: number; }
 
 /** Variación entre periodos (§2): absoluta = B − A; porcentual = (B − A) ÷ A × 100, o 100 %/0 % si A = 0. */
-function variacion(a: number, b: number, decimales = 2): MetricaComparada {
+export function variacion(a: number, b: number, decimales = 2): MetricaComparada {
   const abs = b - a;
   const pct = a === 0 ? (b > 0 ? 100 : 0) : (abs / a) * 100;
   return { a: a.toFixed(decimales), b: b.toFixed(decimales), variacionAbsoluta: abs.toFixed(decimales), variacionPct: pct };

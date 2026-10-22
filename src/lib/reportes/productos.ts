@@ -1,4 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
+import { variacion, type MetricaComparada } from '@/lib/reportes/clientes';
 
 /**
  * M2 · Productos, pestaña "Catálogo de artículos" (spec_reportes §5.1). Reusa vw_venta_linea y
@@ -326,4 +327,44 @@ export async function kardexProducto(db: Db, productoId: string): Promise<Movimi
     id: r.id, fecha: r.fecha, tipo: NOMBRE_TIPO_MOVIMIENTO[r.tipo] ?? r.tipo, almacenCodigo: r.almacen_codigo,
     documento: r.documento, cantidad: r.cantidad, stockAlmacen: r.stock_almacen, stockTotal: r.stock_total,
   }));
+}
+
+export interface ComparativaMultianualProducto {
+  anioA: number; anioB: number;
+  venta: MetricaComparada; cantidad: MetricaComparada; pedidos: MetricaComparada; devolucion: MetricaComparada;
+  mensual: { mes: number; ventaA: string; ventaB: string }[];
+}
+
+/** Pestaña "Comparativa multianual" (§5.2): año A contra año B, con barras mensuales lado a lado. */
+export async function comparativaMultianual(db: Db, productoId: string, anioA: number, anioB: number): Promise<ComparativaMultianualProducto> {
+  const { rows: venta } = await db.query<{ anio: number; venta: string; cantidad: string; pedidos: string }>(
+    `select extract(year from fecha)::int as anio, sum(base_usd)::numeric(16,2) as venta, sum(cantidad)::numeric(16,4) as cantidad,
+            count(distinct documento_id) as pedidos
+       from vw_venta_linea where producto_id = $1 and extract(year from fecha)::int = any($2::int[])
+      group by 1`, [productoId, [anioA, anioB]]);
+  const { rows: devol } = await db.query<{ anio: number; devolucion: string }>(
+    `select extract(year from fecha)::int as anio, sum(base_usd)::numeric(16,2) as devolucion
+       from vw_nota_credito_linea where producto_id = $1 and motivo_nc = 'devolucion' and extract(year from fecha)::int = any($2::int[])
+      group by 1`, [productoId, [anioA, anioB]]);
+  const { rows: mensual } = await db.query<{ anio: number; mes: number; venta: string }>(
+    `select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes, sum(base_usd)::numeric(16,2) as venta
+       from vw_venta_linea where producto_id = $1 and extract(year from fecha)::int = any($2::int[])
+      group by 1, 2`, [productoId, [anioA, anioB]]);
+
+  const porAnio = (anio: number) => ({
+    venta: Number(venta.find((r) => r.anio === anio)?.venta ?? 0),
+    cantidad: Number(venta.find((r) => r.anio === anio)?.cantidad ?? 0),
+    pedidos: Number(venta.find((r) => r.anio === anio)?.pedidos ?? 0),
+    devolucion: Number(devol.find((r) => r.anio === anio)?.devolucion ?? 0),
+  });
+  const a = porAnio(anioA);
+  const b = porAnio(anioB);
+  const ventaMes = (anio: number, mes: number) => mensual.find((r) => r.anio === anio && r.mes === mes)?.venta ?? '0.00';
+
+  return {
+    anioA, anioB,
+    venta: variacion(a.venta, b.venta), cantidad: variacion(a.cantidad, b.cantidad, 4),
+    pedidos: variacion(a.pedidos, b.pedidos, 0), devolucion: variacion(a.devolucion, b.devolucion),
+    mensual: Array.from({ length: 12 }, (_, i) => ({ mes: i + 1, ventaA: ventaMes(anioA, i + 1), ventaB: ventaMes(anioB, i + 1) })),
+  };
 }
