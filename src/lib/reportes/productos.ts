@@ -259,3 +259,26 @@ export async function detalleProductoAnio(db: Db, codigo: string, anios: number[
     })),
   };
 }
+
+export interface StockAlmacenProducto {
+  almacenId: string; codigo: string; nombre: string; sucursal: string; cantidad: string; reservado: string; disponible: string; vendible: boolean;
+}
+
+/** Pestaña "Stock por almacén" (§5.2): existencia del producto en cada almacén activo, con si es vendible. */
+export async function stockPorAlmacen(db: Db, productoId: string): Promise<StockAlmacenProducto[]> {
+  const { rows } = await db.query<{
+    almacen_id: string; codigo: string; nombre: string; sucursal: string; cantidad: string; reservado: string; vendible: boolean;
+  }>(
+    `select a.id as almacen_id, a.codigo, a.nombre, s.nombre as sucursal,
+            coalesce(e.cantidad, 0::numeric(14,4))::text as cantidad, coalesce(e.reservado, 0::numeric(14,4))::text as reservado,
+            a.permite_venta as vendible
+       from almacen a
+       join sucursal s on s.id = a.sucursal_id
+       left join existencia e on e.almacen_id = a.id and e.producto_id = $1
+      where a.activo
+      order by s.nombre, a.codigo`, [productoId]);
+  return rows.map((r) => ({
+    almacenId: r.almacen_id, codigo: r.codigo, nombre: r.nombre, sucursal: r.sucursal,
+    cantidad: r.cantidad, reservado: r.reservado, disponible: (Number(r.cantidad) - Number(r.reservado)).toFixed(4), vendible: r.vendible,
+  }));
+}

@@ -9,7 +9,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisGrupos, catalogoProductos, detalleProductoAnio } from '@/lib/reportes/productos';
+import { analisisGrupos, catalogoProductos, detalleProductoAnio, stockPorAlmacen } from '@/lib/reportes/productos';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -156,5 +156,13 @@ describe('M2 Productos: catálogo de artículos (spec_reportes §5.1, §2, §12)
 
   it('un código que no existe devuelve null', async () => {
     expect(await detalleProductoAnio(db, 'NO-EXISTE')).toBeNull();
+  });
+
+  it('el stock por almacén trae la existencia, lo reservado, lo disponible y si el almacén es vendible', async () => {
+    const filas = await stockPorAlmacen(db, aceite);
+    expect(filas).toEqual([{
+      almacenId: mostrador, codigo: 'MOS', nombre: 'Mostrador', sucursal: 'Barquisimeto',
+      cantidad: '47.0000', reservado: '0.0000', disponible: '47.0000', vendible: true,
+    }]);
   });
 });
