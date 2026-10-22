@@ -9,7 +9,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisGrupos, catalogoProductos } from '@/lib/reportes/productos';
+import { analisisGrupos, catalogoProductos, detalleProductoAnio } from '@/lib/reportes/productos';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -133,5 +133,28 @@ describe('M2 Productos: catálogo de artículos (spec_reportes §5.1, §2, §12)
     const grupos = await analisisGrupos(db, 'categoria');
     const g = grupos.find((x) => x.nombre === 'Sin categoría')!;
     expect(g).toMatchObject({ totalArticulos: 1, ventaUsd: '100.00', productoLider: { codigo: 'AC-001' } });
+  });
+
+  it('el detalle del producto trae sus tarjetas, los ratios de devolución, la evolución mensual y el top de clientes', async () => {
+    const d = await detalleProductoAnio(db, 'AC-001');
+    expect(d).toMatchObject({
+      producto: { codigo: 'AC-001', descripcion: 'Aceite de motor', grupo: 'Aceites', marca: 'Genérica' },
+      ventaTotalUsd: '100.00', unidadesVendidas: '5.0000', pedidos: 1,
+      stockDisponible: '47.0000',
+      diasInventario: '15.7', diasSinInventario: 0, // de vw_disponibilidad (misma fuente que el reporte de inventario)
+      tasaDevolucionPct: 40,
+      ratiosDevolucion: { montoPct: 40, cantidadPct: 40, pedidosPct: 100 },
+    });
+    expect(d!.topClientes).toEqual([{
+      clienteId: clienteA, codigo: 'C00001', razonSocial: 'Repuestos Lara, C.A.', cantidad: '5.0000', montoUsd: '100.00', compras: 1, ultimaCompra: hoy,
+    }]);
+    const mesHoy = Number(hoy.slice(5, 7));
+    const fila = d!.evolucionMensual.find((m) => m.mes === mesHoy)!;
+    expect(fila).toMatchObject({ ventaUsd: '100.00', devolucionUsd: '40.00' });
+    expect(d!.evolucionMensual.filter((m) => m.mes !== mesHoy).every((m) => m.ventaUsd === '0.00' && m.devolucionUsd === '0.00')).toBe(true);
+  });
+
+  it('un código que no existe devuelve null', async () => {
+    expect(await detalleProductoAnio(db, 'NO-EXISTE')).toBeNull();
   });
 });

@@ -162,3 +162,100 @@ export async function analisisGrupos(db: Db, agrupador: Agrupador, f: Omit<Filtr
     productoLider: r.lider_codigo ? { codigo: r.lider_codigo, descripcion: r.lider_descripcion! } : null,
   }));
 }
+
+/**
+ * Detalle de producto, pestaña "Vista general / anual" (§5.2). Los días de inventario y los días sin
+ * inventario salen siempre de vw_disponibilidad (la ventana vigente, calculada con el kardex, §9) y no
+ * dependen del año elegido para la venta: son el estado actual del producto, igual que la deuda de un
+ * cliente nunca depende del año en M1.
+ */
+
+export interface TopClienteProducto {
+  clienteId: string; codigo: string; razonSocial: string; cantidad: string; montoUsd: string; compras: number; ultimaCompra: string | null;
+}
+
+export interface DetalleProductoAnio {
+  producto: { id: string; codigo: string; descripcion: string; grupo: string | null; marca: string | null };
+  ventaTotalUsd: string;
+  unidadesVendidas: string;
+  pedidos: number;
+  stockDisponible: string;
+  diasInventario: string | null;
+  diasSinInventario: number | null;
+  tasaDevolucionPct: number | null;
+  ratiosDevolucion: { montoPct: number | null; cantidadPct: number | null; pedidosPct: number | null };
+  evolucionMensual: { mes: number; ventaUsd: string; devolucionUsd: string }[];
+  topClientes: TopClienteProducto[];
+}
+
+export async function detalleProductoAnio(db: Db, codigo: string, anios: number[] = []): Promise<DetalleProductoAnio | null> {
+  const { rows: prod } = await db.query<{ id: string; codigo: string; descripcion: string; grupo: string | null; marca: string | null }>(
+    `select p.id, p.codigo, p.descripcion, g.nombre as grupo, m.nombre as marca
+       from producto p left join grupo_producto g on g.id = p.grupo_id left join marca m on m.id = p.marca_id
+      where p.codigo = $1`, [codigo]);
+  if (!prod[0]) return null;
+  const productoId = prod[0].id;
+  const filtroAnio = anios.length > 0 ? 'extract(year from fecha)::int = any($2::int[])' : 'true';
+  const params = anios.length > 0 ? [productoId, anios] : [productoId];
+
+  const { rows: venta } = await db.query<{ venta: string; unidades: string; pedidos: string }>(
+    `select coalesce(sum(base_usd), 0::numeric(16,2))::text as venta, coalesce(sum(cantidad), 0::numeric(16,4))::text as unidades,
+            count(distinct documento_id)::text as pedidos
+       from vw_venta_linea where producto_id = $1 and ${filtroAnio}`, params);
+  const { rows: nc } = await db.query<{ devol_monto: string; devol_cantidad: string; devol_pedidos: string }>(
+    `select coalesce(sum(base_usd) filter (where motivo_nc = 'devolucion'), 0::numeric(16,2))::text as devol_monto,
+            coalesce(sum(cantidad) filter (where motivo_nc = 'devolucion'), 0::numeric(16,4))::text as devol_cantidad,
+            count(distinct factura_id) filter (where motivo_nc = 'devolucion')::text as devol_pedidos
+       from vw_nota_credito_linea where producto_id = $1 and ${filtroAnio}`, params);
+  const { rows: stock } = await db.query<{ disponible: string }>(
+    `select coalesce(sum(e.cantidad - e.reservado), 0::numeric(14,4))::text as disponible
+       from existencia e join almacen a on a.id = e.almacen_id and a.permite_venta
+      where e.producto_id = $1`, [productoId]);
+  const { rows: disp } = await db.query<{ cobertura: string | null; dias_sin: number | null }>(
+    `select cobertura_dias::text as cobertura, dias_sin_existencia as dias_sin from vw_disponibilidad where producto_id = $1`, [productoId]);
+
+  const { rows: evVenta } = await db.query<{ mes: number; venta: string }>(
+    `select extract(month from fecha)::int as mes, sum(base_usd)::numeric(16,2)::text as venta
+       from vw_venta_linea where producto_id = $1 and ${filtroAnio} group by 1`, params);
+  const { rows: evNc } = await db.query<{ mes: number; devolucion: string }>(
+    `select extract(month from fecha)::int as mes, sum(base_usd)::numeric(16,2)::text as devolucion
+       from vw_nota_credito_linea where producto_id = $1 and motivo_nc = 'devolucion' and ${filtroAnio} group by 1`, params);
+  const ventaPorMes = Object.fromEntries(evVenta.map((r) => [r.mes, r.venta]));
+  const devolPorMes = Object.fromEntries(evNc.map((r) => [r.mes, r.devolucion]));
+  const evolucionMensual = Array.from({ length: 12 }, (_, i) => ({
+    mes: i + 1, ventaUsd: ventaPorMes[i + 1] ?? '0.00', devolucionUsd: devolPorMes[i + 1] ?? '0.00',
+  }));
+
+  const { rows: top } = await db.query<{
+    cliente_id: string; codigo: string; razon_social: string; cantidad: string; monto: string; compras: string; ultima: string | null;
+  }>(
+    `select l.cliente_id, c.codigo, t.razon_social, sum(l.cantidad)::numeric(16,4)::text as cantidad,
+            sum(l.base_usd)::numeric(16,2)::text as monto, count(distinct l.documento_id)::text as compras, max(l.fecha)::text as ultima
+       from vw_venta_linea l join cliente c on c.tercero_id = l.cliente_id join tercero t on t.id = c.tercero_id
+      where l.producto_id = $1 and ${filtroAnio}
+      group by l.cliente_id, c.codigo, t.razon_social
+      order by sum(l.base_usd) desc
+      limit 20`, params);
+
+  const pct = (num: number, den: number): number | null => (den > 0 ? (num / den) * 100 : null);
+  const ventaTotal = Number(venta[0].venta);
+  const unidades = Number(venta[0].unidades);
+  const pedidos = Number(venta[0].pedidos);
+  const devolMonto = Number(nc[0].devol_monto);
+  const devolCantidad = Number(nc[0].devol_cantidad);
+  const devolPedidos = Number(nc[0].devol_pedidos);
+
+  return {
+    producto: prod[0],
+    ventaTotalUsd: ventaTotal.toFixed(2), unidadesVendidas: venta[0].unidades, pedidos,
+    stockDisponible: stock[0].disponible,
+    diasInventario: disp[0]?.cobertura ?? null, diasSinInventario: disp[0]?.dias_sin ?? null,
+    tasaDevolucionPct: pct(devolMonto, ventaTotal),
+    ratiosDevolucion: { montoPct: pct(devolMonto, ventaTotal), cantidadPct: pct(devolCantidad, unidades), pedidosPct: pct(devolPedidos, pedidos) },
+    evolucionMensual,
+    topClientes: top.map((r) => ({
+      clienteId: r.cliente_id, codigo: r.codigo, razonSocial: r.razon_social, cantidad: r.cantidad, montoUsd: r.monto,
+      compras: Number(r.compras), ultimaCompra: r.ultima,
+    })),
+  };
+}

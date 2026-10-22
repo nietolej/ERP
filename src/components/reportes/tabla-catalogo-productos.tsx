@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Celda, Tabla } from '@/components/ui';
 import { monto } from '@/lib/formato';
 import type { FilaCatalogoProducto } from '@/lib/reportes/productos';
@@ -12,7 +13,7 @@ export function TablaCatalogoProductos({ filas }: { filas: FilaCatalogoProducto[
       vacio="No hay productos que coincidan.">
       {filas.map((f) => (
         <tr key={f.id} className="hover:bg-white/[0.03]">
-          <Celda><span className="font-mono">{f.codigo}</span>
+          <Celda><Link href={`/reportes/productos/${f.codigo}`} className="font-mono text-acento hover:underline">{f.codigo}</Link>
             <span className="block text-xs text-texto-2">{f.descripcion}</span></Celda>
           <Celda className="text-texto-2">{f.grupo ?? '—'} / {f.marca ?? '—'}</Celda>
           <Celda derecha>{f.precioAUsd === null ? '—' : monto(f.precioAUsd, 'US$ ')}</Celda>
