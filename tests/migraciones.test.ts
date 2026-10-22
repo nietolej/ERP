@@ -44,6 +44,7 @@ describe('migraciones', () => {
       '0027_disponibilidad_promociones.sql',
       '0028_cobros.sql',
       '0029_notas_credito_debito.sql',
+      '0030_reportes_inicio.sql',
     ]);
   });
 

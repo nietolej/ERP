@@ -1,0 +1,36 @@
+'use client';
+
+import {
+  Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
+
+const NOMBRE_MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+export interface PuntoVentaMensual {
+  anio: number;
+  mes: number;
+  venta: number;
+  meta: number | null;
+}
+
+/** Barras de venta mensual con la línea de meta global, si existe (spec_reportes §3). */
+export function GraficoVentasMensuales({ datos }: { datos: PuntoVentaMensual[] }) {
+  const hayMeta = datos.some((d) => d.meta !== null);
+  const data = datos.map((d) => ({ ...d, etiqueta: `${NOMBRE_MES[d.mes - 1]}-${String(d.anio).slice(2)}` }));
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" vertical={false} />
+        <XAxis dataKey="etiqueta" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={{ stroke: '#ffffff1a' }} tickLine={false} />
+        <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} width={70}
+          tickFormatter={(v: number) => `$${v.toLocaleString('en-US')}`} />
+        <Tooltip
+          contentStyle={{ background: '#0f172a', border: '1px solid #ffffff1a', borderRadius: 8, fontSize: 13 }}
+          labelStyle={{ color: '#f8fafc' }}
+          formatter={(v, nombre) => [`US$ ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, nombre === 'meta' ? 'Meta' : 'Venta']} />
+        <Bar dataKey="venta" name="venta" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        {hayMeta && <Line dataKey="meta" name="meta" type="monotone" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} connectNulls />}
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}

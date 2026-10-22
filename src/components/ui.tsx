@@ -77,6 +77,17 @@ export function Campo({ etiqueta, children, ayuda }: { etiqueta: string; childre
   );
 }
 
+/** Tarjeta de indicador (spec_reportes §1.2): título en mayúsculas pequeñas, valor destacado y subtítulo. */
+export function KpiCard({ titulo, valor, subtitulo, tono }: { titulo: string; valor: string; subtitulo?: ReactNode; tono?: Tono }) {
+  return (
+    <div className="panel p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-texto-2">{titulo}</p>
+      <p className={`mt-2 text-2xl font-bold tabular-nums ${tono ? TONOS[tono].split(' ').find((c) => c.startsWith('text-')) ?? '' : ''}`}>{valor}</p>
+      {subtitulo && <p className="mt-1 text-xs text-texto-2">{subtitulo}</p>}
+    </div>
+  );
+}
+
 /** Indicador de estado de un paso de configuración. */
 export function Paso({ listo, titulo, detalle }: { listo: boolean; titulo: string; detalle: string }) {
   return (

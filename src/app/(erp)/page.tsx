@@ -1,13 +1,16 @@
 import Link from 'next/link';
-import { Aviso, Encabezado, Panel, Paso } from '@/components/ui';
+import { GraficoVentasMensuales } from '@/components/grafico-ventas';
+import { Aviso, Encabezado, KpiCard, Panel, Paso } from '@/components/ui';
 import { exigirSesion } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
-import { fecha, hoyCaracas, tasa } from '@/lib/formato';
+import { fecha, hoyCaracas, monto, tasa } from '@/lib/formato';
+import {
+  clientesActivos90Dias, cobranzaPendiente, productosEnQuiebre, ventaMensualConMeta, ventaMes,
+} from '@/lib/reportes/inicio';
 
 /**
- * Inicio. Las tarjetas comerciales (ventas del mes, clientes activos, quiebres, cobranza)
- * se habilitan en la Fase 2 (spec_reportes §3). En la Fase 0 se muestra el estado real
- * de la configuración necesaria para el arranque (§14.2 de la especificación).
+ * Inicio. Las tarjetas de configuración salen de la §14.2 de la especificación principal; las tarjetas
+ * comerciales y el gráfico de venta mensual salen de spec_reportes §3, con las vistas de la §12.
  */
 export default async function InicioPage() {
   const u = await exigirSesion();
@@ -33,9 +36,35 @@ export default async function InicioPage() {
   const e = rows[0];
   const tasaAlDia = e.tasa_fecha === hoy;
 
+  const [venta, clientes, quiebres, cobranza, ventaMensual] = await Promise.all([
+    ventaMes(db), clientesActivos90Dias(db), productosEnQuiebre(db), cobranzaPendiente(db), ventaMensualConMeta(db, 6),
+  ]);
+  const signoVariacion = venta.variacionPct === null ? '' : venta.variacionPct >= 0 ? '+' : '';
+
   return (
     <>
       <Encabezado titulo={`Bienvenido, ${u.nombre}`} descripcion="Dashboard central · Distribuciones Hanei Motors" />
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard titulo="Ventas del mes" valor={monto(venta.ventaUsd, 'US$ ')}
+          subtitulo={venta.variacionPct === null ? 'Sin venta en el mismo tramo del mes anterior' :
+            `${signoVariacion}${venta.variacionPct.toFixed(1)} % vs. mismos días del mes anterior`} />
+        <KpiCard titulo="Clientes activos" valor={String(clientes)} subtitulo="Con compras en los últimos 90 días" />
+        <KpiCard titulo="Productos en quiebre" valor={String(quiebres)} tono={quiebres > 0 ? 'peligro' : 'exito'}
+          subtitulo="Riesgo de quiebre (stock comercial)" />
+        <KpiCard titulo="Cobranza pendiente" valor={monto(cobranza.deudaUsd, 'US$ ')} tono={Number(cobranza.vencidoUsd) > 0 ? 'advertencia' : undefined}
+          subtitulo={`(${monto(cobranza.vencidoUsd, 'US$ ')} vencido)`} />
+      </div>
+
+      <Panel titulo="Rendimiento global de ventas" className="mb-5">
+        {ventaMensual.every((m) => Number(m.ventaUsd) === 0) ? (
+          <Aviso>Todavía no hay facturas emitidas. El gráfico se llena a medida que se registran ventas.</Aviso>
+        ) : (
+          <GraficoVentasMensuales datos={ventaMensual.map((m) => ({
+            anio: m.anio, mes: m.mes, venta: Number(m.ventaUsd), meta: m.metaUsd === null ? null : Number(m.metaUsd),
+          }))} />
+        )}
+      </Panel>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel titulo="Configuración para el arranque (día 0)">
@@ -63,12 +92,12 @@ export default async function InicioPage() {
               <Aviso tono="peligro">Diferencia en el mayor de {e.cuadre_ves} VES. Avise a Contabilidad y al administrador.</Aviso>
             )}
           </Panel>
-          <Panel titulo="Indicadores comerciales">
-            <p className="text-sm text-texto-2">
-              Ventas del mes, clientes activos, productos en quiebre y cobranza pendiente aparecen aquí cuando
-              se registren las primeras operaciones (Fase 2: ventas, cobros e inventario).
-            </p>
-            <Link href="/reportes/clientes" className="mt-3 inline-block text-sm font-semibold text-acento">Ver módulos de reportes →</Link>
+          <Panel titulo="Accesos rápidos">
+            <div className="flex flex-col gap-2 text-sm">
+              <Link href="/reportes/inventario" className="font-semibold text-acento hover:underline">Sugerido de compras →</Link>
+              <Link href="/reportes/cobranzas" className="font-semibold text-acento hover:underline">Análisis de cartera →</Link>
+              <Link href="/reportes/devoluciones" className="font-semibold text-acento hover:underline">Auditoría de calidad →</Link>
+            </div>
           </Panel>
         </div>
       </div>
