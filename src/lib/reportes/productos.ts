@@ -282,3 +282,48 @@ export async function stockPorAlmacen(db: Db, productoId: string): Promise<Stock
     cantidad: r.cantidad, reservado: r.reservado, disponible: (Number(r.cantidad) - Number(r.reservado)).toFixed(4), vendible: r.vendible,
   }));
 }
+
+const NOMBRE_TIPO_MOVIMIENTO: Record<string, string> = {
+  entrada_compra: 'Entrada por compra', salida_venta: 'Salida por venta', devolucion_cliente: 'Devolución de cliente',
+  devolucion_proveedor: 'Devolución a proveedor', transferencia_salida: 'Transferencia (salida)',
+  transferencia_entrada: 'Transferencia (entrada)', ajuste_positivo: 'Ajuste positivo', ajuste_negativo: 'Ajuste negativo',
+  consumo_produccion: 'Consumo de producción', entrada_produccion: 'Entrada de producción', apertura: 'Apertura',
+};
+
+export interface MovimientoKardex {
+  id: string; fecha: string; tipo: string; almacenCodigo: string; documento: string; cantidad: string; stockAlmacen: string; stockTotal: string;
+}
+
+/**
+ * Pestaña "Movimientos" (§5.2): kardex del producto, en orden cronológico, con el stock por almacén y el
+ * stock total progresivos (sumas acumuladas sobre el mismo orden). El documento se resuelve según el tipo
+ * de origen del movimiento (recepción, nota de entrega, nota de crédito o ajuste de inventario).
+ */
+export async function kardexProducto(db: Db, productoId: string): Promise<MovimientoKardex[]> {
+  const { rows } = await db.query<{
+    id: string; fecha: string; tipo: string; almacen_codigo: string; documento: string; cantidad: string; stock_almacen: string; stock_total: string;
+  }>(
+    `select m.id::text, m.fecha::text, m.tipo, a.codigo as almacen_codigo,
+            case m.origen_tipo
+              when 'recepcion' then coalesce(dc.serie || '-' || dc.numero::text, 'Recepción (sin número)')
+              when 'nota_entrega' then coalesce(dv1.serie || '-' || dv1.numero::text, 'Nota de entrega')
+              when 'nota_credito' then coalesce(dv2.serie || '-' || dv2.numero::text, 'Nota de crédito')
+              when 'ajuste_inventario' then coalesce('AJ-' || ai.numero::text, 'Ajuste (sin número)')
+              else m.origen_tipo
+            end as documento,
+            m.cantidad::text,
+            sum(m.cantidad) over (partition by m.almacen_id order by m.fecha, m.id)::text as stock_almacen,
+            sum(m.cantidad) over (order by m.fecha, m.id)::text as stock_total
+       from movimiento_inventario m
+       join almacen a on a.id = m.almacen_id
+       left join documento_compra dc on m.origen_tipo = 'recepcion' and dc.id = m.origen_id
+       left join documento_venta dv1 on m.origen_tipo = 'nota_entrega' and dv1.id = m.origen_id
+       left join documento_venta dv2 on m.origen_tipo = 'nota_credito' and dv2.id = m.origen_id
+       left join ajuste_inventario ai on m.origen_tipo = 'ajuste_inventario' and ai.id = m.origen_id
+      where m.producto_id = $1
+      order by m.fecha, m.id`, [productoId]);
+  return rows.map((r) => ({
+    id: r.id, fecha: r.fecha, tipo: NOMBRE_TIPO_MOVIMIENTO[r.tipo] ?? r.tipo, almacenCodigo: r.almacen_codigo,
+    documento: r.documento, cantidad: r.cantidad, stockAlmacen: r.stock_almacen, stockTotal: r.stock_total,
+  }));
+}

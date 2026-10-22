@@ -52,8 +52,8 @@ export function PanelDetalleProducto({ d }: { d: DetalleProductoAnio }) {
       </Panel>
 
       <Aviso>
-        El panel de rotación e inventario (pendiente en tránsito y en producción), la comparativa multianual y el kardex
-        de movimientos quedan para una próxima entrega.
+        El panel de rotación e inventario (pendiente en tránsito y en producción) y la comparativa multianual quedan
+        para una próxima entrega. El gráfico mensual por tipo de movimiento de la pestaña Movimientos también queda pendiente.
       </Aviso>
     </div>
   );

@@ -9,7 +9,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisGrupos, catalogoProductos, detalleProductoAnio, stockPorAlmacen } from '@/lib/reportes/productos';
+import { analisisGrupos, catalogoProductos, detalleProductoAnio, kardexProducto, stockPorAlmacen } from '@/lib/reportes/productos';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -164,5 +164,14 @@ describe('M2 Productos: catálogo de artículos (spec_reportes §5.1, §2, §12)
       almacenId: mostrador, codigo: 'MOS', nombre: 'Mostrador', sucursal: 'Barquisimeto',
       cantidad: '47.0000', reservado: '0.0000', disponible: '47.0000', vendible: true,
     }]);
+  });
+
+  it('el kardex trae la entrada, la salida por venta y el reingreso de la devolución, con el stock progresivo', async () => {
+    const filas = await kardexProducto(db, aceite);
+    expect(filas.map((f) => ({ tipo: f.tipo, documento: f.documento, cantidad: f.cantidad, stockAlmacen: f.stockAlmacen, stockTotal: f.stockTotal }))).toEqual([
+      { tipo: 'Entrada por compra', documento: 'prueba', cantidad: '50.0000', stockAlmacen: '50.0000', stockTotal: '50.0000' },
+      { tipo: 'Salida por venta', documento: 'A-1', cantidad: '-5.0000', stockAlmacen: '45.0000', stockTotal: '45.0000' },
+      { tipo: 'Devolución de cliente', documento: 'A-1', cantidad: '2.0000', stockAlmacen: '47.0000', stockTotal: '47.0000' },
+    ]);
   });
 });
