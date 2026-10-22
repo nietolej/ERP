@@ -17,10 +17,26 @@ export async function aniosDisponibles(db: Db): Promise<number[]> {
   return rows.map((r) => r.anio);
 }
 
+const esBisiesto = (a: number) => (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0;
+
+/** Periodos por defecto de "Comparación de periodos" (§4.3): el año anterior contra el actual, al mismo día. */
+export function periodosPorDefecto(hoy: string): { periodoA: { desde: string; hasta: string }; periodoB: { desde: string; hasta: string } } {
+  const anio = Number(hoy.slice(0, 4));
+  let mesDia = hoy.slice(5);
+  if (mesDia === '02-29' && !esBisiesto(anio - 1)) mesDia = '02-28';
+  return {
+    periodoB: { desde: `${anio}-01-01`, hasta: hoy },
+    periodoA: { desde: `${anio - 1}-01-01`, hasta: `${anio - 1}-${mesDia}` },
+  };
+}
+
 export interface FiltroClientes {
   clienteId?: string;
-  /** Años a sumar; vacío o ausente = todo el histórico ("Todos"). */
+  /** Años a sumar; vacío o ausente = todo el histórico ("Todos"). Se ignora si se da `fechaDesde`/`fechaHasta`. */
   anios?: number[];
+  /** Rango de fechas explícito (§4.3, Comparación de periodos): manda sobre `anios` cuando está presente. */
+  fechaDesde?: string;
+  fechaHasta?: string;
   incluirInactivos?: boolean;
   /** Seguridad por fila: un usuario con solo el rol Ventas ve nada más su propia cartera (§4.3). */
   vendedorId?: string;
@@ -29,19 +45,24 @@ export interface FiltroClientes {
 interface Condicion { sql: string; params: unknown[]; }
 
 /**
- * `$n` consecutivos para cliente, vendedor (join a `vendedor v`) y año, a partir de `desde`.
+ * `$n` consecutivos para cliente, vendedor (join a `vendedor v`) y periodo, a partir de `primerParametro`.
  * `columnaCliente` se califica con su alias de tabla cuando la consulta junta más de una tabla con `cliente_id`
  * (p. ej. vw_cxc_antiguedad y documento_venta a la vez), para que la columna no quede ambigua.
  */
-function condicion(f: FiltroClientes, columnaFecha: string, desde: number, columnaCliente = 'cliente_id'): Condicion {
+function condicion(f: FiltroClientes, columnaFecha: string, primerParametro: number, columnaCliente = 'cliente_id'): Condicion {
   const partes: string[] = [];
   const params: unknown[] = [];
-  let n = desde;
+  let n = primerParametro;
   if (f.clienteId) { partes.push(`${columnaCliente} = $${n++}`); params.push(f.clienteId); }
   else if (!f.incluirInactivos) { partes.push(`${columnaCliente} in (select tercero_id from cliente where estado = 'activo')`); }
   if (!f.incluirInactivos) partes.push(`v.tipo in ('interno', 'externo')`);
   if (f.vendedorId) { partes.push(`v.id = $${n++}`); params.push(f.vendedorId); }
-  if (f.anios && f.anios.length > 0) { partes.push(`extract(year from ${columnaFecha})::int = any($${n++})`); params.push(f.anios); }
+  if (f.fechaDesde || f.fechaHasta) {
+    if (f.fechaDesde) { partes.push(`${columnaFecha} >= $${n++}`); params.push(f.fechaDesde); }
+    if (f.fechaHasta) { partes.push(`${columnaFecha} <= $${n++}`); params.push(f.fechaHasta); }
+  } else if (f.anios && f.anios.length > 0) {
+    partes.push(`extract(year from ${columnaFecha})::int = any($${n++})`); params.push(f.anios);
+  }
   return { sql: partes.length > 0 ? `where ${partes.join(' and ')}` : '', params };
 }
 
@@ -140,8 +161,8 @@ export async function analisisAnio(db: Db, f: FiltroClientes = {}): Promise<Anal
        from vw_venta_documento d join vendedor v on v.id = d.vendedor_id ${cCancel.sql}${cCancel.sql ? ' and' : 'where'} d.cancelada`,
     cCancel.params);
 
-  // Cuentas por cobrar: deuda actual, emitida en el periodo y vencimiento más antiguo (siempre al día de hoy, sin filtro de año en la deuda actual).
-  const cCxc = condicion({ ...f, anios: undefined }, 'a.fecha', 1, 'a.cliente_id');
+  // Cuentas por cobrar: deuda actual, emitida en el periodo y vencimiento más antiguo (siempre al día de hoy, sin filtro de periodo en la deuda actual).
+  const cCxc = condicion({ ...f, anios: undefined, fechaDesde: undefined, fechaHasta: undefined }, 'a.fecha', 1, 'a.cliente_id');
   const { rows: cxc } = await db.query<{ deuda: string; vencimiento: string | null }>(
     `select coalesce(sum(a.saldo_usd), 0)::numeric(16,2)::text as deuda, min(a.vencimiento)::text as vencimiento
        from vw_cxc_antiguedad a join documento_venta f on f.id = a.documento_id join vendedor v on v.id = f.vendedor_id ${cCxc.sql}`,
@@ -153,7 +174,7 @@ export async function analisisAnio(db: Db, f: FiltroClientes = {}): Promise<Anal
     cCxcAnio.params);
 
   // Partidas vencidas (para el insight de mora), siempre a hoy, con el mismo filtro de cliente/vendedor.
-  const cMora = condicion({ ...f, anios: undefined }, 'a.fecha', 1, 'a.cliente_id');
+  const cMora = condicion({ ...f, anios: undefined, fechaDesde: undefined, fechaHasta: undefined }, 'a.fecha', 1, 'a.cliente_id');
   const { rows: mora } = await db.query<{ n: string }>(
     `select count(*)::text as n from vw_cxc_antiguedad a join documento_venta f on f.id = a.documento_id join vendedor v on v.id = f.vendedor_id
       ${cMora.sql}${cMora.sql ? ' and' : 'where'} a.dias_vencida > 0`, cMora.params);
@@ -279,6 +300,71 @@ export async function analisisHistorico(db: Db, f: Omit<FiltroClientes, 'anios'>
   ]);
   porAnio.sort((a, b) => a.anio - b.anio);
   return { total, porAnio };
+}
+
+export interface MetricaComparada { a: string; b: string; variacionAbsoluta: string; variacionPct: number; }
+
+/** Variación entre periodos (§2): absoluta = B − A; porcentual = (B − A) ÷ A × 100, o 100 %/0 % si A = 0. */
+function variacion(a: number, b: number, decimales = 2): MetricaComparada {
+  const abs = b - a;
+  const pct = a === 0 ? (b > 0 ? 100 : 0) : (abs / a) * 100;
+  return { a: a.toFixed(decimales), b: b.toFixed(decimales), variacionAbsoluta: abs.toFixed(decimales), variacionPct: pct };
+}
+
+export interface ComparacionPeriodos {
+  periodoA: { desde: string; hasta: string };
+  periodoB: { desde: string; hasta: string };
+  ventaTotal: MetricaComparada;
+  items: MetricaComparada;
+  pedidos: MetricaComparada;
+  ticketPromedio: MetricaComparada;
+  devolucionMonto: MetricaComparada;
+  devolucionItems: MetricaComparada;
+  devolucionPedidos: MetricaComparada;
+  indiceDevolucionMontoPct: { a: number | null; b: number | null };
+  descuentoPonderado: MetricaComparada;
+  diasPagoPromedio: { a: number | null; b: number | null };
+  pagosA: { instrumento: string; montoUsd: string; pct: number }[];
+  pagosB: { instrumento: string; montoUsd: string; pct: number }[];
+  global: { ultimaCompra: string | null; deudaActualUsd: string; vencimientoMasAntiguo: string | null };
+}
+
+/**
+ * Pestaña "Comparación de periodos" (§4.3): reusa `analisisAnio` una vez por periodo, con el rango de fechas
+ * de cada uno en vez del año. El panel global (última compra, deuda actual, vencimiento CxC) no depende del
+ * periodo: la deuda y el vencimiento ya salen sin filtro de periodo en `analisisAnio`; la última compra se
+ * consulta aparte, porque ahí sí viene acotada al periodo.
+ */
+export async function comparacionPeriodos(db: Db, p: {
+  clienteId?: string; periodoA: { desde: string; hasta: string }; periodoB: { desde: string; hasta: string };
+  incluirInactivos?: boolean; vendedorId?: string;
+}): Promise<ComparacionPeriodos> {
+  const base: FiltroClientes = { clienteId: p.clienteId, incluirInactivos: p.incluirInactivos, vendedorId: p.vendedorId };
+  const [a, b, ultimaCompra] = await Promise.all([
+    analisisAnio(db, { ...base, fechaDesde: p.periodoA.desde, fechaHasta: p.periodoA.hasta }),
+    analisisAnio(db, { ...base, fechaDesde: p.periodoB.desde, fechaHasta: p.periodoB.hasta }),
+    (async () => {
+      const c = condicion(base, 'd.fecha', 1);
+      const { rows } = await db.query<{ ultima: string | null }>(
+        `select max(d.fecha)::text as ultima from vw_venta_documento d join vendedor v on v.id = d.vendedor_id ${c.sql}`, c.params);
+      return rows[0].ultima;
+    })(),
+  ]);
+  return {
+    periodoA: p.periodoA, periodoB: p.periodoB,
+    ventaTotal: variacion(Number(a.finanzasMetas.ventaTotalUsd), Number(b.finanzasMetas.ventaTotalUsd)),
+    items: variacion(Number(a.volumenOperaciones.itemsVendidos), Number(b.volumenOperaciones.itemsVendidos), 4),
+    pedidos: variacion(a.volumenOperaciones.pedidos, b.volumenOperaciones.pedidos, 0),
+    ticketPromedio: variacion(Number(a.volumenOperaciones.ticketPromedioUsd), Number(b.volumenOperaciones.ticketPromedioUsd)),
+    devolucionMonto: variacion(Number(a.devoluciones.montoUsd), Number(b.devoluciones.montoUsd)),
+    devolucionItems: variacion(Number(a.devoluciones.items), Number(b.devoluciones.items), 4),
+    devolucionPedidos: variacion(a.devoluciones.pedidos, b.devoluciones.pedidos, 0),
+    indiceDevolucionMontoPct: { a: a.devoluciones.indiceMontoPct, b: b.devoluciones.indiceMontoPct },
+    descuentoPonderado: variacion(Number(a.descuentos.totalUsd), Number(b.descuentos.totalUsd)),
+    diasPagoPromedio: { a: a.cobranzasCxC.diasPagoPromedio, b: b.cobranzasCxC.diasPagoPromedio },
+    pagosA: a.pagosPorInstrumento, pagosB: b.pagosPorInstrumento,
+    global: { ultimaCompra, deudaActualUsd: b.cobranzasCxC.deudaActualUsd, vencimientoMasAntiguo: b.cobranzasCxC.vencimientoMasAntiguo },
+  };
 }
 
 export interface PartidaAbierta {

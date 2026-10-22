@@ -12,7 +12,9 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion, type DatosNotaCredito } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisAnio, analisisHistorico, partidasAbiertas, topItems } from '@/lib/reportes/clientes';
+import {
+  analisisAnio, analisisHistorico, comparacionPeriodos, partidasAbiertas, periodosPorDefecto, topItems,
+} from '@/lib/reportes/clientes';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -221,5 +223,27 @@ describe('M1 Clientes: análisis por año (spec_reportes §4.1, §2, §12)', () 
       { monto: '100.00', abonado: '10.00', saldo: '90.00', mora: 'Al día' },   // f2: descuento comercial del 10 %
       { monto: '100.00', abonado: '0.00', saldo: '100.00', mora: 'Al día' },   // f3: sin notas ni cobros
     ]);
+  });
+
+  it('la comparación de periodos contrasta un año vacío (A) contra el año con datos (B) del cliente A', async () => {
+    const c = await comparacionPeriodos(db, {
+      clienteId: clienteA,
+      periodoA: { desde: `${anioActual - 1}-01-01`, hasta: `${anioActual - 1}-12-31` },
+      periodoB: { desde: `${anioActual}-01-01`, hasta: hoy },
+    });
+    expect(c.ventaTotal).toEqual({ a: '0.00', b: '500.00', variacionAbsoluta: '500.00', variacionPct: 100 });
+    expect(c.devolucionMonto).toEqual({ a: '0.00', b: '40.00', variacionAbsoluta: '40.00', variacionPct: 100 });
+    expect(c.pedidos).toEqual({ a: '0', b: '1', variacionAbsoluta: '1', variacionPct: 100 });
+    // El panel global nunca depende del periodo: siempre la deuda y el vencimiento de hoy.
+    expect(c.global).toMatchObject({ deudaActualUsd: '350.00', vencimientoMasAntiguo: hoy, ultimaCompra: hoy });
+  });
+
+  it('periodosPorDefecto compara el año anterior contra el actual, al mismo día (con el resguardo del 29 de febrero)', () => {
+    expect(periodosPorDefecto('2026-10-22')).toEqual({
+      periodoA: { desde: '2025-01-01', hasta: '2025-10-22' },
+      periodoB: { desde: '2026-01-01', hasta: '2026-10-22' },
+    });
+    // 2028 es bisiesto y 2027 no: el 29 de febrero retrocede al 28.
+    expect(periodosPorDefecto('2028-02-29').periodoA).toEqual({ desde: '2027-01-01', hasta: '2027-02-28' });
   });
 });

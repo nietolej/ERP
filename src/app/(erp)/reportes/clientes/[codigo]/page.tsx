@@ -1,22 +1,29 @@
 import { notFound } from 'next/navigation';
 import { BuscadorCliente } from '@/components/buscador-cliente';
 import { FiltroAnio } from '@/components/reportes/filtro-anio';
+import { FiltroComparacion } from '@/components/reportes/filtro-comparacion';
 import { FiltroIncluir } from '@/components/reportes/filtro-incluir';
 import { PanelAnalisisAnio } from '@/components/reportes/panel-analisis-anio';
+import { PanelComparacion } from '@/components/reportes/panel-comparacion';
 import { PanelHistorico } from '@/components/reportes/panel-historico';
 import { Pestanas } from '@/components/reportes/pestanas';
 import { Aviso, Encabezado, Panel } from '@/components/ui';
 import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import type { Db } from '@/lib/db/tipos';
-import { fecha } from '@/lib/formato';
+import { fecha, hoyCaracas } from '@/lib/formato';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS, puedeVerCliente } from '@/lib/maestros/clientes';
 import {
-  analisisAnio, analisisHistorico, aniosDisponibles, partidasAbiertas, topItems, type FiltroClientes,
+  analisisAnio, analisisHistorico, aniosDisponibles, comparacionPeriodos, partidasAbiertas, periodosPorDefecto, topItems,
+  type FiltroClientes,
 } from '@/lib/reportes/clientes';
 import { buscarClientesAutocompletar } from '../acciones';
 
-type Busqueda = { tab?: string; anios?: string | string[]; incluir?: string };
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+type Busqueda = {
+  tab?: string; anios?: string | string[]; incluir?: string; a_desde?: string; a_hasta?: string; b_desde?: string; b_hasta?: string;
+};
 
 export default async function ReporteClientePage({ params, searchParams }: {
   params: Promise<{ codigo: string }>; searchParams: Promise<Busqueda>;
@@ -25,7 +32,7 @@ export default async function ReporteClientePage({ params, searchParams }: {
   const db = await getDb();
   const { codigo } = await params;
   const q = await searchParams;
-  const tab = q.tab === 'historico' ? 'historico' : 'anio';
+  const tab = q.tab === 'historico' ? 'historico' : q.tab === 'comparacion' ? 'comparacion' : 'anio';
 
   const { rows } = await db.query<{
     id: string; codigo: string; rif: string; razon_social: string; vendedor: string | null; direccion_fiscal: string | null;
@@ -50,10 +57,21 @@ export default async function ReporteClientePage({ params, searchParams }: {
 
   const filtro = { clienteId: cliente.id, anios, incluirInactivos, vendedorId };
   const base = `/reportes/clientes/${codigo}`;
-  const anioActual = new Date().getUTCFullYear();
+  const hoy = hoyCaracas();
+  const anioActual = Number(hoy.slice(0, 4));
+  const porDefecto = periodosPorDefecto(hoy);
+  const periodoA = {
+    desde: FECHA.test(q.a_desde ?? '') ? q.a_desde! : porDefecto.periodoA.desde,
+    hasta: FECHA.test(q.a_hasta ?? '') ? q.a_hasta! : porDefecto.periodoA.hasta,
+  };
+  const periodoB = {
+    desde: FECHA.test(q.b_desde ?? '') ? q.b_desde! : porDefecto.periodoB.desde,
+    hasta: FECHA.test(q.b_hasta ?? '') ? q.b_hasta! : porDefecto.periodoB.hasta,
+  };
   const pestanas = [
     { tab: 'anio', label: 'Análisis por año', href: `${base}?tab=anio${incluirInactivos ? '&incluir=1' : ''}` },
     { tab: 'historico', label: 'Análisis total (histórico)', href: `${base}?tab=historico${incluirInactivos ? '&incluir=1' : ''}` },
+    { tab: 'comparacion', label: 'Comparación de periodos', href: `${base}?tab=comparacion${incluirInactivos ? '&incluir=1' : ''}` },
   ];
 
   return (
@@ -66,6 +84,8 @@ export default async function ReporteClientePage({ params, searchParams }: {
       <Pestanas activa={tab} items={pestanas} />
       {tab === 'historico' ? (
         <TabHistorico db={db} filtro={{ clienteId: cliente.id, incluirInactivos, vendedorId }} anioActual={anioActual} />
+      ) : tab === 'comparacion' ? (
+        <TabComparacion db={db} filtro={{ clienteId: cliente.id, incluirInactivos, vendedorId }} periodoA={periodoA} periodoB={periodoB} />
       ) : (
         <TabAnio db={db} filtro={filtro} anios={anios} incluirInactivos={incluirInactivos} base={base} />
       )}
@@ -95,6 +115,18 @@ async function TabHistorico({ db, filtro, anioActual }: { db: Db; filtro: Omit<F
     <>
       <FiltroIncluir incluirInactivos={Boolean(filtro.incluirInactivos)} tab="historico" />
       <PanelHistorico h={h} partidas={partidas} anioActual={anioActual} />
+    </>
+  );
+}
+
+async function TabComparacion({ db, filtro, periodoA, periodoB }: {
+  db: Db; filtro: Omit<FiltroClientes, 'anios'>; periodoA: { desde: string; hasta: string }; periodoB: { desde: string; hasta: string };
+}) {
+  const c = await comparacionPeriodos(db, { ...filtro, periodoA, periodoB });
+  return (
+    <>
+      <FiltroComparacion periodoA={periodoA} periodoB={periodoB} incluirInactivos={Boolean(filtro.incluirInactivos)} />
+      <PanelComparacion c={c} />
     </>
   );
 }
