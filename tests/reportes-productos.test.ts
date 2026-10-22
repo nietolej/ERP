@@ -9,7 +9,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { catalogoProductos } from '@/lib/reportes/productos';
+import { analisisGrupos, catalogoProductos } from '@/lib/reportes/productos';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -117,5 +117,21 @@ describe('M2 Productos: catálogo de artículos (spec_reportes §5.1, §2, §12)
 
   it('la búsqueda por texto no encuentra productos que no coinciden', async () => {
     expect(await catalogoProductos(db, { texto: 'NO-EXISTE' })).toEqual([]);
+  });
+
+  it('análisis por código común agrupa el artículo con el total de artículos, venta, devolución, stock valorizado y el líder', async () => {
+    const grupos = await analisisGrupos(db, 'codigo_comun');
+    const g = grupos.find((x) => x.codigo === 'BASE-AC-001')!;
+    expect(g).toMatchObject({
+      nombre: 'Artículo AC-001', totalArticulos: 1, unidadesVendidas: '5.0000', ventaUsd: '100.00', devolucionUsd: '40.00',
+      stockValorizadoUsd: (47 * 6.5).toFixed(2), // 47 unidades × US$ 6,50 de costo promedio
+      productoLider: { codigo: 'AC-001', descripcion: 'Aceite de motor' },
+    });
+  });
+
+  it('análisis por categoría agrupa bajo "Sin categoría" el artículo que no tiene categoría asignada', async () => {
+    const grupos = await analisisGrupos(db, 'categoria');
+    const g = grupos.find((x) => x.nombre === 'Sin categoría')!;
+    expect(g).toMatchObject({ totalArticulos: 1, ventaUsd: '100.00', productoLider: { codigo: 'AC-001' } });
   });
 });
