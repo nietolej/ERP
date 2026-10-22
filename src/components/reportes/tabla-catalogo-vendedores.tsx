@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Celda, Tabla } from '@/components/ui';
 import { monto } from '@/lib/formato';
 import type { FilaCatalogoVendedor } from '@/lib/reportes/vendedores';
@@ -10,7 +11,7 @@ export function TablaCatalogoVendedores({ filas }: { filas: FilaCatalogoVendedor
     <Tabla
       columnas={['Código · Nombre · Contacto', { t: 'Atendidos', derecha: true }, { t: 'Facturas', derecha: true },
         { t: 'Cobertura', derecha: true }, { t: 'Top 3', derecha: true }, { t: 'Venta ($)', derecha: true },
-        { t: 'Devoluciones', derecha: true }, { t: 'Cumplimiento meta', derecha: true }]}
+        { t: 'Devoluciones', derecha: true }, { t: 'Cumplimiento meta', derecha: true }, { t: 'Acción', derecha: true }]}
       vacio="No hay vendedores que coincidan.">
       {filas.map((f) => (
         <tr key={f.id} className="hover:bg-white/[0.03]">
@@ -23,6 +24,7 @@ export function TablaCatalogoVendedores({ filas }: { filas: FilaCatalogoVendedor
           <Celda derecha>{monto(f.ventaTotalUsd, 'US$ ')}</Celda>
           <Celda derecha className={f.devolucionesPct !== null && f.devolucionesPct > 0 ? 'text-peligro' : ''}>{pct(f.devolucionesPct)}</Celda>
           <Celda derecha mono>{f.metaUsd === null ? 'Sin meta' : pct(f.cumplimientoMetaPct)}</Celda>
+          <Celda derecha><Link href={`/reportes/vendedores/${f.codigo}`} className="font-semibold text-acento hover:underline">Ver detalle →</Link></Celda>
         </tr>
       ))}
     </Tabla>
