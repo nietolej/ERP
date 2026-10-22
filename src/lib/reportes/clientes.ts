@@ -418,3 +418,27 @@ export async function topItems(db: Db, f: FiltroClientes, orden: 'cantidad' | 'm
     stockComercial: r.stock_comercial, cantidad: r.cantidad, montoUsd: r.monto_usd,
   }));
 }
+
+export interface MovimientoCxC { fecha: string; documento: string; concepto: string; cargoUsd: string; abonoUsd: string; saldoUsd: string; }
+export interface EstadoCuentaDetalle { movimientos: MovimientoCxC[]; totalCargosUsd: string; totalAbonosUsd: string; saldoFinalUsd: string; }
+
+/**
+ * Pestaña "Estado de cuenta (detalle)" (§4.4, solo vista de cliente): todos los movimientos de CxC del
+ * cliente en el periodo, en orden estricto por fecha y hora, con el saldo progresivo acumulado del periodo.
+ */
+export async function estadoCuentaDetalle(db: Db, f: { clienteId: string; desde: string; hasta: string }): Promise<EstadoCuentaDetalle> {
+  const { rows } = await db.query<{ fecha: string; documento: string; concepto: string; cargo: string; abono: string }>(
+    `select ((momento at time zone 'America/Caracas')::date)::text as fecha, documento, concepto,
+            cargo_usd::text as cargo, abono_usd::text as abono
+       from vw_cxc_movimiento
+      where cliente_id = $1 and ((momento at time zone 'America/Caracas')::date) between $2::date and $3::date
+      order by momento, desempate`,
+    [f.clienteId, f.desde, f.hasta]);
+  let saldo = 0, cargos = 0, abonos = 0;
+  const movimientos = rows.map((r) => {
+    const cargo = Number(r.cargo), abono = Number(r.abono);
+    cargos += cargo; abonos += abono; saldo += cargo - abono;
+    return { fecha: r.fecha, documento: r.documento, concepto: r.concepto, cargoUsd: cargo.toFixed(2), abonoUsd: abono.toFixed(2), saldoUsd: saldo.toFixed(2) };
+  });
+  return { movimientos, totalCargosUsd: cargos.toFixed(2), totalAbonosUsd: abonos.toFixed(2), saldoFinalUsd: saldo.toFixed(2) };
+}

@@ -13,7 +13,7 @@ import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion, type DatosNotaCredito } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
 import {
-  analisisAnio, analisisHistorico, comparacionPeriodos, partidasAbiertas, periodosPorDefecto, topItems,
+  analisisAnio, analisisHistorico, comparacionPeriodos, estadoCuentaDetalle, partidasAbiertas, periodosPorDefecto, topItems,
 } from '@/lib/reportes/clientes';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
@@ -236,6 +236,24 @@ describe('M1 Clientes: análisis por año (spec_reportes §4.1, §2, §12)', () 
     expect(c.pedidos).toEqual({ a: '0', b: '1', variacionAbsoluta: '1', variacionPct: 100 });
     // El panel global nunca depende del periodo: siempre la deuda y el vencimiento de hoy.
     expect(c.global).toMatchObject({ deudaActualUsd: '350.00', vencimientoMasAntiguo: hoy, ultimaCompra: hoy });
+  });
+
+  it('el estado de cuenta detalle del cliente A ordena los movimientos por fecha y hora, con saldo progresivo', async () => {
+    const e = await estadoCuentaDetalle(db, { clienteId: clienteA, desde: `${anioActual}-01-01`, hasta: hoy });
+    expect(e).toMatchObject({ totalCargosUsd: '500.00', totalAbonosUsd: '150.00', saldoFinalUsd: '350.00' });
+    expect(e.movimientos.map((m) => ({ concepto: m.concepto, cargo: m.cargoUsd, abono: m.abonoUsd, saldo: m.saldoUsd }))).toEqual([
+      { concepto: 'Factura', cargo: '200.00', abono: '0.00', saldo: '200.00' },  // f1
+      { concepto: 'Factura', cargo: '100.00', abono: '0.00', saldo: '300.00' },  // f2
+      { concepto: 'Nota de crédito', cargo: '0.00', abono: '10.00', saldo: '290.00' }, // descuento comercial de f2
+      { concepto: 'Factura', cargo: '100.00', abono: '0.00', saldo: '390.00' },  // f3
+      { concepto: 'Nota de crédito', cargo: '0.00', abono: '40.00', saldo: '350.00' }, // devolución de f1
+      { concepto: 'Factura', cargo: '100.00', abono: '0.00', saldo: '450.00' },  // f4
+      { concepto: 'Nota de crédito', cargo: '0.00', abono: '20.00', saldo: '430.00' }, // pronto pago de f4
+      { concepto: 'Cobro', cargo: '0.00', abono: '80.00', saldo: '350.00' },     // liquida f4
+    ]);
+    // El saldo final del periodo coincide con la deuda actual de "por año" (misma cuenta, mismos movimientos).
+    const anio = await analisisAnio(db, { clienteId: clienteA, anios: [anioActual] });
+    expect(e.saldoFinalUsd).toBe(anio.cobranzasCxC.deudaActualUsd);
   });
 
   it('periodosPorDefecto compara el año anterior contra el actual, al mismo día (con el resguardo del 29 de febrero)', () => {

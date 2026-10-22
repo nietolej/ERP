@@ -46,6 +46,7 @@ describe('migraciones', () => {
       '0029_notas_credito_debito.sql',
       '0030_reportes_inicio.sql',
       '0031_reportes_clientes.sql',
+      '0032_reportes_estado_cuenta.sql',
     ]);
   });
 

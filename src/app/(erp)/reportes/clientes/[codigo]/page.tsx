@@ -3,8 +3,10 @@ import { BuscadorCliente } from '@/components/buscador-cliente';
 import { FiltroAnio } from '@/components/reportes/filtro-anio';
 import { FiltroComparacion } from '@/components/reportes/filtro-comparacion';
 import { FiltroIncluir } from '@/components/reportes/filtro-incluir';
+import { FiltroRango } from '@/components/reportes/filtro-rango';
 import { PanelAnalisisAnio } from '@/components/reportes/panel-analisis-anio';
 import { PanelComparacion } from '@/components/reportes/panel-comparacion';
+import { PanelEstadoCuenta } from '@/components/reportes/panel-estado-cuenta';
 import { PanelHistorico } from '@/components/reportes/panel-historico';
 import { Pestanas } from '@/components/reportes/pestanas';
 import { Aviso, Encabezado, Panel } from '@/components/ui';
@@ -14,8 +16,8 @@ import type { Db } from '@/lib/db/tipos';
 import { fecha, hoyCaracas } from '@/lib/formato';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS, puedeVerCliente } from '@/lib/maestros/clientes';
 import {
-  analisisAnio, analisisHistorico, aniosDisponibles, comparacionPeriodos, partidasAbiertas, periodosPorDefecto, topItems,
-  type FiltroClientes,
+  analisisAnio, analisisHistorico, aniosDisponibles, comparacionPeriodos, estadoCuentaDetalle, partidasAbiertas, periodosPorDefecto,
+  topItems, type FiltroClientes,
 } from '@/lib/reportes/clientes';
 import { buscarClientesAutocompletar } from '../acciones';
 
@@ -23,6 +25,7 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 type Busqueda = {
   tab?: string; anios?: string | string[]; incluir?: string; a_desde?: string; a_hasta?: string; b_desde?: string; b_hasta?: string;
+  desde?: string; hasta?: string;
 };
 
 export default async function ReporteClientePage({ params, searchParams }: {
@@ -32,7 +35,7 @@ export default async function ReporteClientePage({ params, searchParams }: {
   const db = await getDb();
   const { codigo } = await params;
   const q = await searchParams;
-  const tab = q.tab === 'historico' ? 'historico' : q.tab === 'comparacion' ? 'comparacion' : 'anio';
+  const tab = q.tab === 'historico' ? 'historico' : q.tab === 'comparacion' ? 'comparacion' : q.tab === 'detalle' ? 'detalle' : 'anio';
 
   const { rows } = await db.query<{
     id: string; codigo: string; rif: string; razon_social: string; vendedor: string | null; direccion_fiscal: string | null;
@@ -68,10 +71,15 @@ export default async function ReporteClientePage({ params, searchParams }: {
     desde: FECHA.test(q.b_desde ?? '') ? q.b_desde! : porDefecto.periodoB.desde,
     hasta: FECHA.test(q.b_hasta ?? '') ? q.b_hasta! : porDefecto.periodoB.hasta,
   };
+  const rangoDetalle = {
+    desde: FECHA.test(q.desde ?? '') ? q.desde! : `${anioActual}-01-01`,
+    hasta: FECHA.test(q.hasta ?? '') ? q.hasta! : hoy,
+  };
   const pestanas = [
     { tab: 'anio', label: 'Análisis por año', href: `${base}?tab=anio${incluirInactivos ? '&incluir=1' : ''}` },
     { tab: 'historico', label: 'Análisis total (histórico)', href: `${base}?tab=historico${incluirInactivos ? '&incluir=1' : ''}` },
     { tab: 'comparacion', label: 'Comparación de periodos', href: `${base}?tab=comparacion${incluirInactivos ? '&incluir=1' : ''}` },
+    { tab: 'detalle', label: 'Estado de cuenta (detalle)', href: `${base}?tab=detalle` },
   ];
 
   return (
@@ -86,6 +94,8 @@ export default async function ReporteClientePage({ params, searchParams }: {
         <TabHistorico db={db} filtro={{ clienteId: cliente.id, incluirInactivos, vendedorId }} anioActual={anioActual} />
       ) : tab === 'comparacion' ? (
         <TabComparacion db={db} filtro={{ clienteId: cliente.id, incluirInactivos, vendedorId }} periodoA={periodoA} periodoB={periodoB} />
+      ) : tab === 'detalle' ? (
+        <TabDetalle db={db} clienteId={cliente.id} rango={rangoDetalle} />
       ) : (
         <TabAnio db={db} filtro={filtro} anios={anios} incluirInactivos={incluirInactivos} base={base} />
       )}
@@ -127,6 +137,16 @@ async function TabComparacion({ db, filtro, periodoA, periodoB }: {
     <>
       <FiltroComparacion periodoA={periodoA} periodoB={periodoB} incluirInactivos={Boolean(filtro.incluirInactivos)} />
       <PanelComparacion c={c} />
+    </>
+  );
+}
+
+async function TabDetalle({ db, clienteId, rango }: { db: Db; clienteId: string; rango: { desde: string; hasta: string } }) {
+  const e = await estadoCuentaDetalle(db, { clienteId, ...rango });
+  return (
+    <>
+      <FiltroRango desde={rango.desde} hasta={rango.hasta} tab="detalle" />
+      <PanelEstadoCuenta e={e} />
     </>
   );
 }
