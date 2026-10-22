@@ -39,10 +39,12 @@ export function Etiqueta({ tono = 'info', children }: { tono?: Tono; children: R
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${TONOS[tono]}`}>{children}</span>;
 }
 
-export function Tabla({ columnas, children, vacio }: { columnas: (string | { t: string; derecha?: boolean })[]; children: ReactNode; vacio?: string }) {
+export function Tabla({ columnas, children, vacio, className = '' }: {
+  columnas: (string | { t: string; derecha?: boolean })[]; children: ReactNode; vacio?: string; className?: string;
+}) {
   const hayFilas = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <div className="overflow-x-auto">
+    <div className={`overflow-x-auto ${className}`}>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-borde text-left text-xs uppercase tracking-wider text-texto-2">
