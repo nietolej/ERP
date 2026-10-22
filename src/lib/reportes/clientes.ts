@@ -263,6 +263,49 @@ export async function analisisAnio(db: Db, f: FiltroClientes = {}): Promise<Anal
   };
 }
 
+export interface AnalisisHistoricoClientes {
+  /** Todo el histórico, con las mismas funciones de "Análisis por año" (§4.2: nunca se recalcula aparte). */
+  total: AnalisisAnioClientes;
+  /** Un `analisisAnio` por cada año con venta, para la matriz y el gráfico de evolución anual. */
+  porAnio: (AnalisisAnioClientes & { anio: number })[];
+}
+
+/** Pestaña "Análisis total (histórico)" (spec_reportes §4.2): reusa `analisisAnio`, aplicada a todo el histórico y a cada año. */
+export async function analisisHistorico(db: Db, f: Omit<FiltroClientes, 'anios'> = {}): Promise<AnalisisHistoricoClientes> {
+  const anios = await aniosDisponibles(db);
+  const [total, ...porAnio] = await Promise.all([
+    analisisAnio(db, { ...f, anios: undefined }),
+    ...anios.map(async (anio) => ({ ...(await analisisAnio(db, { ...f, anios: [anio] })), anio })),
+  ]);
+  porAnio.sort((a, b) => a.anio - b.anio);
+  return { total, porAnio };
+}
+
+export interface PartidaAbierta {
+  numero: string; emision: string; montoOriginalUsd: string; abonadoUsd: string; saldoUsd: string; vencimiento: string; mora: string;
+}
+
+const diasEntre = (desde: string, hasta: string) => Math.round((new Date(hasta).getTime() - new Date(desde).getTime()) / 86_400_000);
+
+/** "Estado de cuenta (global)" (§4.2): partidas de CxC abiertas, siempre a hoy (no se filtra por año). */
+export async function partidasAbiertas(db: Db, f: Omit<FiltroClientes, 'anios'> = {}): Promise<PartidaAbierta[]> {
+  const hoy = (await db.query<{ h: string }>(`select ${HOY}::text as h`)).rows[0].h;
+  const c = condicion({ ...f, anios: undefined }, 'a.fecha', 1, 'a.cliente_id');
+  const { rows } = await db.query<{
+    numero: string; emision: string; monto_usd: string; saldo_usd: string; vencimiento: string;
+  }>(
+    `select a.factura as numero, a.fecha::text as emision, p.monto_usd::text, a.saldo_usd::text, a.vencimiento::text
+       from vw_cxc_antiguedad a join partida_cxc p on p.id = a.partida_id join documento_venta d on d.id = a.documento_id join vendedor v on v.id = d.vendedor_id
+       ${c.sql}
+      order by a.vencimiento, a.factura`, c.params);
+  return rows.map((r) => ({
+    numero: r.numero, emision: r.emision, montoOriginalUsd: r.monto_usd,
+    abonadoUsd: (Number(r.monto_usd) - Number(r.saldo_usd)).toFixed(2), saldoUsd: r.saldo_usd, vencimiento: r.vencimiento,
+    mora: r.vencimiento < hoy ? `${diasEntre(r.vencimiento, hoy)} días de vencido`
+        : r.vencimiento > hoy ? `${diasEntre(hoy, r.vencimiento)} días por vencer` : 'Al día',
+  }));
+}
+
 export interface TopItemCliente {
   productoId: string; codigo: string; descripcion: string; ultimaVenta: string | null; stockComercial: string | null;
   cantidad: string; montoUsd: string;

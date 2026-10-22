@@ -12,7 +12,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion, type DatosNotaCredito } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analisisAnio, topItems } from '@/lib/reportes/clientes';
+import { analisisAnio, analisisHistorico, partidasAbiertas, topItems } from '@/lib/reportes/clientes';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -201,5 +201,25 @@ describe('M1 Clientes: análisis por año (spec_reportes §4.1, §2, §12)', () 
   it('la vista global suma los tres clientes', async () => {
     const r = await analisisAnio(db, { anios: [anioActual] });
     expect(r.finanzasMetas.ventaTotalUsd).toBe('620.00'); // 500 (A) + 100 (B) + 20 (C)
+  });
+
+  it('el histórico de cliente A usa las mismas funciones que "por año", con un único año de datos', async () => {
+    const h = await analisisHistorico(db, { clienteId: clienteA });
+    expect(h.total.finanzasMetas.ventaTotalUsd).toBe('500.00');
+    expect(h.total.devoluciones.montoUsd).toBe('40.00');
+    expect(h.porAnio).toHaveLength(1);
+    expect(h.porAnio[0]).toMatchObject({ anio: anioActual });
+    expect(h.porAnio[0].finanzasMetas.ventaTotalUsd).toBe(h.total.finanzasMetas.ventaTotalUsd);
+  });
+
+  it('el estado de cuenta global del cliente A lista solo las partidas abiertas, con su monto, abono y saldo', async () => {
+    const partidas = await partidasAbiertas(db, { clienteId: clienteA });
+    expect(partidas).toHaveLength(3); // f1, f2 y f3: f4 quedó cancelada
+    const porMonto = [...partidas].sort((a, b) => Number(b.montoOriginalUsd) - Number(a.montoOriginalUsd));
+    expect(porMonto.map((p) => ({ monto: p.montoOriginalUsd, abonado: p.abonadoUsd, saldo: p.saldoUsd, mora: p.mora }))).toEqual([
+      { monto: '200.00', abonado: '40.00', saldo: '160.00', mora: 'Al día' },  // f1: devolución de 2 unidades
+      { monto: '100.00', abonado: '10.00', saldo: '90.00', mora: 'Al día' },   // f2: descuento comercial del 10 %
+      { monto: '100.00', abonado: '0.00', saldo: '100.00', mora: 'Al día' },   // f3: sin notas ni cobros
+    ]);
   });
 });
