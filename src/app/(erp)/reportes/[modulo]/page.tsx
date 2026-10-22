@@ -4,10 +4,6 @@ import { exigirSesion } from '@/lib/auth/dal';
 
 /** Módulos de reportes (spec_reportes): se habilitan cuando existen los datos que los alimentan. */
 const MODULOS: Record<string, { titulo: string; fase: number; contenido: string[] }> = {
-  vendedores: {
-    titulo: 'Vendedores (M3)', fase: 2,
-    contenido: ['Catálogo con cobertura y concentración', 'Vista anual vs meta', 'Analítica estratégica y cartera dormida', 'Comparativa multianual', 'Cartera activa y productos vendidos'],
-  },
   cobranzas: {
     titulo: 'Cobranzas (M4)', fase: 2,
     contenido: ['Resumen y velocidad de cobro', 'Antigüedad de saldos', 'Promedio por vendedor', 'Promedio por cliente', 'Bancos y canales'],
