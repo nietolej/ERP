@@ -10,7 +10,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { catalogoVendedores, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
+import { analiticaEstrategicaVendedor, catalogoVendedores, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -146,6 +146,7 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
   let mostrador: string;
   let clienteA: string;
   let clienteB: string;
+  let clienteC: string;
   let aceite: string;
   let vendedorId: string;
   let motivoDevolucion = '';
@@ -201,6 +202,7 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
     };
     clienteA = await cliente('J-00000011-5', 'Repuestos Lara, C.A.');
     clienteB = await cliente('J-00000021-2', 'Autopartes Sur, C.A.');
+    clienteC = await cliente('J-00000031-0', 'Frenos Centro, C.A.');
 
     const exento = (await db.query<{ id: string }>(`select id from alicuota_iva where codigo = 'EXENTO'`)).rows[0].id;
     const marca = await db.transaction((tx) => crearCatalogo(tx, 'marca', 'GENERICA', 'Genérica'));
@@ -256,5 +258,103 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
     const v = await vistaGeneralVendedor(db, vendedorId, [anioActual]);
     expect(v.insight.tipo).toBe('deuda');
     expect(v.insight.mensaje).toContain('Deuda activa');
+  });
+});
+
+describe('M3 Vendedores: detalle, pestaña "Analítica estratégica & cartera dormida" (spec_reportes §6.2)', () => {
+  let db: Db;
+  let cerrar: () => Promise<void>;
+  let ventas: Usuario;
+  let facturacion: Usuario;
+  let almacenista: Usuario;
+  let mostrador: string;
+  let clienteA: string;
+  let clienteB: string;
+  let clienteC: string;
+  let aceite: string;
+  let vendedorId: string;
+  let hoy = '';
+  let anioActual = 0;
+
+  const como = <T,>(u: Usuario, fn: (tx: Db) => Promise<T>) => db.transaction(async (tx) => {
+    await tx.query("select set_config('app.usuario_id', $1, true)", [u.id]);
+    return fn(tx);
+  });
+  async function facturar(cliente: string, cantidad: string): Promise<string> {
+    const pedido = await como(ventas, (tx) => crearPedido(tx, ventas, { clienteId: cliente, almacenId: mostrador }));
+    await como(ventas, (tx) => agregarLinea(tx, ventas, pedido, { productoId: aceite, cantidad }));
+    await como(ventas, (tx) => emitirPedido(tx, ventas, pedido));
+    const nota = await como(ventas, (tx) => generarNotaEntrega(tx, ventas, pedido));
+    await como(almacenista, (tx) => confirmarSalida(tx, almacenista, nota));
+    const f = await como(facturacion, (tx) => facturarNotas(tx, facturacion, [nota], { servicio: new ImprentaSimulada() }));
+    return f.facturaId;
+  }
+
+  beforeAll(async () => {
+    ({ db, cerrar } = await baseDePrueba());
+    const idGer = await usuarioDePrueba(db, 'gerente5@prueba.test', ['gerencia']);
+    const idVen = await usuarioDePrueba(db, 'ventas5@prueba.test', ['ventas']);
+    const idFac = await usuarioDePrueba(db, 'facturacion5@prueba.test', ['facturacion']);
+    const idAlm = await usuarioDePrueba(db, 'almacen5@prueba.test', ['almacen']);
+    ventas = { id: idVen, roles: ['ventas'] };
+    facturacion = { id: idFac, roles: ['facturacion'] };
+    almacenista = { id: idAlm, roles: ['almacen'] };
+
+    await db.query(`insert into empresa (rif, razon_social, domicilio_fiscal) values ('J-12345678-4', 'Distribuciones Hanei Motors, C.A.', 'Barquisimeto, Lara')`);
+    await db.query(`select fn_crear_periodos(extract(year from now())::int)`);
+    const h = (await db.query<{ d: string; a: number }>(
+      `select ((now() at time zone 'America/Caracas')::date)::text as d, extract(year from now() at time zone 'America/Caracas')::int as a`)).rows[0];
+    hoy = h.d; anioActual = h.a;
+    await db.query(`insert into tasa_cambio (fecha, moneda, tasa) values ($1, 'USD', 40.000000)`, [hoy]);
+
+    const sucursal = (await db.query<{ id: string }>(`insert into sucursal (codigo, nombre) values ('BQTO', 'Barquisimeto') returning id`)).rows[0].id;
+    mostrador = await db.transaction((tx) => crearAlmacen(tx, 'MOS', { nombre: 'Mostrador', sucursalId: sucursal, esComercial: true, permiteVenta: true, usaPicking: false }));
+    await db.transaction((tx) => asignarUsuarios(tx, mostrador, [idAlm]));
+
+    const vend = await db.transaction((tx) => crearVendedor(tx, idGer, { nombre: 'Pedro Pérez', tipo: 'interno', usuarioId: idVen }));
+    vendedorId = vend.id;
+    const contado = (await db.query<{ id: string }>(`select id from condicion_pago where codigo = 'CONTADO'`)).rows[0].id;
+    const cliente = async (rif: string, nombre: string) => {
+      const c = await db.transaction((tx) => crearCliente(tx, idFac, {
+        rif, tercero: { razonSocial: nombre, domiciliado: true, contribuyenteEspecial: false, agenteRetencionIva: false }, comercial: { vendedorId: vend.id },
+      }));
+      await db.transaction((tx) => aprobarCliente(tx, c.id, idGer, { condicionPagoId: contado, limiteCreditoUsd: '0', nivelPrecio: 'B', descuentoPct: '0' }));
+      return c.id;
+    };
+    clienteA = await cliente('J-00000012-3', 'Repuestos Lara, C.A.');
+    clienteB = await cliente('J-00000022-0', 'Autopartes Sur, C.A.');
+    // Cliente C queda asignado al vendedor pero nunca compra: cartera dormida sin historial.
+    clienteC = await cliente('J-00000032-8', 'Frenos Centro, C.A.');
+
+    const exento = (await db.query<{ id: string }>(`select id from alicuota_iva where codigo = 'EXENTO'`)).rows[0].id;
+    const marca = await db.transaction((tx) => crearCatalogo(tx, 'marca', 'GENERICA', 'Genérica'));
+    const base = await db.transaction((tx) => resolverProductoBase(tx, 'BASE-AC-003', { descripcion: 'Artículo AC-003' }));
+    aceite = await db.transaction((tx) => crearProducto(tx, idAlm, 'AC-003', {
+      descripcion: 'Aceite de motor', productoBaseId: base.id, marcaId: marca, unidad: 'und', alicuotaIvaId: exento, inventariable: true,
+    }));
+    await db.transaction((tx) => fijarPrecio(tx, aceite, 'B', '20.00', hoy));
+    await como(almacenista, (tx) => tx.query(
+      `insert into movimiento_inventario (tipo, producto_id, almacen_id, cantidad, costo_unitario_usd, origen_tipo, origen_id)
+       values ('entrada_compra', $1, $2, 50, 6.5, 'prueba', gen_random_uuid())`, [aceite, mostrador]));
+
+    // Cliente A: 5 unidades (US$ 100). Cliente B: 3 unidades (US$ 60). Cliente C: sin compras.
+    await facturar(clienteA, '5');
+    await facturar(clienteB, '3');
+  });
+  afterAll(() => cerrar());
+
+  it('cobertura de cartera y concentración top 3 sobre los 3 clientes asignados', async () => {
+    const a = await analiticaEstrategicaVendedor(db, vendedorId, [anioActual]);
+    expect(a.coberturaCarteraPct).toBeCloseTo(66.67, 1);
+    expect(a.concentracionTop3Pct).toBe(100);
+  });
+
+  it('marca al cliente sin compras en el periodo como cartera dormida, sin historial', async () => {
+    const a = await analiticaEstrategicaVendedor(db, vendedorId, [anioActual]);
+    expect(a.tasaFugaPct).toBeCloseTo(33.33, 1);
+    expect(a.dormidos).toHaveLength(1);
+    expect(a.dormidos[0]).toMatchObject({
+      id: clienteC, ventaHistoricaUsd: '0.00', ultimaCompra: null, diasSinComprar: null, enRiesgo: false,
+    });
   });
 });

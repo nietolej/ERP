@@ -47,6 +47,7 @@ describe('migraciones', () => {
       '0030_reportes_inicio.sql',
       '0031_reportes_clientes.sql',
       '0032_reportes_estado_cuenta.sql',
+      '0033_reportes_vendedores_estrategica.sql',
     ]);
   });
 

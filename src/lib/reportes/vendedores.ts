@@ -241,3 +241,90 @@ export async function vistaGeneralVendedor(db: Db, vendedorId: string, anios: nu
     metaUsd, cumplimientoMetaPct, devolucionesPct, insight, mensual,
   };
 }
+
+export interface ClienteDormidoVendedor {
+  id: string; codigo: string; nombre: string; ventaHistoricaUsd: string; ultimaCompra: string | null;
+  diasSinComprar: number | null; enRiesgo: boolean;
+}
+
+export interface AnaliticaEstrategicaVendedor {
+  coberturaCarteraPct: number | null;
+  concentracionTop3Pct: number | null;
+  ventaCruzada: number | null;
+  tasaFugaPct: number | null;
+  dormidos: ClienteDormidoVendedor[];
+}
+
+/**
+ * M3 · Vendedores, pestaña "Analítica estratégica & cartera dormida" del detalle de vendedor (spec_reportes §6.2).
+ * Cobertura y concentración top 3 reusan la misma fórmula del catálogo (§6.1). "Cartera dormida" son los clientes
+ * asignados sin ninguna factura en el periodo filtrado; "días sin comprar" sale de su última compra histórica,
+ * no de una estimación.
+ */
+export async function analiticaEstrategicaVendedor(db: Db, vendedorId: string, anios: number[]): Promise<AnaliticaEstrategicaVendedor> {
+  const aniosFiltro = anios.length > 0 ? anios : null;
+  const umbralFuga = Number((await db.query<{ v: string }>("select fn_parametro_reporte('DIAS_FUGA_CLIENTE')::text as v")).rows[0].v);
+
+  const { rows: venta } = await db.query<{ venta: string; atendidos: string }>(
+    `select coalesce(sum(base_usd), 0)::numeric(16,2)::text as venta, count(distinct cliente_id)::text as atendidos
+       from vw_venta_documento
+      where vendedor_id = $1 and ($2::int[] is null or extract(year from fecha)::int = any($2::int[]))`,
+    [vendedorId, aniosFiltro]);
+  const ventaTotal = Number(venta[0].venta);
+
+  const { rows: top3 } = await db.query<{ top3: string }>(
+    `with venta_cliente as (
+       select cliente_id, sum(base_usd) as venta from vw_venta_documento
+        where vendedor_id = $1 and ($2::int[] is null or extract(year from fecha)::int = any($2::int[]))
+        group by cliente_id
+     )
+     select coalesce(sum(venta), 0)::numeric(16,2)::text as top3
+       from (select venta, row_number() over (order by venta desc) as rn from venta_cliente) x where rn <= 3`,
+    [vendedorId, aniosFiltro]);
+
+  const { rows: asignados } = await db.query<{ asignados: string }>(
+    `select count(*)::text as asignados from cliente where estado = 'activo' and vendedor_id = $1`, [vendedorId]);
+
+  const { rows: cruzada } = await db.query<{ v: string | null }>(
+    `with por_factura as (
+       select documento_id, count(distinct grupo_id) as grupos from vw_venta_linea
+        where vendedor_id = $1 and ($2::int[] is null or extract(year from fecha)::int = any($2::int[]))
+        group by documento_id
+     )
+     select avg(grupos)::text as v from por_factura`, [vendedorId, aniosFiltro]);
+
+  const { rows: dormidos } = await db.query<{
+    id: string; codigo: string; nombre: string; venta: string; ultima: string | null; dias: number | null;
+  }>(
+    `with compras_periodo as (
+       select cliente_id from vw_venta_documento
+        where vendedor_id = $1 and ($2::int[] is null or extract(year from fecha)::int = any($2::int[]))
+        group by cliente_id
+     ), historico as (
+       select cliente_id, sum(base_usd)::numeric(16,2) as venta, max(fecha) as ultima
+         from vw_venta_documento where vendedor_id = $1 group by cliente_id
+     )
+     select c.tercero_id as id, c.codigo, t.razon_social as nombre, coalesce(h.venta, 0::numeric(16,2))::text as venta,
+            h.ultima::text as ultima, (${HOY_V} - h.ultima) as dias
+       from cliente c
+       join tercero t on t.id = c.tercero_id
+       left join historico h on h.cliente_id = c.tercero_id
+      where c.estado = 'activo' and c.vendedor_id = $1
+        and not exists (select 1 from compras_periodo cp where cp.cliente_id = c.tercero_id)
+      order by coalesce(h.venta, 0) desc`,
+    [vendedorId, aniosFiltro]);
+
+  const pct = (num: number, den: number): number | null => (den > 0 ? (num / den) * 100 : null);
+  const asignadosN = Number(asignados[0].asignados);
+
+  return {
+    coberturaCarteraPct: pct(Number(venta[0].atendidos), asignadosN),
+    concentracionTop3Pct: pct(Number(top3[0].top3), ventaTotal),
+    ventaCruzada: cruzada[0].v === null ? null : Number(cruzada[0].v),
+    tasaFugaPct: pct(dormidos.length, asignadosN),
+    dormidos: dormidos.map((d) => ({
+      id: d.id, codigo: d.codigo, nombre: d.nombre, ventaHistoricaUsd: d.venta, ultimaCompra: d.ultima,
+      diasSinComprar: d.dias, enRiesgo: d.dias !== null && d.dias > umbralFuga,
+    })),
+  };
+}
