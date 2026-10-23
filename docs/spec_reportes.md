@@ -21,6 +21,7 @@
 11. [Diferencias intencionales respecto al dashboard](#11-diferencias-intencionales-respecto-al-dashboard)
 12. [Vistas SQL que alimentan los reportes](#12-vistas-sql-que-alimentan-los-reportes)
 13. [Entrega por fases y criterios de aceptación](#13-entrega-por-fases-y-criterios-de-aceptación)
+14. [M7 · Análisis Avanzado](#14-m7--análisis-avanzado)
 
 ---
 
@@ -39,6 +40,7 @@ El menú lateral replica el del dashboard, con los mismos nombres y en el mismo 
 | 6 | Devoluciones (M5) | `/reportes/devoluciones` | §8 |
 | 7 | Inventario (M6) | `/reportes/inventario` | §9 |
 | 8 | Configuración de Metas | `/metas` | §10 |
+| 9 | Análisis Avanzado (M7) | `/reportes/analisis-avanzado` | §14 |
 
 ### 1.2 Diseño visual
 - Se replica el aspecto del dashboard: barra lateral colapsable, tema oscuro con paneles translúcidos, tarjetas de indicador (título en mayúsculas pequeñas, ícono y valor destacado), tablas ordenables y gráficos de barras, líneas y torta.
@@ -452,6 +454,7 @@ Los reportes se entregan a medida que existen los datos que los alimentan (§13 
 | Fase 1 (Maestros) | Configuración de Metas (§10) |
 | Fase 2 (Ventas, CxC, inventario) | Inicio, M1 Clientes, M2 Productos (catálogo y detalle anual), M3 Vendedores, M4 Cobranzas, M5 Devoluciones |
 | Fase 3 (Compras) | M2 Stock por almacén y Movimientos, M6 Inventario completo (tránsito, producción, sugerido con creación de OC) |
+| Fase 3 (ampliación) | M7 Análisis Avanzado (§14): histograma de pedidos y patrones de morosidad en cuanto M4 tiene datos; patrones de velocidad y de quiebres en cuanto M6 está completo |
 
 **Criterios de aceptación:**
 1. **Paridad visual:** cada pantalla tiene los módulos, pestañas, tarjetas, gráficos, columnas, filtros y exportaciones descritos aquí, con la misma navegación que el dashboard.
@@ -461,3 +464,38 @@ Los reportes se entregan a medida que existen los datos que los alimentan (§13 
    - La deuda en M1 = la de M4 = el saldo de la cuenta de CxC en el mayor.
 4. **Sin datos inventados:** ninguna pantalla muestra valores de relleno. Sin datos, o ante un error, se ven los estados vacíos o de error de la §1.4.
 5. **Rendimiento:** cada pantalla carga en menos de 3 s con el volumen de un año de operación.
+
+---
+
+## 14. M7 · Análisis Avanzado
+
+Módulo nuevo, sin equivalente en el dashboard anterior: no replica una pantalla existente, sino que cruza los mismos datos de M1-M6 para detectar patrones. Usa los mismos filtros comunes (§1.3: año, sucursal, incluir inactivos) más los que se indican en cada pestaña. Todos los umbrales y tamaños de tramo son parámetros en `parametro_reporte` (§1.4: nunca un valor fijo en el código) con un valor de referencia, **pendientes de confirmar con Gerencia** (igual que los demás parámetros de reportes e inventario, [decisiones.md](decisiones.md)).
+
+### 14.1 Histograma de Pedidos (`/reportes/analisis-avanzado/pedidos`)
+- **Filtros:** año, sucursal, vendedor, zona (`cliente.zona`), cliente (búsqueda).
+- **Definición:** cada pedido es una factura (grano de `vw_venta_documento`; "venta" §2). El histograma agrupa las facturas del periodo en tramos de monto de igual ancho, desde $0 hasta un tope, con un tramo final abierto "más de $X".
+  - `HISTOGRAMA_PEDIDOS_TRAMO_USD`: ancho de cada tramo. Valor de referencia **$50**.
+  - `HISTOGRAMA_PEDIDOS_TOPE_USD`: monto a partir del cual los pedidos entran en el tramo abierto. Valor de referencia **$1.000**.
+- **Gráfico:** barras, una por tramo, con la cantidad de pedidos.
+- **Tabla** (exportable): tramo, cantidad de pedidos, % del total, monto total y pedido promedio del tramo.
+
+### 14.2 Patrones de Morosidad (`/reportes/analisis-avanzado/morosidad`)
+- **Filtros:** año, sucursal, vendedor, zona.
+- **Definición:** cruza el tramo de monto del pedido (los mismos de §14.1) y los **días de crédito** (`condicion_pago.dias`) de la condición de pago **actual** del cliente contra el comportamiento real de cobro. *Nota: la factura no congela la condición de pago del cliente (§3, modelo de datos); si un cliente cambió de plazo, sus facturas antiguas se agrupan con el plazo que tiene hoy, no el que tenía al facturar. Congelarla por factura es un cambio de modelo, pendiente de confirmar con Gerencia.* Por cada combinación (tramo de monto × días de crédito) muestra: cantidad de facturas, **días de pago promedio** ponderado (§2), **% de facturas en mora** (partidas con `dias_vencida > 0` sobre el total de esa celda) y deuda abierta.
+- **Objetivo:** ver si los pedidos grandes, o los plazos largos, se pagan más tarde que el resto — sin asumirlo de antemano.
+- **Umbral de mora relevante** (para resaltar una celda): `MOROSIDAD_PATRON_PCT`, % de facturas en mora a partir del cual la celda se marca. Valor de referencia **20 %**.
+- **Tabla matricial** (exportable): una fila por combinación, ordenable por % de mora o por días de pago.
+
+### 14.3 Patrones de Velocidad tras Quiebre (`/reportes/analisis-avanzado/velocidad-quiebre`)
+- **Filtros:** año, grupo/familia de producto, almacén.
+- **Definición:** reusa `vw_existencia_diaria` y el kardex de M6 (§9) para ubicar los **episodios de quiebre** de cada producto: tramos de días consecutivos con existencia comercial ≤ 0, con su fecha de inicio y la fecha en que vuelve a haber existencia. Para cada episodio compara la **velocidad de venta** (unidades ÷ día, §9.1) en los `VENTANA_VELOCIDAD_QUIEBRE_DIAS` días previos al quiebre contra los mismos días posteriores a la reposición.
+  - `VENTANA_VELOCIDAD_QUIEBRE_DIAS`: tamaño de cada ventana. Valor de referencia **15 días**.
+- **Tabla** (exportable): producto, almacén, fecha del quiebre, duración (días), velocidad antes, velocidad después y variación %. Ordenable por variación % descendente, para ubicar primero los productos cuya demanda "explota" al reponerse (demanda reprimida liberada) frente a los que no recuperan su venta.
+
+### 14.4 Patrones de Quiebres de Stock (`/reportes/analisis-avanzado/quiebres`)
+- **Filtros:** año, grupo/familia de producto, almacén.
+- **Definición:** agrupa los mismos episodios de §14.3 por producto (o por grupo/familia) y muestra: cantidad de episodios en el periodo, duración total y promedio en días, y la **venta perdida estimada** acumulada (§9.1), para priorizar qué productos se quiebran con más frecuencia, no solo los que tienen más venta perdida en un momento dado.
+- **Tabla** (exportable), por defecto ordenada por cantidad de episodios descendente; un selector permite ordenar por duración total o por venta perdida.
+- **Gráfico:** línea de cantidad de episodios por mes, para ver si los quiebres se concentran en ciertos meses (por ejemplo, antes de una reposición periódica).
+
+**Pendiente de confirmar con Gerencia:** los cuatro parámetros de esta sección (tramos del histograma, umbral de mora relevante y ventana de velocidad) son valores de referencia para empezar a probar; igual que los umbrales de inventario de la [decisión 21 de octubre](decisiones.md), se ajustan cuando Gerencia los revise con datos reales.
