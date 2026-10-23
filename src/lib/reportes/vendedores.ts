@@ -1,4 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
+import { variacion, type MetricaComparada } from '@/lib/reportes/clientes';
 
 /**
  * M3 · Vendedores, pestaña "Catálogo" (spec_reportes §6.1). Reusa vw_venta_documento y vw_nota_credito_linea
@@ -326,5 +327,45 @@ export async function analiticaEstrategicaVendedor(db: Db, vendedorId: string, a
       id: d.id, codigo: d.codigo, nombre: d.nombre, ventaHistoricaUsd: d.venta, ultimaCompra: d.ultima,
       diasSinComprar: d.dias, enRiesgo: d.dias !== null && d.dias > umbralFuga,
     })),
+  };
+}
+
+export interface ComparativaMultianualVendedor {
+  anioA: number; anioB: number;
+  venta: MetricaComparada; facturas: MetricaComparada; clientesAtendidos: MetricaComparada; devolucion: MetricaComparada;
+  mensual: { mes: number; ventaA: string; ventaB: string }[];
+}
+
+/** Pestaña "Comparativa multianual" del detalle de vendedor (spec_reportes §6.2): año A contra año B. */
+export async function comparativaMultianualVendedor(db: Db, vendedorId: string, anioA: number, anioB: number): Promise<ComparativaMultianualVendedor> {
+  const { rows: venta } = await db.query<{ anio: number; venta: string; facturas: string; atendidos: string }>(
+    `select extract(year from fecha)::int as anio, sum(base_usd)::numeric(16,2) as venta, count(*) as facturas,
+            count(distinct cliente_id) as atendidos
+       from vw_venta_documento where vendedor_id = $1 and extract(year from fecha)::int = any($2::int[])
+      group by 1`, [vendedorId, [anioA, anioB]]);
+  const { rows: devol } = await db.query<{ anio: number; devolucion: string }>(
+    `select extract(year from fecha)::int as anio, sum(base_usd)::numeric(16,2) as devolucion
+       from vw_nota_credito_linea where vendedor_id = $1 and motivo_nc = 'devolucion' and extract(year from fecha)::int = any($2::int[])
+      group by 1`, [vendedorId, [anioA, anioB]]);
+  const { rows: mensual } = await db.query<{ anio: number; mes: number; venta: string }>(
+    `select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes, sum(base_usd)::numeric(16,2) as venta
+       from vw_venta_documento where vendedor_id = $1 and extract(year from fecha)::int = any($2::int[])
+      group by 1, 2`, [vendedorId, [anioA, anioB]]);
+
+  const porAnio = (anio: number) => ({
+    venta: Number(venta.find((r) => r.anio === anio)?.venta ?? 0),
+    facturas: Number(venta.find((r) => r.anio === anio)?.facturas ?? 0),
+    atendidos: Number(venta.find((r) => r.anio === anio)?.atendidos ?? 0),
+    devolucion: Number(devol.find((r) => r.anio === anio)?.devolucion ?? 0),
+  });
+  const a = porAnio(anioA);
+  const b = porAnio(anioB);
+  const ventaMes = (anio: number, mes: number) => mensual.find((r) => r.anio === anio && r.mes === mes)?.venta ?? '0.00';
+
+  return {
+    anioA, anioB,
+    venta: variacion(a.venta, b.venta), facturas: variacion(a.facturas, b.facturas, 0),
+    clientesAtendidos: variacion(a.atendidos, b.atendidos, 0), devolucion: variacion(a.devolucion, b.devolucion),
+    mensual: Array.from({ length: 12 }, (_, i) => ({ mes: i + 1, ventaA: ventaMes(anioA, i + 1), ventaB: ventaMes(anioB, i + 1) })),
   };
 }

@@ -10,7 +10,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analiticaEstrategicaVendedor, catalogoVendedores, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
+import { analiticaEstrategicaVendedor, catalogoVendedores, comparativaMultianualVendedor, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -258,6 +258,17 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
     const v = await vistaGeneralVendedor(db, vendedorId, [anioActual]);
     expect(v.insight.tipo).toBe('deuda');
     expect(v.insight.mensaje).toContain('Deuda activa');
+  });
+
+  it('la comparativa multianual contrasta un año vacío (A) contra el año con ventas (B)', async () => {
+    const c = await comparativaMultianualVendedor(db, vendedorId, anioActual - 1, anioActual);
+    expect(c.venta).toEqual({ a: '0.00', b: '160.00', variacionAbsoluta: '160.00', variacionPct: 100 });
+    expect(c.facturas).toEqual({ a: '0', b: '2', variacionAbsoluta: '2', variacionPct: 100 });
+    expect(c.clientesAtendidos).toEqual({ a: '0', b: '2', variacionAbsoluta: '2', variacionPct: 100 });
+    expect(c.devolucion).toEqual({ a: '0.00', b: '40.00', variacionAbsoluta: '40.00', variacionPct: 100 });
+    const mesHoy = Number(hoy.slice(5, 7));
+    expect(c.mensual.find((m) => m.mes === mesHoy)).toMatchObject({ ventaA: '0.00', ventaB: '160.00' });
+    expect(c.mensual.filter((m) => m.mes !== mesHoy).every((m) => m.ventaA === '0.00' && m.ventaB === '0.00')).toBe(true);
   });
 });
 
