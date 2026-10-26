@@ -330,6 +330,28 @@ export async function analiticaEstrategicaVendedor(db: Db, vendedorId: string, a
   };
 }
 
+export interface ClienteCarteraVendedor {
+  clienteId: string; codigo: string; nombre: string; facturas: number; montoUsd: string;
+}
+
+/**
+ * M3 · Vendedores, pestaña "Cartera Activa" del detalle de vendedor (spec_reportes §6.2): clientes
+ * atendidos por el vendedor en el periodo filtrado, con cantidad de facturas y monto vendido.
+ */
+export async function carteraActivaVendedor(db: Db, vendedorId: string, anios: number[]): Promise<ClienteCarteraVendedor[]> {
+  const aniosFiltro = anios.length > 0 ? anios : null;
+  const { rows } = await db.query<{ cliente_id: string; codigo: string; nombre: string; facturas: string; monto: string }>(
+    `select v.cliente_id, c.codigo, t.razon_social as nombre, count(*)::text as facturas, sum(v.base_usd)::numeric(16,2)::text as monto
+       from vw_venta_documento v
+       join cliente c on c.tercero_id = v.cliente_id
+       join tercero t on t.id = c.tercero_id
+      where v.vendedor_id = $1 and ($2::int[] is null or extract(year from v.fecha)::int = any($2::int[]))
+      group by v.cliente_id, c.codigo, t.razon_social
+      order by sum(v.base_usd) desc`,
+    [vendedorId, aniosFiltro]);
+  return rows.map((r) => ({ clienteId: r.cliente_id, codigo: r.codigo, nombre: r.nombre, facturas: Number(r.facturas), montoUsd: r.monto }));
+}
+
 export interface ComparativaMultianualVendedor {
   anioA: number; anioB: number;
   venta: MetricaComparada; facturas: MetricaComparada; clientesAtendidos: MetricaComparada; devolucion: MetricaComparada;

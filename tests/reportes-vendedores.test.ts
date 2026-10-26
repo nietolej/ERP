@@ -10,7 +10,7 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analiticaEstrategicaVendedor, catalogoVendedores, comparativaMultianualVendedor, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
+import { analiticaEstrategicaVendedor, carteraActivaVendedor, catalogoVendedores, comparativaMultianualVendedor, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -133,6 +133,14 @@ describe('M3 Vendedores: catálogo (spec_reportes §6.1, §2, §12)', () => {
 
   it('la búsqueda por texto no encuentra vendedores que no coinciden', async () => {
     expect(await catalogoVendedores(db, { texto: 'NO-EXISTE' })).toEqual([]);
+  });
+
+  it('cartera activa: clientes atendidos en el periodo, con facturas y monto vendido, orden por monto', async () => {
+    const filas = await carteraActivaVendedor(db, vendedorId, [anioActual]);
+    expect(filas).toEqual([
+      { clienteId: clienteA, codigo: expect.any(String), nombre: 'Repuestos Lara, C.A.', facturas: 1, montoUsd: '100.00' },
+      { clienteId: clienteB, codigo: expect.any(String), nombre: 'Autopartes Sur, C.A.', facturas: 1, montoUsd: '60.00' },
+    ]);
   });
 });
 

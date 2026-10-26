@@ -5,13 +5,16 @@ import { PanelAnaliticaEstrategicaVendedor } from '@/components/reportes/panel-a
 import { PanelComparativaVendedor } from '@/components/reportes/panel-comparativa-vendedor';
 import { PanelVistaGeneralVendedor } from '@/components/reportes/panel-vista-general-vendedor';
 import { Pestanas } from '@/components/reportes/pestanas';
+import { TablaCarteraActivaVendedor } from '@/components/reportes/tabla-cartera-activa-vendedor';
 import { Encabezado, Panel } from '@/components/ui';
 import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { hoyCaracas } from '@/lib/formato';
 import { aniosDisponibles } from '@/lib/reportes/clientes';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/clientes';
-import { analiticaEstrategicaVendedor, comparativaMultianualVendedor, vendedorPorCodigo, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
+import {
+  analiticaEstrategicaVendedor, carteraActivaVendedor, comparativaMultianualVendedor, vendedorPorCodigo, vistaGeneralVendedor,
+} from '@/lib/reportes/vendedores';
 
 type Busqueda = { tab?: string; anios?: string | string[]; anioA?: string; anioB?: string };
 
@@ -22,7 +25,7 @@ export default async function ReporteVendedorPage({ params, searchParams }: {
   const db = await getDb();
   const { codigo } = await params;
   const q = await searchParams;
-  const tab = q.tab === 'estrategica' ? 'estrategica' : q.tab === 'comparativa' ? 'comparativa' : 'general';
+  const tab = q.tab === 'estrategica' ? 'estrategica' : q.tab === 'comparativa' ? 'comparativa' : q.tab === 'cartera' ? 'cartera' : 'general';
   const anios = (Array.isArray(q.anios) ? q.anios : q.anios ? [q.anios] : []).map(Number).filter((n) => Number.isInteger(n));
   const base = `/reportes/vendedores/${codigo}`;
 
@@ -48,6 +51,7 @@ export default async function ReporteVendedorPage({ params, searchParams }: {
     { tab: 'general', label: 'Vista general / anual', href: `${base}?tab=general` },
     { tab: 'estrategica', label: 'Analítica estratégica & cartera dormida', href: `${base}?tab=estrategica` },
     { tab: 'comparativa', label: 'Comparativa multianual', href: `${base}?tab=comparativa` },
+    { tab: 'cartera', label: 'Cartera activa', href: `${base}?tab=cartera` },
   ];
 
   return (
@@ -66,6 +70,8 @@ export default async function ReporteVendedorPage({ params, searchParams }: {
           </Panel>
           {tab === 'estrategica' ? (
             <PanelAnaliticaEstrategicaVendedor a={await analiticaEstrategicaVendedor(db, vendedor.id, anios)} />
+          ) : tab === 'cartera' ? (
+            <Panel><TablaCarteraActivaVendedor filas={await carteraActivaVendedor(db, vendedor.id, anios)} /></Panel>
           ) : (
             <PanelVistaGeneralVendedor v={await vistaGeneralVendedor(db, vendedor.id, anios)} />
           )}
