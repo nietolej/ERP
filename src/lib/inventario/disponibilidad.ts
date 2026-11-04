@@ -14,6 +14,9 @@ export const ROLES_VEN_DISPONIBILIDAD = [
 export const ESTADOS_SALUD = ['RIESGO_QUIEBRE', 'DEMANDA_REPRIMIDA', 'SOBRESTOCK', 'SIN_ROTACION', 'SALUDABLE'] as const;
 export type EstadoSalud = (typeof ESTADOS_SALUD)[number];
 
+/** Filtro adicional de la pantalla (§9): solo productos con existencia comercial en cero. */
+export const FILTRO_STOCK_CERO = 'STOCK_CERO';
+
 export const NOMBRE_ESTADO_SALUD: Record<EstadoSalud, { texto: string; tono: 'peligro' | 'advertencia' | 'info' | 'exito'; ayuda: string }> = {
   RIESGO_QUIEBRE: { texto: 'Riesgo de quiebre', tono: 'peligro', ayuda: 'Sin existencia o con cobertura menor al mínimo' },
   DEMANDA_REPRIMIDA: { texto: 'Demanda reprimida', tono: 'advertencia', ayuda: 'Se vende bien cuando hay, pero pasa muchos días sin existencia' },
@@ -26,6 +29,7 @@ export interface FilaDisponibilidad {
   producto_id: string;
   codigo: string;
   descripcion: string;
+  grupo: string | null;
   dias_periodo: number;
   dias_con_existencia: number;
   dias_sin_existencia: number;
@@ -75,6 +79,7 @@ const HOY = `((now() at time zone 'America/Caracas')::date)`;
 export async function consultarDisponibilidad(db: Db, f: FiltroDisponibilidad = {}): Promise<{ desde: string; hasta: string; filas: FilaDisponibilidad[] }> {
   validarPeriodo(f.desde, f.hasta);
   const estado = (ESTADOS_SALUD as readonly string[]).includes(f.estado ?? '') ? f.estado! : '';
+  const soloStockCero = f.estado === FILTRO_STOCK_CERO;
   const orden = ORDENES[f.orden ?? 'venta_perdida'];
   const texto = (f.texto ?? '').trim();
   // El periodo por omisión sale de la base, junto con el parámetro de la ventana.
@@ -84,17 +89,19 @@ export async function consultarDisponibilidad(db: Db, f: FiltroDisponibilidad = 
     [f.desde || null, f.hasta || null]);
   const { desde, hasta } = pe[0];
   const { rows } = await db.query<FilaDisponibilidad>(
-    `select d.producto_id, p.codigo, p.descripcion, d.dias_periodo, d.dias_con_existencia, d.dias_sin_existencia,
+    `select d.producto_id, p.codigo, p.descripcion, g.nombre as grupo, d.dias_periodo, d.dias_con_existencia, d.dias_sin_existencia,
             d.pct_disponibilidad::text, d.unidades_vendidas::text, d.velocidad_basica::text, d.velocidad_ajustada::text,
             d.stock_comercial::text, d.cobertura_dias::text, d.venta_perdida_unidades::text, d.precio_lista_a_usd::text,
             d.venta_perdida_usd::text, d.estado_salud
        from fn_disponibilidad($1::date, $2::date) d
        join producto p on p.id = d.producto_id
+       left join grupo_producto g on g.id = p.grupo_id
       where ($3 = '' or d.estado_salud = $3)
+        and (not $6::boolean or d.stock_comercial <= 0)
         and ($4 = '' or p.codigo ilike '%' || $4 || '%' or fn_nombre_normalizado(p.descripcion) like '%' || fn_nombre_normalizado($4) || '%')
       order by ${orden}
       limit $5`,
-    [desde, hasta, estado, texto, Math.min(Math.max(f.limite ?? 200, 1), 1000)]);
+    [desde, hasta, estado, texto, Math.min(Math.max(f.limite ?? 200, 1), 1000), soloStockCero]);
   return { desde, hasta, filas: rows };
 }
 
