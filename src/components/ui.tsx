@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { BotonCsv } from '@/components/boton-csv';
 
 /** Componentes visuales base, con el estilo del dashboard (spec_reportes §1.2). */
 
@@ -44,7 +45,9 @@ export function Tabla({ columnas, children, vacio, className = '' }: {
 }) {
   const hayFilas = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <div className={`overflow-x-auto ${className}`}>
+    <div data-tabla className={className}>
+      {hayFilas && <BotonCsv />}
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-borde text-left text-xs uppercase tracking-wider text-texto-2">
@@ -61,6 +64,7 @@ export function Tabla({ columnas, children, vacio, className = '' }: {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

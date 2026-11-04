@@ -54,7 +54,7 @@ El menú lateral replica el del dashboard, con los mismos nombres y en el mismo 
 | **Sucursal** | Todas, Barquisimeto o Caracas. Reemplaza la separación BQTO/CCS que el dashboard deducía del código de vendedor |
 | **Incluir inactivos** | Por defecto se excluyen los clientes con `estado = 'inactivo'` y los vendedores de tipo `administrativo` o `casa`. Un interruptor los incluye |
 | **Búsqueda** | Por código o nombre (clientes, productos, vendedores) |
-| **Exportar CSV** | Disponible en todas las tablas y series, con los mismos campos que se ven en pantalla |
+| **Exportar CSV** | Disponible en todas las tablas y series, con los mismos campos que se ven en pantalla. Construido: cada tabla de `/reportes` tiene su botón y exporta el texto mostrado y los filtros aplicados, en UTF-8 con BOM y separador `;` (Excel de Venezuela). **Pendiente:** las series de los gráficos que no tienen tabla |
 
 El estado de los filtros vive en la URL (`?year=2026&tab=historico`), como en el dashboard, para poder compartir un enlace a una vista exacta.
 
@@ -469,8 +469,7 @@ Los reportes se entregan a medida que existen los datos que los alimentan (§13 
 
 ## 14. M7 · Análisis Avanzado
 
-Módulo nuevo, sin equivalente en el dashboard anterior: no replica una pantalla existente, sino que cruza los mismos datos de M1-M6 para detectar patrones. Usa los mismos filtros comunes (§1.3: año, sucursal, incluir inactivos) más los que se indican en cada pestaña. Todos los umbrales y tamaños de tramo son parámetros en `parametro_reporte` (§1.4: nunca un valor fijo en el código), creados en la migración 0036 con los valores de referencia de la [decisión 16](decisiones.md); Gerencia los ajusta con datos reales. Las pestañas se abren en `/reportes/analisis-avanzado?tab=pedidos|morosidad|velocidad|quiebres`, como en los demás módulos; las dos de inventario solo las ven los roles que ven la disponibilidad. Aún no tienen exportación a CSV (como el resto de los reportes).
-
+Módulo nuevo, sin equivalente en el dashboard anterior: no replica una pantalla existente, sino que cruza los mismos datos de M1-M6 para detectar patrones. Usa los mismos filtros comunes (§1.3: año, sucursal, incluir inactivos) más los que se indican en cada pestaña. Todos los umbrales y tamaños de tramo son parámetros en `parametro_reporte` (§1.4: nunca un valor fijo en el código), creados en la migración 0036 con los valores de referencia de la [decisión 16](decisiones.md); Gerencia los ajusta con datos reales. Las pestañas se abren en `/reportes/analisis-avanzado?tab=pedidos|morosidad|velocidad|quiebres`, como en los demás módulos; las dos de inventario solo las ven los roles que ven la disponibilidad.
 ### 14.1 Histograma de Pedidos (`/reportes/analisis-avanzado/pedidos`)
 - **Filtros:** año, sucursal, vendedor, zona (`cliente.zona`), cliente (búsqueda).
 - **Definición:** cada pedido es una factura (grano de `vw_venta_documento`; "venta" §2). El histograma agrupa las facturas del periodo en tramos de monto de igual ancho, desde $0 hasta un tope, con un tramo final abierto "más de $X".
