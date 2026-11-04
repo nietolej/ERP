@@ -10,7 +10,10 @@ import { confirmarSalida } from '@/lib/ventas/despacho';
 import { facturarNotas } from '@/lib/ventas/facturas';
 import { crearNotaCredito, emitirNota, enviarAprobacion } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
-import { analiticaEstrategicaVendedor, carteraActivaVendedor, catalogoVendedores, comparativaMultianualVendedor, vistaGeneralVendedor } from '@/lib/reportes/vendedores';
+import {
+  analiticaEstrategicaVendedor, carteraActivaVendedor, catalogoVendedores, comparativaMultianualVendedor, productosVendidosVendedor,
+  vistaGeneralVendedor,
+} from '@/lib/reportes/vendedores';
 import type { Db } from '@/lib/db/tipos';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
@@ -141,6 +144,17 @@ describe('M3 Vendedores: catálogo (spec_reportes §6.1, §2, §12)', () => {
       { clienteId: clienteA, codigo: expect.any(String), nombre: 'Repuestos Lara, C.A.', facturas: 1, montoUsd: '100.00' },
       { clienteId: clienteB, codigo: expect.any(String), nombre: 'Autopartes Sur, C.A.', facturas: 1, montoUsd: '60.00' },
     ]);
+  });
+
+  it('productos vendidos: unidades y monto por producto en el periodo (8 und = US$ 160)', async () => {
+    const filas = await productosVendidosVendedor(db, vendedorId, [anioActual]);
+    expect(filas).toEqual([
+      { productoId: aceite, codigo: 'AC-001', descripcion: 'Aceite de motor', cantidad: '8.0000', montoUsd: '160.00' },
+    ]);
+  });
+
+  it('productos vendidos: un año sin ventas devuelve lista vacía', async () => {
+    expect(await productosVendidosVendedor(db, vendedorId, [anioActual - 5])).toEqual([]);
   });
 });
 

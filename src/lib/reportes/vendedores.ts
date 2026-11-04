@@ -352,6 +352,29 @@ export async function carteraActivaVendedor(db: Db, vendedorId: string, anios: n
   return rows.map((r) => ({ clienteId: r.cliente_id, codigo: r.codigo, nombre: r.nombre, facturas: Number(r.facturas), montoUsd: r.monto }));
 }
 
+export interface ProductoVendidoVendedor {
+  productoId: string; codigo: string; descripcion: string; cantidad: string; montoUsd: string;
+}
+
+/**
+ * M3 · Vendedores, pestaña "Productos Vendidos" del detalle de vendedor (spec_reportes §6.2): los 30 productos
+ * principales del vendedor en el periodo filtrado, con unidades y monto (base sin IVA, en USD).
+ */
+export async function productosVendidosVendedor(db: Db, vendedorId: string, anios: number[]): Promise<ProductoVendidoVendedor[]> {
+  const aniosFiltro = anios.length > 0 ? anios : null;
+  const { rows } = await db.query<{ producto_id: string; codigo: string; descripcion: string; cantidad: string; monto: string }>(
+    `select p.id as producto_id, p.codigo, p.descripcion,
+            sum(l.cantidad)::numeric(16,4)::text as cantidad, sum(l.base_usd)::numeric(16,2)::text as monto
+       from vw_venta_linea l
+       join producto p on p.id = l.producto_id
+      where l.vendedor_id = $1 and ($2::int[] is null or extract(year from l.fecha)::int = any($2::int[]))
+      group by p.id, p.codigo, p.descripcion
+      order by sum(l.base_usd) desc, p.codigo
+      limit 30`,
+    [vendedorId, aniosFiltro]);
+  return rows.map((r) => ({ productoId: r.producto_id, codigo: r.codigo, descripcion: r.descripcion, cantidad: r.cantidad, montoUsd: r.monto }));
+}
+
 export interface ComparativaMultianualVendedor {
   anioA: number; anioB: number;
   venta: MetricaComparada; facturas: MetricaComparada; clientesAtendidos: MetricaComparada; devolucion: MetricaComparada;
