@@ -162,7 +162,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Cobranzas (M4)', href: '/reportes/cobranzas' },
       { texto: 'Devoluciones (M5)', href: '/reportes/devoluciones' },
       { texto: 'Inventario (M6)', href: '/reportes/inventario' },
-      { texto: 'Analítica avanzada', fase: 8 },
+      { texto: 'Análisis avanzado (M7)', href: '/reportes/analisis-avanzado' },
     ],
   },
   {

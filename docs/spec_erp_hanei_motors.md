@@ -479,6 +479,8 @@ create table documento_venta (
   motivo_nc_id    uuid references motivo(id),               -- motivo del catálogo (devolución o descuento) de la NC
   fecha_emision   timestamptz not null,
   fecha_vencimiento date,
+  condicion_pago_id uuid references condicion_pago(id),     -- factura: la del cliente, congelada al emitir (decisión 17, migración 0036)
+  dias_credito    smallint check (dias_credito between 0 and 365),  -- factura: sus días de crédito, congelados al emitir
   moneda          char(3) not null references moneda(codigo),
   tasa            numeric(18,6) not null check (tasa > 0),   -- VES por USD, congelada al emitir
   subtotal        numeric(16,2) not null default 0,

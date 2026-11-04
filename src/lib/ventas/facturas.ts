@@ -56,8 +56,8 @@ export async function facturarNotas(tx: Db, u: Usuario, notaIds: string[], opcio
 
   const { rows: emp } = await tx.query<{ rif: string }>('select rif from empresa');
   if (!emp[0]) throw new ErrorMaestro('Configure la empresa (RIF, razón social y domicilio fiscal) antes de facturar.');
-  const { rows: cli } = await tx.query<{ rif: string; estado: string; dias: number | null }>(
-    `select t.rif, c.estado, cp.dias from cliente c join tercero t on t.id = c.tercero_id
+  const { rows: cli } = await tx.query<{ rif: string; estado: string; dias: number | null; condicion_id: string | null }>(
+    `select t.rif, c.estado, cp.dias, cp.id as condicion_id from cliente c join tercero t on t.id = c.tercero_id
        left join condicion_pago cp on cp.id = c.condicion_pago_id where c.tercero_id = $1`, [notas[0].cliente_id]);
   if (cli[0].estado === 'pendiente') throw new ErrorMaestro('El cliente todavía no está aprobado.');
 
@@ -67,9 +67,10 @@ export async function facturarNotas(tx: Db, u: Usuario, notaIds: string[], opcio
   const { hoy, tasa } = dia[0];
 
   const { rows: fac } = await tx.query<{ id: string }>(
-    `insert into documento_venta (tipo, sucursal_id, almacen_id, cliente_id, vendedor_id, moneda, fecha_vencimiento, created_by)
-     values ('factura', $1, $2, $3, $4, 'VES', ($5::date + $6::int), $7) returning id`,
-    [notas[0].sucursal_id, notas[0].almacen_id, notas[0].cliente_id, notas[0].vendedor_id, hoy, cli[0].dias ?? 0, u.id]);
+    // La condición de pago del cliente se congela en la factura (decisión 17): no cambia aunque el cliente cambie de plazo.
+    `insert into documento_venta (tipo, sucursal_id, almacen_id, cliente_id, vendedor_id, moneda, fecha_vencimiento, condicion_pago_id, dias_credito, created_by)
+     values ('factura', $1, $2, $3, $4, 'VES', ($5::date + $6::int), $7, $6::int, $8) returning id`,
+    [notas[0].sucursal_id, notas[0].almacen_id, notas[0].cliente_id, notas[0].vendedor_id, hoy, cli[0].dias ?? 0, cli[0].condicion_id, u.id]);
   const facturaId = fac[0].id;
 
   await tx.query(
