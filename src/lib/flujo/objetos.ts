@@ -2,6 +2,7 @@ import { aprobarAsiento } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
 import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
+import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
@@ -73,6 +74,11 @@ export const MANEJADOR_ORDEN_COMPRA: Manejador<void> = {
 export const MANEJADOR_FACTURA_COMPRA: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarFactura(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarFactura(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_NOTA_PROVEEDOR: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarNotaProveedor(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarNotaProveedor(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PAGO: Manejador<void> = {
@@ -162,6 +168,15 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select f.id::text as id, 'Factura ' || f.numero_factura || ' · ' || p.codigo || ' · US$ ' || f.total_usd as texto
          from factura_compra f join proveedor p on p.tercero_id = f.proveedor_id where f.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_FACTURA_COMPRA,
+  },
+  nota_proveedor: {
+    etiqueta: 'Nota del proveedor',
+    ruta: (id) => `/compras/notas/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select n.id::text as id, case when n.tipo = 'nota_credito' then 'Nota de crédito ' else 'Nota de débito ' end || n.numero_documento || ' · ' || p.codigo
+              || ' · ' || n.moneda || ' ' || n.total as texto
+         from nota_proveedor n join proveedor p on p.tercero_id = n.proveedor_id where n.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_NOTA_PROVEEDOR,
   },
   pago_proveedor: {
     etiqueta: 'Pago a proveedor',

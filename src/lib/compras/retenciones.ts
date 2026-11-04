@@ -100,10 +100,10 @@ export interface FilaRetencion {
 }
 
 /** Retenciones practicadas a una factura de compra o a un gasto, para mostrarlas en su detalle. */
-export async function retencionesDe(db: Db, origen: { facturaId?: string; gastoId?: string }): Promise<FilaRetencion[]> {
+export async function retencionesDe(db: Db, origen: { facturaId?: string; gastoId?: string; notaId?: string }): Promise<FilaRetencion[]> {
   const { rows } = await db.query<FilaRetencion>(
     `select r.impuesto, r.base::text, r.porcentaje::text, r.sustraendo::text, r.monto::text, r.monto_usd::text, r.iva_total, c.codigo as concepto
        from retencion_compra r left join concepto_islr_tarifa t on t.id = r.tarifa_id left join concepto_islr c on c.id = t.concepto_id
-      where r.factura_id = $1 or r.gasto_id = $2 order by r.impuesto`, [origen.facturaId ?? null, origen.gastoId ?? null]);
+      where r.factura_id = $1 or r.gasto_id = $2 or r.nota_id = $3 order by r.impuesto`, [origen.facturaId ?? null, origen.gastoId ?? null, origen.notaId ?? null]);
   return rows;
 }

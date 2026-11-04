@@ -210,7 +210,7 @@ describe('retenciones de IVA e ISLR en facturas de compra y gastos de importaci√
       `select coalesce(sum(round(monto_usd * saldo / monto_original, 2)), 0)::text as usd from partida_cxp where estado = 'abierta'`)).rows[0].usd;
     expect(Number(await mayor('2.1.01'))).toBe(Number(cxp));
     for (const [cuenta, impuesto] of [['2.1.04', 'iva'], ['2.1.05', 'islr']] as const) {
-      const ret = (await db.query<{ usd: string }>('select coalesce(sum(monto_usd), 0)::text as usd from retencion_compra where impuesto = $1', [impuesto])).rows[0].usd;
+      const ret = (await db.query<{ usd: string }>('select coalesce(sum(monto_usd * signo), 0)::text as usd from retencion_compra where impuesto = $1', [impuesto])).rows[0].usd;
       expect(Number(await mayor(cuenta))).toBe(Number(ret));
     }
     const c = (await db.query<{ ves: string; usd: string }>('select diferencia_ves::text as ves, diferencia_usd::text as usd from vw_control_cuadre')).rows[0];

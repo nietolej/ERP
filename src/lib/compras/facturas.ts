@@ -308,12 +308,13 @@ export interface FilaCxp {
 export async function cuentasPorPagar(db: Db, u: Usuario, limite = 300): Promise<FilaCxp[]> {
   if (!u.roles.some((r) => (ROLES_VEN_COMPRAS as readonly string[]).includes(r))) return [];
   const { rows } = await db.query<FilaCxp>(
-    `select c.id, c.factura_id, c.gasto_id, p.codigo || ' · ' || t.razon_social as proveedor, coalesce(f.numero_factura, g.numero_factura) as numero_factura,
+    `select c.id, c.factura_id, c.gasto_id, p.codigo || ' · ' || t.razon_social as proveedor, coalesce(f.numero_factura, g.numero_factura, 'ND ' || nt.numero_documento) as numero_factura,
             to_char(c.fecha, 'DD-MM-YYYY') as fecha,
             to_char(c.vencimiento, 'DD-MM-YYYY') as vencimiento, c.moneda, c.monto_original::text, c.saldo::text,
             round(c.monto_usd * c.saldo / c.monto_original, 2)::text as saldo_usd,
             greatest(((now() at time zone 'America/Caracas')::date - c.vencimiento), 0)::int as dias_vencida
        from partida_cxp c left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id
+       left join nota_proveedor nt on nt.id = c.nota_id
        join proveedor p on p.tercero_id = c.proveedor_id join tercero t on t.id = p.tercero_id
       where c.estado = 'abierta' order by c.vencimiento, c.created_at limit $1`, [limite]);
   return rows;

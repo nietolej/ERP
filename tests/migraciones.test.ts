@@ -53,6 +53,7 @@ describe('migraciones', () => {
       '0036_analisis_avanzado.sql',
       '0037_retenciones_compra.sql',
       '0038_pagos_proveedores.sql',
+      '0039_notas_proveedor.sql',
     ]);
   });
 

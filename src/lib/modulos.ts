@@ -81,6 +81,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Órdenes de compra', href: '/compras/ordenes', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Recepciones de mercancía', href: '/compras/recepciones', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Facturas de proveedor', href: '/compras/facturas', roles: [...ROLES_VEN_COMPRAS] },
+      { texto: 'Notas del proveedor', href: '/compras/notas', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Gastos de importación y costo en destino', href: '/compras/gastos', roles: [...ROLES_VEN_COMPRAS] },
     ],
   },

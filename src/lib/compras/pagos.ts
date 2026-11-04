@@ -262,7 +262,8 @@ export interface DetallePago extends FilaPago {
   lineas: LineaPagoSolicitada[]; aplicaciones: AplicacionPagoDetalle[];
 }
 
-const FACTURA = `coalesce(f.numero_factura, g.numero_factura)`;
+const FACTURA = `coalesce(f.numero_factura, g.numero_factura, 'ND ' || n.numero_documento)`;
+const JOIN_ORIGEN = `left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id left join nota_proveedor n on n.id = c.nota_id`;
 
 export async function detallePago(db: Db, id: string): Promise<DetallePago | null> {
   const { rows } = await db.query<Omit<DetallePago, 'lineas' | 'aplicaciones'>>(
@@ -287,14 +288,14 @@ export async function detallePago(db: Db, id: string): Promise<DetallePago | nul
     db.query<LineaPagoSolicitada>(
       `select l.partida_id, ${FACTURA} as factura, c.moneda, l.monto::text, l.liquida, c.saldo::text
          from pago_linea l join partida_cxp c on c.id = l.partida_id
-         left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id
+         ${JOIN_ORIGEN}
         where l.pago_id = $1 order by l.id`, [id]),
     db.query<AplicacionPagoDetalle>(
       `select ap.id, ap.origen, ap.fecha::text, ${FACTURA} as factura, ap.monto_pago::text, ap.monto_partida::text, c.moneda as moneda_partida,
               ap.ves_partida::text, ap.usd_partida::text, ap.base_ves::text, ap.base_usd::text, (ap.ves_partida - ap.base_ves)::text as dif_ves,
               (ap.usd_partida - ap.base_usd)::text as dif_usd, ap.revertida
          from aplicacion_pago ap join partida_cxp c on c.id = ap.partida_id
-         left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id
+         ${JOIN_ORIGEN}
         where ap.pago_id = $1 order by ap.created_at, ap.id`, [id]),
   ]);
   return { ...rows[0], lineas: lineas.rows, aplicaciones: aplicaciones.rows };
@@ -309,7 +310,7 @@ export async function partidasPorPagar(db: Db, proveedorId: string): Promise<Par
   const { rows } = await db.query<PartidaPorPagar>(
     `select c.id as partida_id, ${FACTURA} as factura, c.fecha::text, c.vencimiento::text, c.moneda, c.saldo::text, c.saldo_usd::text,
             greatest(((now() at time zone 'America/Caracas')::date - c.vencimiento), 0)::int as dias_vencida
-       from partida_cxp c left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id
+       from partida_cxp c ${JOIN_ORIGEN}
       where c.proveedor_id = $1 and c.estado = 'abierta' order by c.vencimiento, c.fecha`, [proveedorId]);
   return rows;
 }
