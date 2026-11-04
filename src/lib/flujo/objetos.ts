@@ -2,6 +2,7 @@ import { aprobarAsiento } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
 import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
+import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
 import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
@@ -72,6 +73,11 @@ export const MANEJADOR_ORDEN_COMPRA: Manejador<void> = {
 export const MANEJADOR_FACTURA_COMPRA: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarFactura(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarFactura(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_PAGO: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarPago(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarPago(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PROMOCION: Manejador<void> = {
@@ -156,6 +162,14 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select f.id::text as id, 'Factura ' || f.numero_factura || ' · ' || p.codigo || ' · US$ ' || f.total_usd as texto
          from factura_compra f join proveedor p on p.tercero_id = f.proveedor_id where f.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_FACTURA_COMPRA,
+  },
+  pago_proveedor: {
+    etiqueta: 'Pago a proveedor',
+    ruta: (id) => `/compras/pagos/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select p.id::text as id, 'Pago ' || p.numero || ' · ' || pr.codigo || ' · ' || p.moneda || ' ' || p.monto as texto
+         from pago p join proveedor pr on pr.tercero_id = p.proveedor_id where p.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_PAGO,
   },
   promocion: {
     etiqueta: 'Promoción',

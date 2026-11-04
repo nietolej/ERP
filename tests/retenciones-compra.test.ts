@@ -4,6 +4,7 @@ import { crearGasto, registrarGasto } from '@/lib/compras/gastos-importacion';
 import { crearOrden, detalleOrden, enviarOrden, guardarLinea as lineaOrden, type Usuario } from '@/lib/compras/ordenes';
 import { recibirMercancia } from '@/lib/compras/recepciones';
 import { retencionesDe } from '@/lib/compras/retenciones';
+import { cuadreCxP } from '@/lib/compras/pagos';
 import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { asignarUsuarios, crearAlmacen } from '@/lib/maestros/almacenes';
 import { crearCatalogo, crearProducto, resolverProductoBase } from '@/lib/maestros/productos';
@@ -214,6 +215,8 @@ describe('retenciones de IVA e ISLR en facturas de compra y gastos de importaci�
     }
     const c = (await db.query<{ ves: string; usd: string }>('select diferencia_ves::text as ves, diferencia_usd::text as usd from vw_control_cuadre')).rows[0];
     expect([Number(c.ves), Number(c.usd)]).toEqual([0, 0]);
+    // El auxiliar de cuentas por pagar (netas de retención) también cuadra con el mayor en bolívares.
+    expect((await cuadreCxP(db)).cuadra).toBe(true);
   });
 
   it('una retención practicada no se edita ni se borra', async () => {

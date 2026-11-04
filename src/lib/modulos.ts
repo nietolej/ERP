@@ -4,6 +4,7 @@ import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
 import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
+import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
 import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
 import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
 import { ROLES_MOTIVOS } from '@/lib/maestros/motivos';
@@ -101,7 +102,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Cuentas por cobrar', href: '/cobranzas/cuentas', roles: [...ROLES_VEN_COBROS] },
       { texto: 'Cobros', href: '/cobranzas/cobros', roles: [...ROLES_VEN_COBROS] },
       { texto: 'Cuentas por pagar', href: '/compras/cuentas-por-pagar', roles: [...ROLES_VEN_COMPRAS] },
-      { texto: 'Pagos a proveedores', fase: 3 },
+      { texto: 'Pagos a proveedores', href: '/compras/pagos', roles: [...ROLES_VEN_PAGOS] },
       { texto: 'Activos fijos y depreciación', fase: 6 },
       { texto: 'Estados financieros', fase: 6 },
       { texto: 'Cierre mensual', fase: 6 },

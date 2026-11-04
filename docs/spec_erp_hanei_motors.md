@@ -895,13 +895,22 @@ flowchart LR
 - **ISLR:** el proveedor tiene un concepto (Decreto 1.808) y la retención sale de `concepto_islr_tarifa`: porcentaje, base mínima y sustraendo en UT, por tipo de persona y domicilio, con vigencia (no se editan: se cierra la vigencia y se registra otra; no se solapan). Retención = base sin IVA × % − sustraendo, solo si la base llega al mínimo; la UT (`UNIDAD_TRIBUTARIA`, en bolívares) se lleva a la moneda de la factura con su tasa. **Contabilidad carga las tarifas** desde Configuración → Conceptos de ISLR; no se precarga normativa. Un proveedor con concepto y sin tarifa vigente **no se contabiliza** (nunca se omite la retención en silencio). Un proveedor sin concepto no tiene ISLR.
 - **Registro:** cada retención queda en `retencion_compra` (base, porcentaje, sustraendo, monto en moneda original y en USD, tarifa usada), inmutable, y se muestra en el detalle de la factura o del gasto.
 - **Pendiente:** el **comprobante** de retención con su numeración, los libros y las declaraciones (Fase 4); la retención sobre las notas de crédito y débito del proveedor y sobre servicios sin recepción (gastos, caja chica) cuando existan.
-- **Pendiente de la Fase 3:** devolución a proveedor y notas de crédito y débito del proveedor, pagos y programación de pagos, IGTF pagado, gastos y caja chica, tesorería, conciliación bancaria y producción.
+- **Pendiente de la Fase 3:** devolución a proveedor y notas de crédito y débito del proveedor, IGTF pagado, gastos y caja chica, conciliación bancaria y producción (los pagos a proveedores y sus anticipos ya están: §7.3).
 
 ### 7.3 Cuentas por pagar y pagos
 - `partida_cxp`, `pago` y `aplicacion_pago`, simétricos a CxC.
 - **Programación de pagos** por vencimiento, con aprobación de Gerencia y descuentos por pronto pago del proveedor.
 - **IGTF pagado:** si se paga en divisas a un agente de percepción, el IGTF se registra como gasto financiero.
 - **Validaciones antes de pagar:** proveedor activo, factura conciliada o aprobada y cuenta bancaria del proveedor verificada. Un cambio reciente en la cuenta bancaria del proveedor exige doble aprobación, como control antifraude.
+
+**Construido (migración 0038): pagos a proveedores.**
+- **Flujo:** Tesorería o Gerencia **solicitan** el pago (`pago`, con las facturas y montos pedidos en `pago_linea`); **Gerencia, distinta de quien lo solicitó, lo aprueba** por el motor de flujo (`pago_proveedor`; la base lo exige). Un pago solicitado **no mueve nada**. Al aprobarse, en una sola transacción: se aplica a las facturas (`aplicacion_pago`), sale del banco y se contabiliza. Rechazado no mueve nada. Hoy todo pago pasa por Gerencia; el umbral por monto se afina en Configuración → Flujos (decisión del 04-11-2026).
+- **Monedas y tasa:** la cuenta fija la moneda del pago, y la base fija la tasa BCV de la fecha, su valor en VES y en USD. Se puede pagar una factura en otra moneda: se convierte por la tasa de la fecha del pago; «liquida» cierra la factura si el equivalente coincide con su saldo (un centavo de tolerancia).
+- **Valor histórico:** cada partida de cuentas por pagar guarda lo que queda de su valor en VES y USD a la tasa de su factura (`saldo_ves`, `saldo_usd`). El auxiliar cuadra con 2.1.01 al centavo en las dos monedas (`cuadreCxP`).
+- **Asiento `pago_proveedor`:** Debe 2.1.01 (a su valor histórico) y 1.2.02 si hay anticipo; Haber banco (su valor en los libros); la diferencia es **diferencial cambiario**: ganancia en 4.2.01 si se pagó menos de lo que valía la factura, pérdida en 6.3.02 si se pagó más (cada una en su moneda, como los cobros). La decisión 2 (tasa real de las operaciones de cambio) sigue abierta.
+- **Anticipos a proveedores:** lo que no se aplica queda en 1.2.02 y se aplica después a facturas del mismo proveedor (asiento `aplicacion_anticipo_pago`), sin nueva aprobación.
+- **Anular** un pago aprobado (motivo del catálogo): reverso del asiento y las facturas recuperan su saldo; no se anula si ya tiene un anticipo aplicado. Un pago, sus aplicaciones y las partidas no se editan ni se borran. La referencia no se repite por cuenta.
+- **Pendiente de §7.3:** verificación de la cuenta bancaria del proveedor y su doble aprobación al cambiarla (no hay cuentas bancarias de proveedores en el modelo), descuento por pronto pago del proveedor, IGTF pagado, programación de pagos por vencimiento, conciliación bancaria (estado `conciliado`) y retención de comprobante de pago como adjunto.
 
 ---
 
