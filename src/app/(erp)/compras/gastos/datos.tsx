@@ -11,6 +11,7 @@ export interface OpcionesGasto {
 export interface ValoresGasto {
   proveedor_id: string; concepto: string; descripcion: string | null; numero_factura: string; numero_control: string; fecha_factura: string;
   fecha_vencimiento: string; moneda: string; criterio_reparto: string; base: string; alicuota_iva_id: string; recepcion_ids: string[];
+  retencion_iva_total?: boolean;
 }
 
 /** Proveedores de servicios, alícuotas con su % de hoy, monedas y recepciones a las que se puede aplicar el gasto. */
@@ -61,6 +62,10 @@ export function CamposGasto({ op, v, hoy }: { op: OpcionesGasto; v?: ValoresGast
           {op.alicuotas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
         </select>
       </Campo>
+      <label className="flex items-start gap-2 text-sm md:col-span-3">
+        <input type="checkbox" name="retencion_iva_total" value="1" defaultChecked={v?.retencion_iva_total} className="mt-1 h-4 w-4" />
+        <span>Retener el 100 % del IVA <span className="block text-xs text-texto-2">Si el IVA no viene discriminado, la factura no cumple los requisitos o el proveedor no tiene RIF. Solo aplica si la empresa es agente de retención de IVA.</span></span>
+      </label>
       <Campo etiqueta="Vence (opcional)" ayuda="Si la deja vacía: fecha de la factura más los días de la condición de pago del proveedor.">
         <input type="date" name="fecha_vencimiento" defaultValue={v?.fecha_vencimiento} className="campo" />
       </Campo>

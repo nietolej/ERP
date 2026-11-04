@@ -5,6 +5,8 @@ import { Aviso, Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/compo
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
 import { NOMBRE_ESTADO_FACTURA, ROLES_REGISTRAN_FACTURA, detalleFactura } from '@/lib/compras/facturas';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
+import { retencionesDe } from '@/lib/compras/retenciones';
+import { TablaRetenciones } from '@/components/compras/tabla-retenciones';
 import { getDb } from '@/lib/db';
 import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
 import { monto } from '@/lib/formato';
@@ -22,6 +24,7 @@ export default async function FacturaCompraPage({ params }: { params: Promise<{ 
   if (!UUID.test(id)) notFound();
   const db = await getDb();
   const d = await detalleFactura(db, id);
+  const retenciones = d ? await retencionesDe(db, { facturaId: id }) : [];
   if (!d) notFound();
 
   const borrador = d.estado === 'borrador';
@@ -153,6 +156,8 @@ export default async function FacturaCompraPage({ params }: { params: Promise<{ 
           </div>
         </Panel>
       )}
+
+      {d && <TablaRetenciones filas={retenciones} moneda={d.moneda} />}
 
       {puedeEditar && (
         <Panel titulo="Acciones" className="mt-5">

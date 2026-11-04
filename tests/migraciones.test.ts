@@ -51,6 +51,7 @@ describe('migraciones', () => {
       '0034_reportes_devoluciones.sql',
       '0035_reportes_inventario.sql',
       '0036_analisis_avanzado.sql',
+      '0037_retenciones_compra.sql',
     ]);
   });
 

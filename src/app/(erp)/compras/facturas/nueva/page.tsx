@@ -46,6 +46,10 @@ export default async function NuevaFacturaCompraPage({ searchParams }: { searchP
               <Campo etiqueta="Vence (opcional)" ayuda="Si la deja vacía: fecha de la factura más los días de la condición de pago del proveedor.">
                 <input type="date" name="fecha_vencimiento" className="campo" />
               </Campo>
+              <label className="flex items-start gap-2 text-sm sm:col-span-3">
+                <input type="checkbox" name="retencion_iva_total" value="1" className="mt-1 h-4 w-4" />
+                <span>Retener el 100 % del IVA <span className="block text-xs text-texto-2">Márquelo si el IVA no viene discriminado, la factura no cumple los requisitos o el proveedor no tiene RIF. Solo aplica si la empresa es agente de retención de IVA.</span></span>
+              </label>
             </div>
             <div className="flex justify-end"><BotonEnviar>Crear factura</BotonEnviar></div>
           </Formulario>

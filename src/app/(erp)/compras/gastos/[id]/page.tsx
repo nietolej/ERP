@@ -7,6 +7,8 @@ import { NOMBRE_CRITERIO } from '@/lib/compras/costo-destino';
 import { ROLES_REGISTRAN_FACTURA } from '@/lib/compras/facturas';
 import { CONCEPTOS_GASTO, NOMBRE_CONCEPTO, calcularReparto, detalleGasto, type ConceptoGasto } from '@/lib/compras/gastos-importacion';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
+import { retencionesDe } from '@/lib/compras/retenciones';
+import { TablaRetenciones } from '@/components/compras/tabla-retenciones';
 import { getDb } from '@/lib/db';
 import { hoyCaracas, monto } from '@/lib/formato';
 import { mensajeDeError } from '@/lib/acciones';
@@ -21,6 +23,7 @@ export default async function GastoPage({ params }: { params: Promise<{ id: stri
   if (!UUID.test(id)) notFound();
   const db = await getDb();
   const d = await detalleGasto(db, id);
+  const retenciones = d ? await retencionesDe(db, { gastoId: id }) : [];
   if (!d) notFound();
 
   const borrador = d.estado === 'borrador';
@@ -57,7 +60,7 @@ export default async function GastoPage({ params }: { params: Promise<{ id: stri
             <CamposGasto op={op} hoy={hoy}
               v={{ proveedor_id: d.proveedor_id, concepto: d.concepto, descripcion: d.descripcion, numero_factura: d.numero_factura, numero_control: d.numero_control,
                    fecha_factura: d.fecha_factura, fecha_vencimiento: d.fecha_vencimiento, moneda: d.moneda, criterio_reparto: d.criterio_reparto, base: d.base,
-                   alicuota_iva_id: d.alicuota_iva_id, recepcion_ids: d.recepciones.map((r) => r.id) }} />
+                   alicuota_iva_id: d.alicuota_iva_id, recepcion_ids: d.recepciones.map((r) => r.id), retencion_iva_total: d.retencion_iva_total }} />
             <div className="flex justify-end"><BotonEnviar>Guardar datos</BotonEnviar></div>
           </Formulario>
         ) : (
@@ -110,6 +113,8 @@ export default async function GastoPage({ params }: { params: Promise<{ id: stri
           </>
         )}
       </Panel>
+
+      {d && <TablaRetenciones filas={retenciones} moneda={d.moneda} />}
 
       {puedeEditar && (
         <Panel titulo="Acciones" className="mt-5">

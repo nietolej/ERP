@@ -194,6 +194,7 @@ export async function crearFacturaAccion(_: EstadoAccion, fd: FormData): Promise
     id = await conUsuario(u.id, (tx) => crearFactura(tx, u, {
       ordenId, numeroFactura: texto(fd, 'numero_factura'), numeroControl: texto(fd, 'numero_control'),
       fechaFactura: texto(fd, 'fecha_factura'), fechaVencimiento: texto(fd, 'fecha_vencimiento') || undefined,
+      retencionIvaTotal: texto(fd, 'retencion_iva_total') === '1',
     }));
   } catch (e) {
     return { error: mensajeDeError(e) };
@@ -308,6 +309,7 @@ const datosGasto = (fd: FormData): DatosGasto => ({
   base: texto(fd, 'base'),
   alicuotaIvaId: texto(fd, 'alicuota_iva_id'),
   recepcionIds: fd.getAll('recepcion_id').map(String).filter((v) => UUID.test(v)),
+  retencionIvaTotal: texto(fd, 'retencion_iva_total') === '1',
 });
 
 export async function crearGastoAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {

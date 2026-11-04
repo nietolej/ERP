@@ -5,6 +5,7 @@ import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
+import { calcularRetenciones, guardarRetenciones, sumaRetenciones } from './retenciones';
 
 /**
  * Factura de compra de mercancía con conciliación a tres vías y cuenta por pagar (§7.2, §7.3). Migración 0024.
@@ -52,6 +53,8 @@ export interface DatosFactura {
   fechaFactura: string;
   /** Si se omite: fecha de la factura + días de la condición de pago del proveedor. */
   fechaVencimiento?: string;
+  /** Retención de IVA al 100 %: IVA no discriminado, factura que no cumple requisitos o proveedor sin RIF (§11.2). */
+  retencionIvaTotal?: boolean;
 }
 
 export async function crearFactura(tx: Db, u: Usuario, d: DatosFactura): Promise<string> {
@@ -72,9 +75,9 @@ export async function crearFactura(tx: Db, u: Usuario, d: DatosFactura): Promise
         and estado in ('borrador', 'retenida', 'contabilizada')`, [ord[0].proveedor_id, numero]);
   if (dup.length) throw new ErrorMaestro(`Ese proveedor ya tiene registrada la factura ${numero.toUpperCase()}.`);
   const { rows } = await tx.query<{ id: string }>(
-    `insert into factura_compra (orden_id, proveedor_id, numero_factura, numero_control, fecha_factura, fecha_vencimiento, moneda, created_by)
-     values ($1, $2, $3, $4, $5::date, coalesce($6::date, $5::date + $7::int), 'USD', $8) returning id`,
-    [d.ordenId, ord[0].proveedor_id, numero, control, d.fechaFactura, d.fechaVencimiento || null, ord[0].dias ?? 0, u.id]);
+    `insert into factura_compra (orden_id, proveedor_id, numero_factura, numero_control, fecha_factura, fecha_vencimiento, moneda, retencion_iva_total, created_by)
+     values ($1, $2, $3, $4, $5::date, coalesce($6::date, $5::date + $7::int), 'USD', $8, $9) returning id`,
+    [d.ordenId, ord[0].proveedor_id, numero, control, d.fechaFactura, d.fechaVencimiento || null, ord[0].dias ?? 0, d.retencionIvaTotal ?? false, u.id]);
   return rows[0].id;
 }
 
@@ -158,10 +161,11 @@ export async function rechazarFactura(tx: Db, id: string, _usuario: string, moti
 async function contabilizarFactura(tx: Db, id: string, usuarioId: string): Promise<string> {
   const { rows: cab } = await tx.query<{
     proveedor_id: string; moneda: string; tasa: string; fecha: string; vencimiento: string; total: string; total_usd: string; iva: string;
-    numero: string; numero_factura: string;
+    numero: string; numero_factura: string; base_sin_iva: string; iva_total: boolean;
   }>(
     `select proveedor_id, moneda, tasa::text, fecha_factura::text as fecha, fecha_vencimiento::text as vencimiento, total::text, total_usd::text,
-            iva::text, numero::text, numero_factura from factura_compra where id = $1`, [id]);
+            iva::text, numero::text, numero_factura, (base_imponible + exento)::text as base_sin_iva, retencion_iva_total as iva_total
+       from factura_compra where id = $1`, [id]);
   const f = cab[0];
   const { rows: lineas } = await tx.query<{ producto_id: string; cantidad: string; base: string; valor_recibido_usd: string; en_existencia: string }>(
     `select l.producto_id, l.cantidad::text, l.base::text, l.valor_recibido_usd::text,
@@ -201,17 +205,25 @@ async function contabilizarFactura(tx: Db, id: string, usuarioId: string): Promi
       [a.productoId, a.usd.toFixed(2), id, usuarioId]);
   }
 
+  // Retenciones al contabilizar (R-BX): la cuenta por pagar nace por el neto y cada retención queda guardada.
+  const retenciones = await calcularRetenciones(tx, {
+    proveedorId: f.proveedor_id, fecha: f.fecha, tasa: f.tasa, baseSinIva: f.base_sin_iva, iva: f.iva, ivaTotal: f.iva_total,
+  });
+  const retIva = sumaRetenciones(retenciones, 'iva');
+  const retIslr = sumaRetenciones(retenciones, 'islr');
+  const neto = new Decimal(f.total).minus(retIva).minus(retIslr);
+  await guardarRetenciones(tx, { facturaId: id }, { proveedorId: f.proveedor_id, fecha: f.fecha, moneda: f.moneda, tasa: f.tasa }, retenciones, enUsd);
   await tx.query(
     `insert into partida_cxp (proveedor_id, factura_id, fecha, vencimiento, moneda, tasa, monto_original, monto_usd, saldo)
      values ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $7)`,
-    [f.proveedor_id, id, f.fecha, f.vencimiento, f.moneda, f.tasa, f.total, f.total_usd]);
+    [f.proveedor_id, id, f.fecha, f.vencimiento, f.moneda, f.tasa, neto.toFixed(2), retenciones.length ? enUsd(neto).toFixed(2) : f.total_usd]);
 
   const r = await contabilizar(tx, {
     evento: 'factura_compra', fecha: f.fecha, descripcion: `Factura de compra ${f.numero_factura} · registro ${f.numero}`,
     origen: { tipo: 'factura_compra', id }, moneda: f.moneda,
     importes: {
       recibido: recibido.toFixed(2), aum_inv: aumInv.toFixed(2), aum_cv: aumCv.toFixed(2), red_inv: redInv.toFixed(2),
-      red_cv: redCv.toFixed(2), iva: f.iva, total: f.total,
+      red_cv: redCv.toFixed(2), iva: f.iva, total: f.total, neto: neto.toFixed(2), ret_iva: retIva.toFixed(2), ret_islr: retIslr.toFixed(2),
     },
     terceroId: f.proveedor_id, usuarioId,
   });

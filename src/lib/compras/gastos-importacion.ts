@@ -5,6 +5,7 @@ import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { CRITERIOS_REPARTO, repartirCosto, type CriterioReparto, type LineaReparto } from './costo-destino';
 import { dos } from './facturas';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
+import { calcularRetenciones, guardarRetenciones, sumaRetenciones } from './retenciones';
 
 /**
  * Gastos de importación y costo en destino (§7.1, §7.2 regla 3). Migración 0025.
@@ -43,6 +44,8 @@ export interface DatosGasto {
   base: string;
   alicuotaIvaId: string;
   recepcionIds: string[];
+  /** Retención de IVA al 100 % (§11.2). */
+  retencionIvaTotal?: boolean;
 }
 
 interface Gasto { id: string; estado: string; criterio_reparto: CriterioReparto; moneda: string }
@@ -99,10 +102,10 @@ export async function crearGasto(tx: Db, u: Usuario, d: DatosGasto): Promise<str
     `select cp.dias from proveedor p left join condicion_pago cp on cp.id = p.condicion_pago_id where p.tercero_id = $1`, [d.proveedorId]);
   const { rows } = await tx.query<{ id: string }>(
     `insert into gasto_importacion (proveedor_id, concepto, descripcion, numero_factura, numero_control, fecha_factura, fecha_vencimiento, moneda,
-                                    criterio_reparto, base, alicuota_iva_id, created_by)
-     values ($1, $2, $3, $4, $5, $6::date, coalesce($7::date, $6::date + $8::int), $9, $10, $11, $12, $13) returning id`,
+                                    criterio_reparto, base, alicuota_iva_id, retencion_iva_total, created_by)
+     values ($1, $2, $3, $4, $5, $6::date, coalesce($7::date, $6::date + $8::int), $9, $10, $11, $12, $13, $14) returning id`,
     [d.proveedorId, d.concepto, d.descripcion?.trim() || null, d.numeroFactura.trim(), d.numeroControl.trim(), d.fechaFactura,
-     d.fechaVencimiento || null, cp[0]?.dias ?? 0, d.moneda, criterio, d.base.trim(), d.alicuotaIvaId, u.id]);
+     d.fechaVencimiento || null, cp[0]?.dias ?? 0, d.moneda, criterio, d.base.trim(), d.alicuotaIvaId, d.retencionIvaTotal ?? false, u.id]);
   for (const r of recepciones) await tx.query('insert into gasto_importacion_recepcion (gasto_id, recepcion_id) values ($1, $2)', [rows[0].id, r]);
   return rows[0].id;
 }
@@ -114,9 +117,9 @@ export async function actualizarGasto(tx: Db, id: string, d: DatosGasto): Promis
     `update gasto_importacion set proveedor_id = $2, concepto = $3, descripcion = $4, numero_factura = $5, numero_control = $6, fecha_factura = $7::date,
             fecha_vencimiento = coalesce($8::date, $7::date + (select coalesce(cp.dias, 0) from proveedor p left join condicion_pago cp on cp.id = p.condicion_pago_id
                                                                 where p.tercero_id = $2)),
-            moneda = $9, criterio_reparto = $10, base = $11, alicuota_iva_id = $12 where id = $1`,
+            moneda = $9, criterio_reparto = $10, base = $11, alicuota_iva_id = $12, retencion_iva_total = $13 where id = $1`,
     [id, d.proveedorId, d.concepto, d.descripcion?.trim() || null, d.numeroFactura.trim(), d.numeroControl.trim(), d.fechaFactura,
-     d.fechaVencimiento || null, d.moneda, criterio, d.base.trim(), d.alicuotaIvaId]);
+     d.fechaVencimiento || null, d.moneda, criterio, d.base.trim(), d.alicuotaIvaId, d.retencionIvaTotal ?? false]);
   await tx.query('delete from gasto_importacion_recepcion where gasto_id = $1', [id]);
   for (const r of recepciones) await tx.query('insert into gasto_importacion_recepcion (gasto_id, recepcion_id) values ($1, $2)', [id, r]);
 }
@@ -195,10 +198,10 @@ export async function registrarGasto(tx: Db, u: Usuario, id: string): Promise<Re
   const { lineas } = await calcularReparto(tx, id);
   const { rows: cab } = await tx.query<{
     proveedor_id: string; moneda: string; tasa: string; fecha: string; vencimiento: string; iva: string; total: string; total_usd: string;
-    numero_factura: string; concepto: string;
+    numero_factura: string; concepto: string; base: string; iva_total: boolean;
   }>(
     `select proveedor_id, moneda, tasa::text, fecha_factura::text as fecha, fecha_vencimiento::text as vencimiento, iva::text, total::text,
-            total_usd::text, numero_factura, concepto from gasto_importacion where id = $1`, [id]);
+            total_usd::text, numero_factura, concepto, base::text, retencion_iva_total as iva_total from gasto_importacion where id = $1`, [id]);
   const g = cab[0];
   const { rows: t } = await tx.query<{ usd: string }>(`select fn_tasa('USD', $1::date)::text as usd`, [g.fecha]);
   const tasaMon = new Decimal(g.tasa);
@@ -233,14 +236,25 @@ export async function registrarGasto(tx: Db, u: Usuario, id: string): Promise<Re
   }
 
   const { rows: num } = await tx.query<{ numero: string }>(`update gasto_importacion set estado = 'contabilizado' where id = $1 returning numero::text`, [id]);
+  // Retenciones al contabilizar (R-BX): la cuenta por pagar nace por el neto y cada retención queda guardada.
+  const retenciones = await calcularRetenciones(tx, {
+    proveedorId: g.proveedor_id, fecha: g.fecha, tasa: g.tasa, baseSinIva: g.base, iva: g.iva, ivaTotal: g.iva_total,
+  });
+  const retIva = sumaRetenciones(retenciones, 'iva');
+  const retIslr = sumaRetenciones(retenciones, 'islr');
+  const neto = new Decimal(g.total).minus(retIva).minus(retIslr);
+  await guardarRetenciones(tx, { gastoId: id }, { proveedorId: g.proveedor_id, fecha: g.fecha, moneda: g.moneda, tasa: g.tasa }, retenciones, enUsd);
   await tx.query(
     `insert into partida_cxp (proveedor_id, gasto_id, fecha, vencimiento, moneda, tasa, monto_original, monto_usd, saldo)
      values ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $7)`,
-    [g.proveedor_id, id, g.fecha, g.vencimiento, g.moneda, g.tasa, g.total, g.total_usd]);
+    [g.proveedor_id, id, g.fecha, g.vencimiento, g.moneda, g.tasa, neto.toFixed(2), retenciones.length ? enUsd(neto).toFixed(2) : g.total_usd]);
   const r = await contabilizar(tx, {
     evento: 'gasto_importacion', fecha: g.fecha, descripcion: `Gasto de importación (${NOMBRE_CONCEPTO[g.concepto as ConceptoGasto] ?? g.concepto}) · factura ${g.numero_factura}`,
     origen: { tipo: 'gasto_importacion', id }, moneda: g.moneda,
-    importes: { inventario: inventario.toFixed(2), costo_ventas: costoVentas.toFixed(2), iva: g.iva, total: g.total },
+    importes: {
+      inventario: inventario.toFixed(2), costo_ventas: costoVentas.toFixed(2), iva: g.iva, total: g.total, neto: neto.toFixed(2),
+      ret_iva: retIva.toFixed(2), ret_islr: retIslr.toFixed(2),
+    },
     terceroId: g.proveedor_id, usuarioId: u.id,
   });
   return { numero: num[0].numero, asiento: r.numero, inventario: inventario.toFixed(2), costoVentas: costoVentas.toFixed(2) };
@@ -270,7 +284,7 @@ export interface DetalleGasto {
   id: string; numero: string | null; estado: string; proveedor_id: string; proveedor: string; concepto: string; descripcion: string | null;
   numero_factura: string; numero_control: string; fecha_factura: string; fecha_vencimiento: string; moneda: string; tasa: string | null;
   criterio_reparto: CriterioReparto; base: string; alicuota_iva_id: string; alicuota_pct: string; iva: string; total: string; total_usd: string;
-  creado_por: string; saldo: string | null; recepciones: { id: string; numero: string; orden: string; fecha: string; total_usd: string }[];
+  creado_por: string; retencion_iva_total: boolean; saldo: string | null; recepciones: { id: string; numero: string; orden: string; fecha: string; total_usd: string }[];
   reparto: { codigo: string; recepcion: string; cantidad: string; monto: string; monto_inventario: string; monto_costo_ventas: string }[];
 }
 
@@ -279,7 +293,7 @@ export async function detalleGasto(db: Db, id: string): Promise<DetalleGasto | n
     `select g.id, g.numero::text, g.estado, g.proveedor_id, p.codigo || ' · ' || t.razon_social as proveedor, g.concepto, g.descripcion,
             g.numero_factura, g.numero_control, to_char(g.fecha_factura, 'YYYY-MM-DD') as fecha_factura,
             to_char(g.fecha_vencimiento, 'YYYY-MM-DD') as fecha_vencimiento, g.moneda, g.tasa::text, g.criterio_reparto, g.base::text,
-            g.alicuota_iva_id, g.alicuota_pct::text, g.iva::text, g.total::text, g.total_usd::text, cr.nombre as creado_por
+            g.alicuota_iva_id, g.alicuota_pct::text, g.iva::text, g.total::text, g.total_usd::text, cr.nombre as creado_por, g.retencion_iva_total
        from gasto_importacion g join proveedor p on p.tercero_id = g.proveedor_id join tercero t on t.id = p.tercero_id
        join usuario cr on cr.id = g.created_by where g.id = $1`, [id]);
   if (!rows[0]) return null;
