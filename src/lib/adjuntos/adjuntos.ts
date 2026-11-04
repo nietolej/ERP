@@ -6,6 +6,7 @@ import { ROLES_VEN_PRODUCTOS } from '@/lib/maestros/productos';
 import { ROLES_VEN_PROVEEDORES } from '@/lib/maestros/proveedores';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ROLES_REGISTRAN_GASTO, ROLES_VEN_CAJA, ROLES_VEN_GASTOS } from '@/lib/gastos/roles';
 import { ROLES_COBRAN, ROLES_VEN_COBROS } from '@/lib/ventas/cobros';
 import { ROLES_CONSTANCIA, ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
 import type { AlmacenArchivos } from './almacen';
@@ -17,7 +18,7 @@ import type { AlmacenArchivos } from './almacen';
  * - Un adjunto no se edita ni se borra: se anula con motivo (lo exige la base de datos).
  */
 
-export const TIPOS_ADJUNTABLES = ['cliente', 'proveedor', 'producto', 'transporte_parada', 'cobro'] as const;
+export const TIPOS_ADJUNTABLES = ['cliente', 'proveedor', 'producto', 'transporte_parada', 'cobro', 'gasto_proveedor', 'vale_caja'] as const;
 export type TipoAdjuntable = (typeof TIPOS_ADJUNTABLES)[number];
 
 export const MAX_BYTES_ADJUNTO = 5 * 1024 * 1024;
@@ -29,6 +30,8 @@ export const PERMISOS_ADJUNTO: Record<TipoAdjuntable, { ver: readonly Rol[]; agr
   producto: { ver: ROLES_VEN_PRODUCTOS, agregar: ['almacen', 'gerencia', 'compras'] },
   transporte_parada: { ver: ROLES_VEN_TRANSPORTE, agregar: ROLES_CONSTANCIA },
   cobro: { ver: ROLES_VEN_COBROS, agregar: ROLES_COBRAN },
+  gasto_proveedor: { ver: ROLES_VEN_GASTOS, agregar: ROLES_REGISTRAN_GASTO },
+  vale_caja: { ver: ROLES_VEN_CAJA, agregar: [] },
 };
 
 type Usuario = { id: string; roles: readonly string[] };

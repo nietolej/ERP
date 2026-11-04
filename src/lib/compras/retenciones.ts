@@ -83,15 +83,15 @@ export const sumaRetenciones = (r: Retencion[], impuesto: 'iva' | 'islr'): Decim
 
 /** Guarda las retenciones practicadas (inmutables) con su equivalente en USD. */
 export async function guardarRetenciones(
-  tx: Db, origen: { facturaId?: string; gastoId?: string }, d: { proveedorId: string; fecha: string; moneda: string; tasa: string },
+  tx: Db, origen: { facturaId?: string; gastoId?: string; gastoProveedorId?: string }, d: { proveedorId: string; fecha: string; moneda: string; tasa: string },
   retenciones: Retencion[], enUsd: (orig: Decimal) => Decimal,
 ): Promise<void> {
   for (const r of retenciones) {
     await tx.query(
-      `insert into retencion_compra (factura_id, gasto_id, proveedor_id, impuesto, fecha, moneda, tasa, base, porcentaje, sustraendo, monto, monto_usd, iva_total, tarifa_id)
-       values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      `insert into retencion_compra (factura_id, gasto_id, gasto_proveedor_id, proveedor_id, impuesto, fecha, moneda, tasa, base, porcentaje, sustraendo, monto, monto_usd, iva_total, tarifa_id)
+       values ($1, $2, $15, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [origen.facturaId ?? null, origen.gastoId ?? null, d.proveedorId, r.impuesto, d.fecha, d.moneda, d.tasa, r.base.toFixed(2), r.porcentaje.toString(),
-       r.sustraendo.toFixed(2), r.monto.toFixed(2), enUsd(r.monto).toFixed(2), r.ivaTotal, r.tarifaId]);
+       r.sustraendo.toFixed(2), r.monto.toFixed(2), enUsd(r.monto).toFixed(2), r.ivaTotal, r.tarifaId, origen.gastoProveedorId ?? null]);
   }
 }
 
@@ -100,10 +100,11 @@ export interface FilaRetencion {
 }
 
 /** Retenciones practicadas a una factura de compra o a un gasto, para mostrarlas en su detalle. */
-export async function retencionesDe(db: Db, origen: { facturaId?: string; gastoId?: string; notaId?: string }): Promise<FilaRetencion[]> {
+export async function retencionesDe(db: Db, origen: { facturaId?: string; gastoId?: string; notaId?: string; gastoProveedorId?: string }): Promise<FilaRetencion[]> {
   const { rows } = await db.query<FilaRetencion>(
     `select r.impuesto, r.base::text, r.porcentaje::text, r.sustraendo::text, r.monto::text, r.monto_usd::text, r.iva_total, c.codigo as concepto
        from retencion_compra r left join concepto_islr_tarifa t on t.id = r.tarifa_id left join concepto_islr c on c.id = t.concepto_id
-      where r.factura_id = $1 or r.gasto_id = $2 or r.nota_id = $3 order by r.impuesto`, [origen.facturaId ?? null, origen.gastoId ?? null, origen.notaId ?? null]);
+      where r.factura_id = $1 or r.gasto_id = $2 or r.nota_id = $3 or r.gasto_proveedor_id = $4 order by r.impuesto`,
+    [origen.facturaId ?? null, origen.gastoId ?? null, origen.notaId ?? null, origen.gastoProveedorId ?? null]);
   return rows;
 }

@@ -10,11 +10,16 @@ import { ErrorPermiso, obtenerUsuario } from '@/lib/auth/dal';
 import { conUsuario, getDb } from '@/lib/db';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const RUTA: Record<Exclude<TipoAdjuntable, 'transporte_parada' | 'cobro'>, string> = { cliente: 'clientes', proveedor: 'proveedores', producto: 'productos' };
+const RUTA: Record<Exclude<TipoAdjuntable, 'transporte_parada' | 'cobro' | 'gasto_proveedor' | 'vale_caja'>, string> = { cliente: 'clientes', proveedor: 'proveedores', producto: 'productos' };
 
 /** Página que muestra el adjunto: la del registro, o el transporte al que pertenece la parada. */
 async function rutaDe(tipo: TipoAdjuntable, entidadId: string): Promise<string> {
   if (tipo === 'cobro') return `/cobranzas/cobros/${entidadId}`;
+  if (tipo === 'gasto_proveedor') return `/gastos/${entidadId}`;
+  if (tipo === 'vale_caja') {
+    const { rows } = await (await getDb()).query<{ fondo_id: string }>('select fondo_id from vale_caja where id = $1', [entidadId]);
+    return `/caja-chica/${rows[0]?.fondo_id ?? ''}`;
+  }
   if (tipo !== 'transporte_parada') return `/maestros/${RUTA[tipo]}/${entidadId}`;
   const { rows } = await (await getDb()).query<{ transporte_id: string }>('select transporte_id from transporte_parada where id = $1', [entidadId]);
   return `/ventas/transportes/${rows[0]?.transporte_id ?? ''}`;

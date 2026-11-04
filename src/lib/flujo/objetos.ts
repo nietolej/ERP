@@ -4,6 +4,8 @@ import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
+import { aprobarReposicion, rechazarReposicion } from '@/lib/gastos/caja-chica';
+import { aprobarGastoProveedor, rechazarGastoProveedor } from '@/lib/gastos/gastos';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
 import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
@@ -84,6 +86,16 @@ export const MANEJADOR_NOTA_PROVEEDOR: Manejador<void> = {
 export const MANEJADOR_PAGO: Manejador<void> = {
   alAprobar: async (tx, id, aprobador) => { await aprobarPago(tx, id, aprobador); },
   alRechazar: (tx, id, usuario, motivo) => rechazarPago(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_GASTO_PROVEEDOR: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarGastoProveedor(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarGastoProveedor(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_REPOSICION_CAJA: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarReposicion(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarReposicion(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PROMOCION: Manejador<void> = {
@@ -185,6 +197,22 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select p.id::text as id, 'Pago ' || p.numero || ' · ' || pr.codigo || ' · ' || p.moneda || ' ' || p.monto as texto
          from pago p join proveedor pr on pr.tercero_id = p.proveedor_id where p.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_PAGO,
+  },
+  gasto_proveedor: {
+    etiqueta: 'Factura de gasto de proveedor',
+    ruta: (id) => `/gastos/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select g.id::text as id, 'Gasto ' || g.numero || ' · ' || p.codigo || ' · ' || g.moneda || ' ' || g.total as texto
+         from gasto_proveedor g join proveedor p on p.tercero_id = g.proveedor_id where g.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_GASTO_PROVEEDOR,
+  },
+  reposicion_caja: {
+    etiqueta: 'Constitución o reposición de caja chica',
+    ruta: (id) => `/caja-chica/reposiciones/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select r.id::text as id, case when r.tipo = 'constitucion' then 'Constitución ' else 'Reposición ' end || f.codigo || ' · ' || r.moneda || ' ' || r.monto as texto
+         from reposicion_caja r join fondo_caja f on f.id = r.fondo_id where r.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_REPOSICION_CAJA,
   },
   promocion: {
     etiqueta: 'Promoción',

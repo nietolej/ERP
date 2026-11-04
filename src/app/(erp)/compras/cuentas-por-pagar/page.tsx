@@ -26,7 +26,7 @@ export default async function CuentasPorPagarPage() {
           {filas.map((f) => (
             <tr key={f.id} className="hover:bg-white/[0.03]">
               <Celda>{f.proveedor}</Celda>
-              <Celda mono><Link href={f.factura_id ? `/compras/facturas/${f.factura_id}` : `/compras/gastos/${f.gasto_id}`} className="text-acento hover:underline">{f.numero_factura}</Link></Celda>
+              <Celda mono><Link href={f.ruta} className="text-acento hover:underline">{f.numero_factura}</Link></Celda>
               <Celda className="text-texto-2">{f.fecha}</Celda>
               <Celda className="text-texto-2">{f.vencimiento}</Celda>
               <Celda derecha mono>{f.moneda} {monto(f.monto_original)}</Celda>
