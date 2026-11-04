@@ -5,6 +5,7 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
+import { ROLES_VEN_CONCILIACION } from '@/lib/tesoreria/conciliacion';
 import { ROLES_CUSTODIO, ROLES_VEN_CAJA, ROLES_VEN_GASTOS } from '@/lib/gastos/roles';
 import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
 import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
@@ -120,7 +121,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Facturas de gasto', href: '/gastos', roles: [...ROLES_VEN_GASTOS] },
       { texto: 'Categorías de gasto', href: '/gastos/categorias', roles: [...ROLES_VEN_GASTOS] },
       { texto: 'Caja chica', href: '/caja-chica', roles: [...new Set([...ROLES_VEN_CAJA, ...ROLES_CUSTODIO])] },
-      { texto: 'Conciliación bancaria', fase: 3 },
+      { texto: 'Conciliación bancaria', href: '/tesoreria/conciliacion', roles: [...ROLES_VEN_CONCILIACION] },
     ],
   },
   {

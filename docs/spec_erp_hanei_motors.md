@@ -895,7 +895,7 @@ flowchart LR
 - **ISLR:** el proveedor tiene un concepto (Decreto 1.808) y la retención sale de `concepto_islr_tarifa`: porcentaje, base mínima y sustraendo en UT, por tipo de persona y domicilio, con vigencia (no se editan: se cierra la vigencia y se registra otra; no se solapan). Retención = base sin IVA × % − sustraendo, solo si la base llega al mínimo; la UT (`UNIDAD_TRIBUTARIA`, en bolívares) se lleva a la moneda de la factura con su tasa. **Contabilidad carga las tarifas** desde Configuración → Conceptos de ISLR; no se precarga normativa. Un proveedor con concepto y sin tarifa vigente **no se contabiliza** (nunca se omite la retención en silencio). Un proveedor sin concepto no tiene ISLR.
 - **Registro:** cada retención queda en `retencion_compra` (base, porcentaje, sustraendo, monto en moneda original y en USD, tarifa usada), inmutable, y se muestra en el detalle de la factura o del gasto.
 - **Pendiente:** el **comprobante** de retención con su numeración, los libros y las declaraciones (Fase 4); la retención sobre las notas de crédito y débito del proveedor y sobre servicios sin recepción (gastos, caja chica) cuando existan.
-- **Pendiente de la Fase 3:** IGTF pagado, conciliación bancaria y producción (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
+- **Pendiente de la Fase 3:** IGTF pagado y producción (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
 
 ### 7.3 Cuentas por pagar y pagos
 - `partida_cxp`, `pago` y `aplicacion_pago`, simétricos a CxC.
@@ -1089,6 +1089,13 @@ create table liquidacion_comision (
   - Revisión manual del resto.
   - Las partidas en tránsito quedan documentadas.
   - Se cierra por mes y por cuenta, y el saldo conciliado debe coincidir con el mayor.
+**Construido (migración 0041): conciliación bancaria.**
+- **Extracto** (`extracto_bancario`, `extracto_linea`): por cuenta bancaria (VES o USD, no cajas) y mes. Tesorería (o Gerencia) lo carga con saldo inicial y final del banco; los movimientos entran por **CSV** (columnas fecha dd-mm-aaaa, descripción, referencia opcional y monto con signo, o ingreso y egreso; todo o nada, con la fila del error) o a mano. Excel queda pendiente. Los meses se concilian en orden y el saldo inicial es el final del último mes cerrado.
+- **Emparejamiento:** el sistema **propone** pares por monto exacto, fecha dentro de la ventana (`VENTANA_DIAS`, 3, editable en Configuración → Parámetros) y referencia (la del cobro o pago del asiento pone primero al candidato). Nada se guarda hasta que una persona confirma. La base exige que el asiento sea de la cuenta contable del banco, contabilizado, de fecha dentro del mes, del mismo monto, y que no se use dos veces. Se puede deshacer mientras el mes esté abierto.
+- **En tránsito:** lo del mayor del banco sin pareja hasta fin de mes. Lo que el banco cobró y no está en libros (comisiones, intereses) lo registra Contabilidad con un asiento y luego se empareja; no se genera solo.
+- **Cierre:** Contabilidad, Jefe de contabilidad o Gerencia, distinta de quien emparejó líneas del extracto. Exige cero líneas sin conciliar, saldo inicial + movimientos = saldo final del banco y **mayor = saldo del banco + neto en tránsito**. Guarda las cifras, el extracto queda inmutable y los cobros emparejados pasan a «conciliado».
+- **Pendiente:** Excel, asientos automáticos por comisiones/intereses/IGTF del banco, emparejar un movimiento del banco con varios asientos (o al revés) y el flujo de caja proyectado.
+
 - **Flujo de caja proyectado:** partidas por cobrar y por pagar por fecha de vencimiento, más gastos recurrentes, por moneda.
 - **Transferencias entre cuentas propias y compra o venta de divisas:** se registran a la tasa real de la operación. La diferencia contra la tasa BCV va a diferencial cambiario.
 

@@ -43,6 +43,11 @@ export default async function ParametrosReportesPage() {
           {parametros.filter((p) => p.tabla === 'inventario').map((p) => <Fila key={p.codigo} p={p} />)}
         </Tabla>
       </Panel>
+      <Panel titulo="Conciliación bancaria" className="mt-5">
+        <Tabla columnas={['Código', 'Qué controla', 'Valor']}>
+          {parametros.filter((p) => p.tabla === 'conciliacion').map((p) => <Fila key={p.codigo} p={p} />)}
+        </Tabla>
+      </Panel>
       {faltantes.length > 0 && (
         <Panel titulo="Opcionales sin cargar" className="mt-5">
           <p className="mb-3 text-sm text-texto-2">Mientras no tengan valor, lo que depende de ellos no se muestra en los reportes.</p>

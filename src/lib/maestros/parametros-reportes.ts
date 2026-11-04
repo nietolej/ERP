@@ -10,8 +10,8 @@ import { ErrorMaestro } from './terceros';
 
 export const ROLES_PARAMETROS = ['gerencia', 'administrador'] as const;
 
-export type TablaParametro = 'reporte' | 'inventario';
-const TABLA_SQL: Record<TablaParametro, string> = { reporte: 'parametro_reporte', inventario: 'parametro_inventario' };
+export type TablaParametro = 'reporte' | 'inventario' | 'conciliacion';
+const TABLA_SQL: Record<TablaParametro, string> = { reporte: 'parametro_reporte', inventario: 'parametro_inventario', conciliacion: 'parametro_conciliacion' };
 
 /** Parámetros opcionales: no tienen valor inicial y el reporte oculta lo que depende de ellos mientras no se carguen. */
 export const PARAMETROS_OPCIONALES: { tabla: TablaParametro; codigo: string; descripcion: string; unidad: string }[] = [
@@ -28,6 +28,7 @@ export async function listarParametros(db: Db): Promise<Parametro[]> {
   const { rows } = await db.query<Parametro>(
     `select 'reporte' as tabla, codigo, descripcion, valor::text, unidad from parametro_reporte
      union all select 'inventario', codigo, descripcion, valor::text, unidad from parametro_inventario
+     union all select 'conciliacion', codigo, descripcion, valor::text, unidad from parametro_conciliacion
      order by 1, 2`);
   return rows;
 }
@@ -49,7 +50,7 @@ async function valorDe(db: Db, tabla: TablaParametro, codigo: string): Promise<D
  * parámetros que, si se invierten, rompen el reporte (tramo y tope del histograma; riesgo y sobrestock de cobertura).
  */
 export async function actualizarParametro(tx: Db, tabla: string, codigo: string, entrada: string): Promise<{ anterior: string | null; nuevo: string }> {
-  if (tabla !== 'reporte' && tabla !== 'inventario') throw new ErrorMaestro('Parámetro desconocido.');
+  if (tabla !== 'reporte' && tabla !== 'inventario' && tabla !== 'conciliacion') throw new ErrorMaestro('Parámetro desconocido.');
   const valor = leerValor(entrada);
   const opcional = PARAMETROS_OPCIONALES.find((p) => p.tabla === tabla && p.codigo === codigo);
   const { rows } = await tx.query<{ unidad: string }>(`select unidad from ${TABLA_SQL[tabla]} where codigo = $1 for update`, [codigo]);
