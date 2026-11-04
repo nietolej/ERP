@@ -42,14 +42,14 @@ export interface FiltroClientes {
   vendedorId?: string;
 }
 
-interface Condicion { sql: string; params: unknown[]; }
+export interface Condicion { sql: string; params: unknown[]; }
 
 /**
  * `$n` consecutivos para cliente, vendedor (join a `vendedor v`) y periodo, a partir de `primerParametro`.
  * `columnaCliente` se califica con su alias de tabla cuando la consulta junta más de una tabla con `cliente_id`
  * (p. ej. vw_cxc_antiguedad y documento_venta a la vez), para que la columna no quede ambigua.
  */
-function condicion(f: FiltroClientes, columnaFecha: string, primerParametro: number, columnaCliente = 'cliente_id'): Condicion {
+export function condicion(f: FiltroClientes, columnaFecha: string, primerParametro: number, columnaCliente = 'cliente_id'): Condicion {
   const partes: string[] = [];
   const params: unknown[] = [];
   let n = primerParametro;
