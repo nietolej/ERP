@@ -12,7 +12,7 @@ export function BotonCsv() {
   const ruta = usePathname();
   const q = useSearchParams();
   const ref = useRef<HTMLButtonElement>(null);
-  if (!ruta.startsWith('/reportes') && !ruta.startsWith('/fiscal') && !ruta.startsWith('/contabilidad/estados') && !ruta.startsWith('/contabilidad/libro-')) return null;
+  if (!ruta.startsWith('/reportes') && !ruta.startsWith('/fiscal') && !ruta.startsWith('/contabilidad/estados') && !ruta.startsWith('/contabilidad/libro-') && !ruta.startsWith('/contabilidad/rentabilidad')) return null;
 
   function exportar() {
     const tabla = ref.current?.closest('[data-tabla]')?.querySelector('table');

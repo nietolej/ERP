@@ -111,6 +111,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Balance de comprobación', href: '/contabilidad/balance', roles: CONTABLES },
       { texto: 'Libro diario', href: '/contabilidad/libro-diario', roles: CONTABLES },
       { texto: 'Libro mayor', href: '/contabilidad/libro-mayor', roles: CONTABLES },
+      { texto: 'Rentabilidad por dimensión', href: '/contabilidad/rentabilidad', roles: CONTABLES },
       { texto: 'Periodos contables', href: '/contabilidad/periodos', roles: CONTABLES },
       { texto: 'Plan de cuentas', href: '/contabilidad/plan-de-cuentas', roles: CONTABLES },
       { texto: 'Cuentas por cobrar', href: '/cobranzas/cuentas', roles: [...ROLES_VEN_COBROS] },
