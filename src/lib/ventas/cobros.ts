@@ -1,3 +1,4 @@
+import { devengarAplicaciones, revertirDevengosDeCobro } from '@/lib/comisiones/comisiones';
 import { registrarIgtfCobro, revertirIgtfCobro } from './igtf';
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
@@ -147,6 +148,7 @@ export async function registrarCobro(tx: Db, u: Usuario, d: DatosCobro): Promise
     anticipo: { original: c[0].por_aplicar, ves: c[0].por_aplicar_ves, usd: c[0].por_aplicar_usd },
   });
   const igtf = await registrarIgtfCobro(tx, cobro.id, u.id);       // IGTF percibido, aparte del cobro (R-DB)
+  await devengarAplicaciones(tx, u, calculadas.map((a) => a.id));   // comisión de venta sobre lo cobrado (R-DV)
   return { id: cobro.id, numero: cobro.numero, asiento, anticipo: c[0].por_aplicar, igtf: igtf?.monto ?? null };
 }
 
@@ -174,6 +176,7 @@ export async function aplicarAnticipo(
     origen: { tipo: 'aplicacion_cobro', id: calculadas[0].id }, clienteId: c.cliente_id, aplicadas: calculadas,
     anticipo: { original: dos(suma('monto_cobro')), ves: dos(suma('base_ves')), usd: dos(suma('base_usd')) },
   });
+  await devengarAplicaciones(tx, u, calculadas.map((a) => a.id));   // comisión de venta sobre lo cobrado (R-DV)
   const { rows: resto } = await tx.query<{ por_aplicar: string }>('select por_aplicar::text from cobro where id = $1', [cobroId]);
   return { asiento, anticipo: resto[0].por_aplicar };
 }
@@ -191,6 +194,7 @@ export async function anularCobro(tx: Db, u: Usuario, id: string, motivo: Motivo
   await tx.query(
     `select fn_reversar_asiento($1, ((now() at time zone 'America/Caracas')::date), $2)`, [a[0].id, `Anulación del cobro: ${texto}`]);
   await revertirIgtfCobro(tx, id);
+  await revertirDevengosDeCobro(tx, u, id);                         // la comisión de lo cobrado se revierte (R-DV)
 }
 
 // ---------------------------------------------------------------------

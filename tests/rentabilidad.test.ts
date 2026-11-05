@@ -161,8 +161,8 @@ describe('rentabilidad por dimensión (spec §12.5; R-DT)', () => {
   });
 
   it('las cifras derivadas usan decimales exactos y no dividen entre cero', () => {
-    const c = cifrasDe({ venta: '100.10', desc_linea: '5.00', devolucion: '10.00', desc_post: '0.05', pronto: '0.05', costo: '60.00' });
-    expect([c.ventaNetaUsd.toFixed(2), c.margenUsd.toFixed(2), c.margenPct]).toEqual(['90.00', '30.00', '33.33']);
-    expect(cifrasDe({ venta: '0', desc_linea: '0', devolucion: '0', desc_post: '0', pronto: '0', costo: '5' }).margenPct).toBeNull();
+    const c = cifrasDe({ venta: '100.10', desc_linea: '5.00', devolucion: '10.00', desc_post: '0.05', pronto: '0.05', costo: '60.00', comision: '3.00' });
+    expect([c.ventaNetaUsd.toFixed(2), c.margenUsd.toFixed(2), c.margenPct]).toEqual(['90.00', '27.00', '30.00']);
+    expect(cifrasDe({ venta: '0', desc_linea: '0', devolucion: '0', desc_post: '0', pronto: '0', costo: '5', comision: '0' }).margenPct).toBeNull();
   });
 });

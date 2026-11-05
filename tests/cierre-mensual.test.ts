@@ -130,6 +130,7 @@ describe('cierre mensual (R-DP a R-DS)', () => {
     const todos = await cuadreAuxiliares(db);
     expect(todos.map((x) => `${x.nombre} ${x.moneda}`)).toEqual([
       'Cuentas por cobrar (1.2.01) VES', 'Cuentas por cobrar (1.2.01) USD', 'Cuentas por pagar (2.1.01) USD', 'Inventario de mercancía (1.3.01) USD',
+      'Comisiones por pagar (2.1.07) VES', 'Comisiones por pagar (2.1.07) USD',
       'Mercancía recibida no facturada (2.1.02): saldo no deudor USD',
     ]);
     expect(todos.every((x) => x.ok)).toBe(true);

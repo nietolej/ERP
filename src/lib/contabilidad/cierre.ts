@@ -3,6 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { declaraPorQuincena } from '@/lib/fiscal/declaraciones';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { saldoAuxiliarComisiones } from '@/lib/comisiones/comisiones';
 import { construirResultados, construirSituacion, movimientosDe, rangoDeMes, saldosAl } from './estados';
 
 /**
@@ -103,7 +104,7 @@ export interface Cuadre { nombre: string; moneda: 'VES' | 'USD'; mayor: string; 
 
 /**
  * Cada auxiliar contra su cuenta del mayor, con lo contabilizado hasta hoy. CxC en bolívares y dólares; CxP, inventario y mercancía recibida no
- * facturada en dólares (su moneda de valoración). Las comisiones se suman cuando exista su auxiliar.
+ * facturada en dólares (su moneda de valoración). Comisiones por pagar en bolívares (valor en libros) y en dólares.
  */
 export async function cuadreAuxiliares(db: Db): Promise<Cuadre[]> {
   const mayor = async (codigo: string, col: 'ves' | 'usd', signo: 1 | -1): Promise<Decimal> => {
@@ -120,11 +121,14 @@ export async function cuadreAuxiliares(db: Db): Promise<Cuadre[]> {
   const cxp = await un(`select coalesce(sum(round(monto_usd * saldo / monto_original, 2)), 0)::text as v from partida_cxp where estado = 'abierta'`);
   const inv = await un(`select coalesce(sum(valor_usd), 0)::text as v from producto_costo`);
   const puente = await mayor('2.1.02', 'usd', -1);
+  const com = await saldoAuxiliarComisiones(db);
   return [
     cuadre('Cuentas por cobrar (1.2.01)', 'VES', await mayor('1.2.01', 'ves', 1), dos(cxc.rows[0].ves)),
     cuadre('Cuentas por cobrar (1.2.01)', 'USD', await mayor('1.2.01', 'usd', 1), dos(cxc.rows[0].usd)),
     cuadre('Cuentas por pagar (2.1.01)', 'USD', await mayor('2.1.01', 'usd', -1), cxp),
     cuadre('Inventario de mercancía (1.3.01)', 'USD', await mayor('1.3.01', 'usd', 1), inv),
+    cuadre('Comisiones por pagar (2.1.07)', 'VES', await mayor('2.1.07', 'ves', -1), dos(com.ves)),
+    cuadre('Comisiones por pagar (2.1.07)', 'USD', await mayor('2.1.07', 'usd', -1), dos(com.usd)),
     // La cuenta puente de la conciliación a tres vías no tiene auxiliar propio: no puede quedar con saldo deudor (se facturó más de lo recibido).
     { nombre: 'Mercancía recibida no facturada (2.1.02): saldo no deudor', moneda: 'USD', mayor: puente.toFixed(2), auxiliar: '≥ 0.00', ok: puente.greaterThanOrEqualTo(0) },
   ];
@@ -183,8 +187,8 @@ export async function checklistCierre(db: Db, anio: number, mes: number): Promis
   const cuadres = await cuadreAuxiliares(db);
   const malos = cuadres.filter((c) => !c.ok);
   agrega({
-    codigo: 'auxiliares', titulo: 'Auxiliares contra mayor: CxC, CxP, inventario y mercancía recibida no facturada', ok: malos.length === 0,
-    detalle: malos.length === 0 ? 'Todos los auxiliares cuadran con su cuenta del mayor (comisiones: sin auxiliar todavía).' : 'Un auxiliar no cuadra con su cuenta del mayor.',
+    codigo: 'auxiliares', titulo: 'Auxiliares contra mayor: CxC, CxP, inventario, comisiones y mercancía recibida no facturada', ok: malos.length === 0,
+    detalle: malos.length === 0 ? 'Todos los auxiliares cuadran con su cuenta del mayor (incluye comisiones por pagar).' : 'Un auxiliar no cuadra con su cuenta del mayor.',
     pendientes: malos.map((c) => `${c.nombre} en ${c.moneda}: mayor ${c.mayor}, auxiliar ${c.auxiliar}`),
   });
 

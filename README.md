@@ -16,7 +16,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 | Fase 3: Compras, CxP, gastos, tesorería y producción | ✅ Incluye conciliación bancaria, IGTF y los reportes M6 y M7 |
 | Fase 4: Fiscal | ✅ Libros, comprobantes de retención, declaraciones y cierre fiscal |
 | Fase 5: Arranque en producción | ✅ Apertura, conteo inicial, carga masiva de productos y checklist firmado. Falta el respaldo automático de la base |
-| Fase 6: Comisiones, estados financieros y reportes | 🟡 En curso: estados financieros (situación, resultados, patrimonio y flujo de efectivo), cierre mensual, libro diario y mayor legales y rentabilidad por dimensión listos; faltan activos fijos, comisiones y cierre del ejercicio |
+| Fase 6: Comisiones, estados financieros y reportes | 🟡 En curso: estados financieros (situación, resultados, patrimonio y flujo de efectivo), cierre mensual, libro diario y mayor legales y rentabilidad por dimensión y comisiones con base cobrada listos; faltan activos fijos, revaluación de divisas y cierre del ejercicio |
 
 ### Fase 0: qué está hecho
 

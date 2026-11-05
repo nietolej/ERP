@@ -1,3 +1,4 @@
+import { revertirPorNota } from '@/lib/comisiones/comisiones';
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import { contabilizar } from '@/lib/contabilidad/motor';
@@ -328,6 +329,7 @@ export async function emitirNota(tx: Db, u: Usuario, id: string, opciones: { ser
     });
     asiento = r.numero;
   }
+  if (n.tipo === 'nota_credito') await revertirPorNota(tx, u, id);    // la comisión ya devengada de esa factura se revierte en proporción (R-DV)
   return { id, numero: `${e[0].serie}-${e[0].numero}`, numeroControl: control.numeroControl, contingencia: !control.numeroControl, asiento, asientoInventario };
 }
 

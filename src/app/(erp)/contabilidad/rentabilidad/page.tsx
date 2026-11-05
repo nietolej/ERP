@@ -33,7 +33,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
   return (
     <>
       <Encabezado titulo="Rentabilidad por dimensión"
-        descripcion={`Margen del ${fecha(desde)} al ${fecha(hasta)}, en dólares (gestión): venta neta de devoluciones y descuentos, menos el costo de cada línea al despachar. Las comisiones se restarán cuando exista su devengo.`}>
+        descripcion={`Margen del ${fecha(desde)} al ${fecha(hasta)}, en dólares (gestión): venta neta de devoluciones y descuentos, menos el costo de cada línea al despachar. Las comisiones devengadas al cobrar también se restan.`}>
         <form className="flex flex-wrap items-end gap-2 text-sm">
           <input type="hidden" name="dim" value={dim} />
           <input type="date" name="desde" defaultValue={desde} className="campo w-auto" aria-label="Desde" />
@@ -51,7 +51,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
         <Panel titulo={`Por ${NOMBRE_DIMENSION[dim].toLowerCase()}`}>
           <Tabla columnas={['Código', NOMBRE_DIMENSION[dim], { t: 'Venta (US$)', derecha: true }, { t: 'Desc. de línea (US$)', derecha: true }, { t: 'Devoluciones (US$)', derecha: true },
             { t: 'Desc. posteriores (US$)', derecha: true }, { t: 'Pronto pago (US$)', derecha: true }, { t: 'Venta neta (US$)', derecha: true }, { t: 'Costo (US$)', derecha: true },
-            { t: 'Margen (US$)', derecha: true }, { t: 'Margen %', derecha: true }]} vacio="Sin facturas emitidas en el rango.">
+            { t: 'Comisiones (US$)', derecha: true }, { t: 'Margen (US$)', derecha: true }, { t: 'Margen %', derecha: true }]} vacio="Sin facturas emitidas en el rango.">
             {filas.length === 0 ? null : <>{filas.map((f) => (
               <tr key={`${f.codigo}|${f.nombre}`}>
                 <Celda mono>{f.codigo}</Celda>
@@ -63,6 +63,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
                 <Celda derecha>{us(f.prontoPagoUsd)}</Celda>
                 <Celda derecha>{us(f.ventaNetaUsd)}</Celda>
                 <Celda derecha>{us(f.costoUsd)}</Celda>
+                <Celda derecha>{us(f.comisionUsd)}</Celda>
                 <Celda derecha className={f.margenUsd.isNegative() ? 'text-red-300' : ''}>{us(f.margenUsd)}</Celda>
                 <Celda derecha className={f.margenUsd.isNegative() ? 'text-red-300' : ''}>{pct(f)}</Celda>
               </tr>
@@ -71,11 +72,11 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
                 <Celda>{''}</Celda><Celda>Total</Celda>
                 <Celda derecha>{us(total.ventaUsd)}</Celda><Celda derecha>{us(total.descuentoLineaUsd)}</Celda><Celda derecha>{us(total.devolucionUsd)}</Celda>
                 <Celda derecha>{us(total.descuentoPosteriorUsd)}</Celda><Celda derecha>{us(total.prontoPagoUsd)}</Celda><Celda derecha>{us(total.ventaNetaUsd)}</Celda>
-                <Celda derecha>{us(total.costoUsd)}</Celda><Celda derecha>{us(total.margenUsd)}</Celda><Celda derecha>{pct(total)}</Celda>
+                <Celda derecha>{us(total.costoUsd)}</Celda><Celda derecha>{us(total.comisionUsd)}</Celda><Celda derecha>{us(total.margenUsd)}</Celda><Celda derecha>{pct(total)}</Celda>
               </tr></>}
           </Tabla>
           <p className="mt-3 text-xs text-texto-2">
-            La venta ya viene neta de los descuentos de línea (columna aparte, informativa). Venta neta = venta − devoluciones − descuentos posteriores − pronto pago. La devolución resta también el costo que reingresa al inventario.
+            La venta ya viene neta de los descuentos de línea (columna aparte, informativa). Venta neta = venta − devoluciones − descuentos posteriores − pronto pago. La devolución resta también el costo que reingresa al inventario. Las comisiones se imputan en la fecha del cobro que las devengó y se reparten entre las líneas de su factura.
           </p>
         </Panel>
       )}

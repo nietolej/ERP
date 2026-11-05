@@ -7,10 +7,11 @@ import { ErrorMaestro } from '@/lib/maestros/terceros';
  * Rentabilidad por dimensión (spec §12.5; migración 0052). Una sola fuente: vw_rentabilidad_linea, en USD (gestión).
  *
  *   venta neta = venta − devoluciones − descuentos posteriores (notas de crédito) − pronto pago
- *   margen     = venta neta − costo (foto del costo de cada línea; la devolución resta el costo que reingresa)
+ *   margen     = venta neta − costo (foto del costo de cada línea; la devolución resta el costo que reingresa) − comisiones
  *   margen %   = margen ÷ venta neta
  *
- * La venta ya viene neta de los descuentos de línea, que se muestran aparte. Las comisiones se restarán cuando exista su devengo.
+ * La venta ya viene neta de los descuentos de línea, que se muestran aparte. Las comisiones son las devengadas (al cobrar) y revertidas en el rango, repartidas entre
+ * las líneas de su factura según su base: se imputan en la fecha del cobro, no en la de la venta.
  */
 
 export const ROLES_VEN_RENTABILIDAD = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'] as const satisfies readonly Rol[];
@@ -33,28 +34,29 @@ const DEF: Record<Dimension, { col: string; join: string; codigo: string; nombre
 
 export interface Cifras {
   ventaUsd: Decimal; descuentoLineaUsd: Decimal; devolucionUsd: Decimal; descuentoPosteriorUsd: Decimal; prontoPagoUsd: Decimal;
-  ventaNetaUsd: Decimal; costoUsd: Decimal; margenUsd: Decimal;
+  ventaNetaUsd: Decimal; costoUsd: Decimal; comisionUsd: Decimal; margenUsd: Decimal;
   /** null si no hay venta neta (no se divide entre cero). */
   margenPct: string | null;
 }
 export interface FilaRentabilidad extends Cifras { codigo: string; nombre: string }
 
-interface Cruda { venta: string; desc_linea: string; devolucion: string; desc_post: string; pronto: string; costo: string }
+interface Cruda { venta: string; desc_linea: string; devolucion: string; desc_post: string; pronto: string; costo: string; comision: string }
 
 /** Las cifras derivadas (venta neta, margen y %) se calculan aquí una sola vez, con decimales exactos. */
 export function cifrasDe(c: Cruda): Cifras {
   const d = (v: string) => new Decimal(v);
   const ventaNetaUsd = d(c.venta).minus(c.devolucion).minus(c.desc_post).minus(c.pronto);
   const costoUsd = d(c.costo);
-  const margenUsd = ventaNetaUsd.minus(costoUsd);
+  const comisionUsd = d(c.comision);
+  const margenUsd = ventaNetaUsd.minus(costoUsd).minus(comisionUsd);
   return {
     ventaUsd: d(c.venta), descuentoLineaUsd: d(c.desc_linea), devolucionUsd: d(c.devolucion), descuentoPosteriorUsd: d(c.desc_post), prontoPagoUsd: d(c.pronto),
-    ventaNetaUsd, costoUsd, margenUsd, margenPct: ventaNetaUsd.isZero() ? null : margenUsd.dividedBy(ventaNetaUsd).times(100).toFixed(2),
+    ventaNetaUsd, costoUsd, comisionUsd, margenUsd, margenPct: ventaNetaUsd.isZero() ? null : margenUsd.dividedBy(ventaNetaUsd).times(100).toFixed(2),
   };
 }
 
 const SUMAS = `coalesce(sum(r.venta_usd), 0)::text as venta, coalesce(sum(r.descuento_linea_usd), 0)::text as desc_linea, coalesce(sum(r.devolucion_usd), 0)::text as devolucion,
-               coalesce(sum(r.descuento_posterior_usd), 0)::text as desc_post, coalesce(sum(r.pronto_pago_usd), 0)::text as pronto, coalesce(sum(r.costo_usd), 0)::text as costo`;
+               coalesce(sum(r.descuento_posterior_usd), 0)::text as desc_post, coalesce(sum(r.pronto_pago_usd), 0)::text as pronto, coalesce(sum(r.costo_usd), 0)::text as costo, coalesce(sum(r.comision_usd), 0)::text as comision`;
 
 function validar(desde: string, hasta: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) throw new ErrorMaestro('Indique un rango de fechas válido.');

@@ -67,6 +67,7 @@ describe('migraciones', () => {
       '0050_checklist_arranque.sql',
       '0051_cierre_mensual.sql',
       '0052_rentabilidad.sql',
+      '0053_comisiones.sql',
     ]);
   });
 

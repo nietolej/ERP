@@ -5,6 +5,7 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
+import { ROLES_VEN_COMISIONES, ROLES_VEN_TODO_COMISIONES } from '@/lib/comisiones/comisiones';
 import { ROLES_VEN_CIERRE } from '@/lib/contabilidad/cierre';
 import { ROLES_VEN_ESTADOS } from '@/lib/contabilidad/estados';
 import { ROLES_VEN_APERTURA } from '@/lib/apertura/apertura';
@@ -142,8 +143,9 @@ export const MODULOS: Modulo[] = [
     descripcion: 'Metas de venta y comisiones.',
     items: [
       { texto: 'Configuración de metas', href: '/metas', roles: ROLES_VEN_METAS },
-      { texto: 'Planes de comisión', fase: 6 },
-      { texto: 'Liquidación de comisiones', fase: 6 },
+      { texto: 'Estado de comisiones', href: '/comisiones', roles: [...ROLES_VEN_COMISIONES] },
+      { texto: 'Planes de comisión', href: '/comisiones/planes', roles: [...ROLES_VEN_TODO_COMISIONES] },
+      { texto: 'Liquidación de comisiones', href: '/comisiones/liquidaciones', roles: [...ROLES_VEN_COMISIONES] },
     ],
   },
   {

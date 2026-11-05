@@ -3,6 +3,7 @@ import type { Db } from '@/lib/db/tipos';
 import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
+import { aprobarLiquidacion, aprobarPlan, rechazarLiquidacion, rechazarPlan } from '@/lib/comisiones/comisiones';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
 import {
   aprobarBanco, aprobarCxc, aprobarCxp, rechazarBanco, rechazarCxc, rechazarCxp,
@@ -91,6 +92,16 @@ export const MANEJADOR_NOTA_PROVEEDOR: Manejador<void> = {
 export const MANEJADOR_PAGO: Manejador<void> = {
   alAprobar: async (tx, id, aprobador) => { await aprobarPago(tx, id, aprobador); },
   alRechazar: (tx, id, usuario, motivo) => rechazarPago(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_PLAN_COMISION: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarPlan(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarPlan(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_LIQUIDACION_COMISION: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarLiquidacion(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarLiquidacion(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_GASTO_PROVEEDOR: Manejador<void> = {
@@ -225,6 +236,20 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select p.id::text as id, 'Pago ' || p.numero || ' · ' || pr.codigo || ' · ' || p.moneda || ' ' || p.monto as texto
          from pago p join proveedor pr on pr.tercero_id = p.proveedor_id where p.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_PAGO,
+  },
+  plan_comision: {
+    etiqueta: 'Plan de comisión',
+    ruta: (id) => `/comisiones/planes/${id}`,
+    resumenes: (db, ids) => consulta(db, `select p.id::text as id, 'Plan ' || p.nombre as texto from plan_comision p where p.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_PLAN_COMISION,
+  },
+  liquidacion_comision: {
+    etiqueta: 'Liquidación de comisiones',
+    ruta: (id) => `/comisiones/liquidaciones/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select l.id::text as id, 'Liquidación ' || l.numero || ' · ' || v.nombre || ' · ' || l.periodo || ' · US$ ' || l.neto_usd as texto
+         from liquidacion_comision l join vendedor v on v.id = l.vendedor_id where l.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_LIQUIDACION_COMISION,
   },
   gasto_proveedor: {
     etiqueta: 'Factura de gasto de proveedor',
