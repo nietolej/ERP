@@ -12,12 +12,12 @@ export function BotonCsv() {
   const ruta = usePathname();
   const q = useSearchParams();
   const ref = useRef<HTMLButtonElement>(null);
-  if (!ruta.startsWith('/reportes') && !ruta.startsWith('/fiscal')) return null;
+  if (!ruta.startsWith('/reportes') && !ruta.startsWith('/fiscal') && !ruta.startsWith('/contabilidad/estados')) return null;
 
   function exportar() {
     const tabla = ref.current?.closest('[data-tabla]')?.querySelector('table');
     if (!tabla) return;
-    const nombre = [ruta.replace(/^\/(reportes|fiscal)\/?/, '').replace(/\//g, '-') || 'reporte', q.get('tab'), q.get('periodo')].filter(Boolean).join('-');
+    const nombre = [ruta.replace(/^\/(reportes|fiscal|contabilidad)\/?/, '').replace(/\//g, '-') || 'reporte', q.get('tab'), q.get('periodo')].filter(Boolean).join('-');
     const hoy = new Date().toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Caracas' }).replace(/\//g, '-');
     const blob = new Blob([aCsv(tablaAFilas(tabla))], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);

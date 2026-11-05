@@ -1369,6 +1369,12 @@ Todos se generan **desde el mayor**, por periodo y comparativos, en **VES (legal
 = UTILIDAD NETA
 ```
 
+**Construido (Fase 6, primera entrega; Contabilidad → Estados financieros):** estado de situación financiera, estado de resultados y estado de cambios en el patrimonio, **desde el mayor**, por mes, en VES (legal) o en USD (gestión: la suma de los valores en USD de cada asiento, sin reexpresión).
+- **Situación:** activo corriente y no corriente (1.4), pasivo corriente y no corriente (2.2), patrimonio. Comparado con el mes anterior y con el cierre del año anterior. El resultado del ejercicio que todavía no se cerró contra 3.3.02 es una partida del patrimonio, así que siempre cuadra; si no cuadra, la pantalla lo avisa con la diferencia.
+- **Resultados:** con la estructura de arriba (ventas brutas, devoluciones, descuentos, ventas netas, costo, utilidad bruta con su margen, gastos de venta y de administración, utilidad operativa, diferencial cambiario como partida separada, gastos financieros, otros ingresos, ISLR y utilidad neta), comparado con el mes anterior y con el acumulado del año. Agrupa por código del plan; una cuenta nueva fuera de la estructura base cae en «Ventas brutas», «Otros gastos» o «Costo de ventas» según su tipo, así que ninguna cuenta se pierde. Excluye los asientos de cierre del ejercicio.
+- **Cambios en el patrimonio:** saldo inicial, resultado del periodo, otros movimientos (aportes, traspasos, cierre del ejercicio) y saldo final por grupo de cuenta; el saldo final es el del balance.
+- **Pendiente:** flujo de efectivo (método indirecto), rentabilidad por dimensión, libro diario y mayor legales con numeración, reexpresión por inflación (decisión del contador), comisiones, activos fijos y cierre mensual.
+
 **Reexpresión por inflación:** la BA VEN-NIF 2 regula el ajuste por inflación en entornos hiperinflacionarios. Si aplica o no a la empresa en cada ejercicio es una **decisión del contador** (§16). El modelo lo soporta mediante asientos de ajuste por periodo con INPC parametrizado.
 
 ### 12.6 Activos fijos (FI-AA)
