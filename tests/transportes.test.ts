@@ -22,7 +22,7 @@ import {
   registrarNoEntrega, salirARuta,
 } from '@/lib/ventas/transportes';
 import type { Db } from '@/lib/db/tipos';
-import { baseDePrueba, esperarError, usuarioDePrueba } from './apoyo';
+import { baseDePrueba, cerrarPeriodosDePrueba, esperarError, reabrirPeriodosDePrueba, usuarioDePrueba } from './apoyo';
 
 const rif = (letra: string, n: string) => `${letra}-${n}-${digitoVerificador(letra, n)}`;
 
@@ -442,9 +442,9 @@ describe('direcciones de entrega, transportistas y transporte (§5.1, §6.4)', (
       await como(almacenista.id, (tx) => agregarParada(tx, almacenista, t, { notaId: n2.notaId }));
 
       // Sin periodo contable abierto la salida falla y revierte todo.
-      await db.query(`update periodo_contable set estado = 'cerrado'`);
+      await cerrarPeriodosDePrueba(db);
       await esperarError(como(almacenista.id, (tx) => cargarTransporte(tx, almacenista, t)), 'eriodo');
-      await db.query(`update periodo_contable set estado = 'abierto'`);
+      await reabrirPeriodosDePrueba(db);
       expect([await salida(n1.notaId), await salida(n2.notaId)]).toEqual([false, false]);
       expect((await detalleTransporte(db, t))!.estado).toBe('planificado');
 

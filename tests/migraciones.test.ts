@@ -65,6 +65,7 @@ describe('migraciones', () => {
       '0048_apertura.sql',
       '0049_apertura_inventario.sql',
       '0050_checklist_arranque.sql',
+      '0051_cierre_mensual.sql',
     ]);
   });
 

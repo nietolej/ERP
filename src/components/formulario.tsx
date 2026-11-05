@@ -50,7 +50,7 @@ export function Formulario({ accion, children, className = '' }: { accion: Accio
   );
 }
 
-export function BotonEnviar({ children, variante = 'primario' }: { children: ReactNode; variante?: 'primario' | 'secundario' | 'peligro' }) {
+export function BotonEnviar({ children, variante = 'primario', disabled = false }: { children: ReactNode; variante?: 'primario' | 'secundario' | 'peligro'; disabled?: boolean }) {
   const enFormulario = useContext(Pendiente);
   const { pending } = useFormStatus();
   const procesando = enFormulario ?? pending;
@@ -60,7 +60,7 @@ export function BotonEnviar({ children, variante = 'primario' }: { children: Rea
     peligro: 'border border-peligro/50 bg-peligro/15 hover:bg-peligro/25 text-red-200',
   }[variante];
   return (
-    <button type="submit" disabled={procesando} className={`rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${estilos}`}>
+    <button type="submit" disabled={procesando || disabled} className={`rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${estilos}`}>
       {procesando ? 'Procesando…' : children}
     </button>
   );

@@ -10,7 +10,7 @@ import {
 } from '@/lib/ventas/facturas';
 import { agregarLinea, anularNotaEntrega, crearPedido, detalleDocumento, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
 import type { Db } from '@/lib/db/tipos';
-import { baseDePrueba, esperarError, usuarioDePrueba } from './apoyo';
+import { baseDePrueba, cerrarPeriodosDePrueba, esperarError, reabrirPeriodosDePrueba, usuarioDePrueba } from './apoyo';
 
 describe('factura de venta, número de control, cuentas por cobrar y asiento (§6.1, §6.3, §11.1, R-AY a R-BB)', () => {
   let db: Db;
@@ -288,9 +288,9 @@ describe('factura de venta, número de control, cuentas por cobrar y asiento (§
     it('si el periodo contable está cerrado no se anula y no queda nada a medias', async () => {
       const nota = await notaDespachada(clienteA, [[pastilla, '1']]);
       const r = await facturar([nota]);
-      await db.query(`update periodo_contable set estado = 'cerrado'`);
+      await cerrarPeriodosDePrueba(db);
       await esperarError(anular(r.facturaId), 'eriodo');
-      await db.query(`update periodo_contable set estado = 'abierto'`);
+      await reabrirPeriodosDePrueba(db);
       const f = (await detalleFactura(db, r.facturaId))!;
       expect([f.estado, f.partida_estado]).toEqual(['emitido', 'abierta']);
     });

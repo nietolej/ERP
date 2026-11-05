@@ -11,7 +11,7 @@ import {
   buscarOrdenes, cambiarPrioridad, detalleOrden, empacarOrden, esperarFaltante, finalizarOrden, iniciarOrden, registrarRecogida, tomarOrden,
 } from '@/lib/ventas/picking';
 import type { Db } from '@/lib/db/tipos';
-import { baseDePrueba, esperarError, usuarioDePrueba } from './apoyo';
+import { baseDePrueba, cerrarPeriodosDePrueba, esperarError, reabrirPeriodosDePrueba, usuarioDePrueba } from './apoyo';
 
 let MOTIVO_OTRO = '';
 const motivoOtro = (detalle: string) => ({ motivoId: MOTIVO_OTRO, detalle });
@@ -334,9 +334,9 @@ describe('picking, salida de mercancía y despacho parcial (§6.4, §8.2, §12.3
     await recoger(orden);
     await como(almacenista.id, (tx) => empacarOrden(tx, almacenista, orden));
     const antes = await existencia(pastilla, a01);
-    await db.query(`update periodo_contable set estado = 'cerrado'`);
+    await cerrarPeriodosDePrueba(db);
     await esperarError(como(almacenista.id, (tx) => confirmarSalida(tx, almacenista, notaId)), 'eriodo');
-    await db.query(`update periodo_contable set estado = 'abierto'`);
+    await reabrirPeriodosDePrueba(db);
     expect(await existencia(pastilla, a01)).toEqual(antes);
     expect((await db.query('select 1 from documento_venta where id = $1 and salida_at is not null', [notaId])).rows).toHaveLength(0);
     await como(almacenista.id, (tx) => confirmarSalida(tx, almacenista, notaId));

@@ -11,7 +11,12 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 | Especificación funcional y técnica | ✅ Lista para revisión |
 | Decisiones abiertas ([docs/decisiones.md](docs/decisiones.md)) | ⏳ Pendientes: las toman Gerencia y el contador (la Fase 0 asumió provisionalmente las recomendaciones 1 y 2) |
 | **Fase 0: Fundaciones** | 🟡 Casi lista: solo falta la carga automática de la tasa BCV, que espera la decisión 2 |
-| Fase 1: Maestros | 🟡 En curso: terceros, clientes, vendedores, proveedores, productos y almacenes listos; siguen bancos, metas y adjuntos |
+| Fase 1: Maestros | ✅ Terceros, clientes, vendedores, proveedores, productos, almacenes, bancos, metas y adjuntos |
+| Fase 2: Ventas, logística, CxC e inventario | ✅ Pedido a factura, notas de crédito y débito, cobros y reportes M1 a M5. La emisión fiscal real espera la imprenta digital (decisión 13): hoy usa un simulador |
+| Fase 3: Compras, CxP, gastos, tesorería y producción | ✅ Incluye conciliación bancaria, IGTF y los reportes M6 y M7 |
+| Fase 4: Fiscal | ✅ Libros, comprobantes de retención, declaraciones y cierre fiscal |
+| Fase 5: Arranque en producción | ✅ Apertura, conteo inicial, carga masiva de productos y checklist firmado. Falta el respaldo automático de la base |
+| Fase 6: Comisiones, estados financieros y reportes | 🟡 En curso: estados financieros (situación, resultados, patrimonio y flujo de efectivo) y cierre mensual listos; faltan activos fijos, comisiones y cierre del ejercicio |
 
 ### Fase 0: qué está hecho
 

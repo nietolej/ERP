@@ -3,7 +3,7 @@ import {
   aprobarAsiento, eliminarBorrador, guardarBorrador, huellaAsiento, type DatosAsientoManual,
 } from '@/lib/contabilidad/manual';
 import type { Db } from '@/lib/db/tipos';
-import { baseDePrueba, cuenta, esperarError, usuarioDePrueba } from './apoyo';
+import { baseDePrueba, cerrarPeriodosDePrueba, cuenta, esperarError, usuarioDePrueba } from './apoyo';
 
 describe('asientos manuales con aprobación (§3.1, §4.3)', () => {
   let db: Db;
@@ -88,7 +88,7 @@ describe('asientos manuales con aprobación (§3.1, §4.3)', () => {
       borrador({ ...datos(), lineas: [{ cuentaId: cxc, debe: '5', haber: '' }, { cuentaId: caja, debe: '', haber: '5' }] }),
       'controlada por el auxiliar de cxc',
     );
-    await db.query(`update periodo_contable set estado = 'cerrado' where anio = 2026 and mes = 2`);
+    await cerrarPeriodosDePrueba(db, 'anio = 2026 and mes = 2');
     await esperarError(borrador(datos('5', '5', { fecha: '2026-02-10' })), 'está cerrado');
   });
 

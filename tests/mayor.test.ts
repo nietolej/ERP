@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/lib/db/tipos';
-import { baseDePrueba, cuenta, esperarError, usuarioDePrueba } from './apoyo';
+import { baseDePrueba, cerrarPeriodosDePrueba, cuenta, esperarError, usuarioDePrueba } from './apoyo';
 
 /** Línea de asiento: [código de cuenta, debe, haber] en VES; USD = VES / 40 para simplificar. */
 type L = [string, string, string];
@@ -111,7 +111,7 @@ describe('mayor contable: reglas garantizadas por la base de datos', () => {
 
   it('R-C: periodo cerrado solo acepta reversos; bloqueado no acepta nada y no se reabre', async () => {
     const a = await contabilizarManual('2026-01-20', gasto);
-    await db.query(`update periodo_contable set estado = 'cerrado' where anio = 2026 and mes = 1`);
+    await cerrarPeriodosDePrueba(db, 'anio = 2026 and mes = 1');
 
     await esperarError(contabilizarManual('2026-01-21', gasto), 'está cerrado');
     const { rows } = await db.query<{ id: string }>(

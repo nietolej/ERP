@@ -11,7 +11,7 @@ const TONO = { abierto: 'exito', cerrado: 'advertencia', bloqueado: 'peligro' } 
 
 export default async function PeriodosPage({ searchParams }: { searchParams: Promise<{ anio?: string }> }) {
   const u = await exigirRol('contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor');
-  const puedeCambiar = tieneRol(u, ['contabilidad']);
+  const puedeCambiar = tieneRol(u, ['contabilidad', 'jefe_contabilidad', 'gerencia']);
   const anioActual = Number(hoyCaracas().slice(0, 4));
   const anio = Number((await searchParams).anio) || anioActual;
   const db = await getDb();
@@ -28,7 +28,7 @@ export default async function PeriodosPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <Encabezado titulo="Periodos contables" descripcion="Abierto acepta todo · Cerrado solo reversos y cierre · Bloqueado nada, y no se reabre (§3.2).">
+      <Encabezado titulo="Periodos contables" descripcion="Abierto acepta todo · Cerrado solo reversos y cierre · Bloqueado nada, y no se reabre (§3.2). Un mes se cierra y se reabre desde el cierre mensual.">
         <div className="flex flex-wrap gap-2">
           {[...new Set([...anios, anioActual])].sort().map((a) => (
             <Link key={a} href={`?anio=${a}`}
@@ -61,11 +61,18 @@ export default async function PeriodosPage({ searchParams }: { searchParams: Pro
                 <Celda>
                   {puedeCambiar && p.estado !== 'bloqueado' && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <Formulario accion={cambiarEstadoPeriodo}>
-                        <input type="hidden" name="id" value={p.id} />
-                        <input type="hidden" name="estado" value={p.estado === 'abierto' ? 'cerrado' : 'abierto'} />
-                        <BotonEnviar variante="secundario">{p.estado === 'abierto' ? 'Cerrar' : 'Reabrir'}</BotonEnviar>
-                      </Formulario>
+                      {p.mes <= 12 ? (
+                        <Link href={`/contabilidad/cierre?periodo=${anio}-${String(p.mes).padStart(2, '0')}`}
+                          className="rounded-lg border border-borde bg-white/5 px-3 py-1.5 text-sm font-semibold hover:bg-white/10">
+                          {p.estado === 'abierto' ? 'Cierre mensual' : 'Ver cierre'}
+                        </Link>
+                      ) : (
+                        <Formulario accion={cambiarEstadoPeriodo}>
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="estado" value={p.estado === 'abierto' ? 'cerrado' : 'abierto'} />
+                          <BotonEnviar variante="secundario">{p.estado === 'abierto' ? 'Cerrar' : 'Reabrir'}</BotonEnviar>
+                        </Formulario>
+                      )}
                       {p.estado === 'cerrado' && (
                         <Formulario accion={cambiarEstadoPeriodo} className="flex items-center gap-2">
                           <input type="hidden" name="id" value={p.id} />

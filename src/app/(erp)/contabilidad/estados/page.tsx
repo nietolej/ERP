@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Aviso, Celda, Encabezado, Panel, Tabla } from '@/components/ui';
 import { exigirRol } from '@/lib/auth/dal';
 import {
-  ROLES_VEN_ESTADOS, estadosDelMes, rangoDeMes, type CambiosPatrimonio, type Grupo, type Moneda, type Par, type Resultados, type Situacion,
+  ROLES_VEN_ESTADOS, estadosDelMes, flujoEfectivoDelMes, rangoDeMes, type CambiosPatrimonio, type FlujoEfectivo, type Grupo, type Moneda, type Par, type Resultados, type Situacion,
 } from '@/lib/contabilidad/estados';
 import { getDb } from '@/lib/db';
 import { monto } from '@/lib/formato';
@@ -11,6 +11,7 @@ const TABS = [
   { id: 'situacion', texto: 'Estado de situación financiera' },
   { id: 'resultados', texto: 'Estado de resultados' },
   { id: 'patrimonio', texto: 'Cambios en el patrimonio' },
+  { id: 'flujo', texto: 'Flujo de efectivo' },
 ] as const;
 
 const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -103,6 +104,25 @@ function Resultados3({ r, m, cols }: { r: Resultados[]; m: Moneda; cols: string[
   );
 }
 
+function Flujo2({ f, m, cols }: { f: FlujoEfectivo[]; m: Moneda; cols: string[] }) {
+  const n = f.length;
+  const sec = (g: (x: FlujoEfectivo) => Grupo) => (f.every((x) => g(x).lineas.length === 0) ? null : <FilaGrupo g={f.map(g)} m={m} n={n} />);
+  return (
+    <Cuerpo cols={cols} m={m}>
+      <FilaTotal titulo="Utilidad neta del periodo" valores={f.map((x) => x.utilidadNeta)} m={m} fuerte={false} />
+      <FilaTotal titulo="(+) Depreciación y otras partidas que no mueven efectivo" valores={f.map((x) => x.depreciacion)} m={m} fuerte={false} />
+      {sec((x) => x.capitalTrabajo)}
+      <FilaTotal titulo="EFECTIVO DE LAS OPERACIONES" valores={f.map((x) => x.efectivoOperacion)} m={m} />
+      {sec((x) => x.inversion)}
+      {sec((x) => x.financiamiento)}
+      <FilaTotal titulo="VARIACIÓN NETA DEL EFECTIVO" valores={f.map((x) => x.variacion)} m={m} />
+      <FilaTotal titulo="Efectivo al inicio (caja, bancos y activos digitales)" valores={f.map((x) => x.efectivoInicial)} m={m} fuerte={false} />
+      <FilaTotal titulo="EFECTIVO AL FINAL" valores={f.map((x) => x.efectivoFinal)} m={m} />
+      <tr><Celda className="text-xs text-texto-2">Diferencia contra el balance (debe ser cero)</Celda>{f.map((x, i) => <Celda key={i} derecha mono className={x.cuadra ? 'text-texto-2' : 'text-peligro'}>{fmt(x.diferencia, m)}</Celda>)}</tr>
+    </Cuerpo>
+  );
+}
+
 function Patrimonio({ c, m }: { c: CambiosPatrimonio; m: Moneda }) {
   const cols = c.columnas.filter((x) => c.filas.some((f) => !f.valores[x.clave].ves.isZero() || !f.valores[x.clave].usd.isZero()));
   return (
@@ -126,10 +146,12 @@ export default async function EstadosPage({ searchParams }: { searchParams: Prom
   const [anio, mes] = periodo.split('-').map(Number);
   const tab = TABS.some((t) => t.id === q.tab) ? q.tab! : 'situacion';
   const m: Moneda = q.moneda === 'usd' ? 'usd' : 'ves';
-  const e = await estadosDelMes(await getDb(), anio, mes);
+  const db = await getDb();
+  const e = await estadosDelMes(db, anio, mes);
+  const flujo = tab === 'flujo' ? await flujoEfectivoDelMes(db, anio, mes) : null;
   const ant = rangoDeMes(anio, mes).anterior;
   const enlace = (extra: Record<string, string>) => `/contabilidad/estados?${new URLSearchParams({ periodo, tab, moneda: m, ...extra }).toString()}`;
-  const alertas = !e.situacion.actual.cuadra;
+  const alertas = !e.situacion.actual.cuadra || (flujo !== null && !flujo.periodo.cuadra);
 
   return (
     <>
@@ -149,7 +171,7 @@ export default async function EstadosPage({ searchParams }: { searchParams: Prom
           ))}
         </nav>
       </Panel>
-      {alertas && <div className="mb-5"><Aviso tono="peligro">El balance del mes no cuadra: avise a Contabilidad y al administrador antes de usar estos estados.</Aviso></div>}
+      {alertas && <div className="mb-5"><Aviso tono="peligro">Un estado del mes no cuadra: avise a Contabilidad y al administrador antes de usar estos estados.</Aviso></div>}
 
       {tab === 'situacion' && (
         <Panel titulo={`Estado de situación financiera al cierre de ${etiquetaMes(anio, mes)}`}>
@@ -161,6 +183,14 @@ export default async function EstadosPage({ searchParams }: { searchParams: Prom
         <Panel titulo={`Estado de resultados de ${etiquetaMes(anio, mes)}`}>
           <Resultados3 r={[e.resultados.periodo, e.resultados.mesAnterior, e.resultados.acumuladoAnio]} m={m}
             cols={[etiquetaMes(anio, mes), etiquetaMes(ant.anio, ant.mes), `Acumulado de ${anio} al cierre de ${NOMBRE_MES[mes - 1]}`]} />
+        </Panel>
+      )}
+      {flujo && (
+        <Panel titulo={`Estado de flujo de efectivo de ${etiquetaMes(anio, mes)} (método indirecto)`}>
+          <Flujo2 f={[flujo.periodo, flujo.acumuladoAnio]} m={m} cols={[etiquetaMes(anio, mes), `Acumulado de ${anio} al cierre de ${NOMBRE_MES[mes - 1]}`]} />
+          <p className="mt-3 text-xs text-texto-2">
+            Parte de la utilidad neta, suma lo que no mueve efectivo y los cambios del capital de trabajo, y agrega inversión y financiamiento. Los saldos de apertura del arranque son el efectivo inicial, no un flujo del mes.
+          </p>
         </Panel>
       )}
       {tab === 'patrimonio' && (

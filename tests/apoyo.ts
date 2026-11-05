@@ -21,6 +21,27 @@ export async function usuarioDePrueba(db: Db, email = 'contador@prueba.test', ro
   return rows[0].id;
 }
 
+const CORREO_CIERRE = 'cierre-prueba@prueba.test';
+
+async function usuarioDeCierre(db: Db): Promise<string> {
+  const { rows } = await db.query<{ id: string }>('select id from usuario where email = $1', [CORREO_CIERRE]);
+  return rows[0]?.id ?? usuarioDePrueba(db, CORREO_CIERRE, ['gerencia']);
+}
+
+/** Cierra (con la función del cierre mensual) los periodos abiertos que cumplan `donde`, del más antiguo al más reciente. */
+export async function cerrarPeriodosDePrueba(db: Db, donde = 'true'): Promise<void> {
+  const u = await usuarioDeCierre(db);
+  const { rows } = await db.query<{ id: string }>(`select id from periodo_contable where estado = 'abierto' and (${donde}) order by anio, mes`);
+  for (const r of rows) await db.query('select fn_cerrar_periodo($1, null, $2)', [r.id, u]);
+}
+
+/** Reabre (con la reapertura de Gerencia) los periodos cerrados que cumplan `donde`. */
+export async function reabrirPeriodosDePrueba(db: Db, donde = 'true'): Promise<void> {
+  const u = await usuarioDeCierre(db);
+  const { rows } = await db.query<{ id: string }>(`select id from periodo_contable where estado = 'cerrado' and (${donde}) order by anio, mes`);
+  for (const r of rows) await db.query('select fn_reabrir_periodo($1, $2, $3)', [r.id, 'Reapertura de prueba', u]);
+}
+
 /** Id de una cuenta por su código. */
 export async function cuenta(db: Db, codigo: string): Promise<string> {
   const { rows } = await db.query<{ id: string }>('select id from cuenta_contable where codigo = $1', [codigo]);

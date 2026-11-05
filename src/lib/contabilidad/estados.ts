@@ -169,6 +169,56 @@ export function construirCambiosPatrimonio(inicio: FilaCuenta[], fin: FilaCuenta
 }
 
 // ---------------------------------------------------------------------
+// Estado de flujo de efectivo (método indirecto)
+// ---------------------------------------------------------------------
+
+export interface FlujoEfectivo {
+  utilidadNeta: Par;
+  /** Aumento de la depreciación acumulada (1.4.02): gasto que no sale de caja. */
+  depreciacion: Par;
+  /** Cambio de cada cuenta de capital de trabajo: un aumento de un activo resta efectivo; un aumento de un pasivo lo suma. */
+  capitalTrabajo: Grupo;
+  efectivoOperacion: Par;
+  inversion: Grupo;
+  financiamiento: Grupo;
+  variacion: Par;
+  efectivoInicial: Par; efectivoFinal: Par;
+  /** variación − (efectivo final − efectivo inicial): debe ser cero porque todo asiento cuadra. */
+  diferencia: Par; cuadra: boolean;
+}
+
+const esEfectivo = (codigo: string) => codigo.startsWith('1.1');
+const esNoCorrienteActivo = (codigo: string) => codigo.startsWith('1.4');
+
+/**
+ * Método indirecto desde el mayor. `mov`: movimiento neto (debe − haber) del periodo de todas las cuentas, SIN los asientos de apertura (los saldos con
+ * que arranca la empresa son saldo inicial, no un flujo). `utilidadNeta`: la del estado de resultados del mismo periodo. Cada cuenta cae en una sola sección:
+ *   efectivo (1.1) → es lo que se explica · activos 1.4 → inversión (1.4.02 es la depreciación) · pasivos 2.2 y patrimonio → financiamiento ·
+ *   el resto de activos y pasivos → capital de trabajo. Como todo asiento cuadra, la suma de las secciones es igual a la variación del efectivo.
+ */
+export function construirFlujoEfectivo(mov: FilaCuenta[], utilidadNeta: Par, efectivoInicial: Par, efectivoFinal: Par): FlujoEfectivo {
+  const m = mov.filter((f) => !esCero(f.neto));
+  const lineaDe = (f: FilaCuenta): LineaEstado => ({ codigo: f.codigo, nombre: f.nombre, valor: neg(f.neto) });
+  const capitalTrabajo = grupo('Cambios en el capital de trabajo', m.filter((f) =>
+    (f.tipo === 'activo' && !esEfectivo(f.codigo) && !esNoCorrienteActivo(f.codigo)) || (f.tipo === 'pasivo' && !f.codigo.startsWith('2.2'))).map(lineaDe));
+  const depreciacion = m.filter((f) => f.codigo === '1.4.02').reduce((s, f) => suma(s, neg(f.neto)), cero());
+  const inversion = grupo('Actividades de inversión', m.filter((f) => f.tipo === 'activo' && esNoCorrienteActivo(f.codigo) && f.codigo !== '1.4.02').map(lineaDe));
+
+  // Patrimonio: lo que cambió, menos la utilidad del periodo, son aportes, retiros y traspasos. Los resultados abiertos y su cierre ya están en `resultadoTotal`.
+  const resultadoTotal = neg(m.filter((f) => f.tipo === 'ingreso' || f.tipo === 'costo' || f.tipo === 'gasto').reduce((s, f) => suma(s, f.neto), cero()));
+  const patrimonioTotal = neg(m.filter((f) => f.tipo === 'patrimonio').reduce((s, f) => suma(s, f.neto), cero()));
+  const otrosPatrimonio = resta(suma(resultadoTotal, patrimonioTotal), utilidadNeta);
+  const lineasFin = m.filter((f) => f.tipo === 'pasivo' && f.codigo.startsWith('2.2')).map(lineaDe);
+  if (!esCero(otrosPatrimonio)) lineasFin.push({ codigo: '', nombre: 'Aportes, retiros y otros movimientos del patrimonio', valor: otrosPatrimonio });
+  const financiamiento = grupo('Actividades de financiamiento', lineasFin);
+
+  const efectivoOperacion = suma(suma(utilidadNeta, depreciacion), capitalTrabajo.total);
+  const variacion = suma(suma(efectivoOperacion, inversion.total), financiamiento.total);
+  const diferencia = resta(variacion, resta(efectivoFinal, efectivoInicial));
+  return { utilidadNeta, depreciacion, capitalTrabajo, efectivoOperacion, inversion, financiamiento, variacion, efectivoInicial, efectivoFinal, diferencia, cuadra: esCero(diferencia) };
+}
+
+// ---------------------------------------------------------------------
 // Lectura del mayor
 // ---------------------------------------------------------------------
 
@@ -195,6 +245,47 @@ export async function movimientosDe(db: Db, desde: string, hasta: string): Promi
        join asiento a on a.id = l.asiento_id and a.estado = 'contabilizado' and a.fecha between $1::date and $2::date and a.tipo <> 'cierre'
       where c.imputable and c.tipo in ('ingreso', 'costo', 'gasto') group by c.codigo, c.nombre, c.tipo order by string_to_array(c.codigo, '.')::int[]`, [desde, hasta]);
   return rows.map((r) => ({ codigo: r.codigo, nombre: r.nombre, tipo: r.tipo, neto: { ves: new Decimal(r.ves), usd: new Decimal(r.usd) } }));
+}
+
+/** Un asiento de apertura: del tipo `apertura` o con una línea contra «Saldos de apertura» (3.9.01), como los de los documentos de apertura. */
+const ES_APERTURA = `(a.tipo = 'apertura' or exists (select 1 from asiento_linea l2 join cuenta_contable c2 on c2.id = l2.cuenta_id where l2.asiento_id = a.id and c2.codigo = '3.9.01'))`;
+
+/** Movimiento neto del periodo de todas las cuentas. `apertura`: solo los asientos de apertura (true) o todos los demás (false). */
+export async function movimientosFlujo(db: Db, desde: string, hasta: string, apertura: boolean): Promise<FilaCuenta[]> {
+  validarFecha(desde); validarFecha(hasta);
+  const { rows } = await db.query<{ codigo: string; nombre: string; tipo: FilaCuenta['tipo']; ves: string; usd: string }>(
+    `select c.codigo, c.nombre, c.tipo, coalesce(sum(l.debe_ves - l.haber_ves), 0)::text as ves, coalesce(sum(l.debe_usd - l.haber_usd), 0)::text as usd
+       from cuenta_contable c join asiento_linea l on l.cuenta_id = c.id
+       join asiento a on a.id = l.asiento_id and a.estado = 'contabilizado' and a.fecha between $1::date and $2::date
+      where c.imputable and ${apertura ? '' : 'not '}${ES_APERTURA}
+      group by c.codigo, c.nombre, c.tipo order by string_to_array(c.codigo, '.')::int[]`, [desde, hasta]);
+  return rows.map((r) => ({ codigo: r.codigo, nombre: r.nombre, tipo: r.tipo, neto: { ves: new Decimal(r.ves), usd: new Decimal(r.usd) } }));
+}
+
+const sumaEfectivo = (filas: FilaCuenta[]): Par => filas.filter((f) => esEfectivo(f.codigo)).reduce((s, f) => suma(s, f.neto), cero());
+
+function diaAnterior(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Flujo de efectivo del periodo [desde, hasta]. El efectivo inicial incluye los saldos de apertura registrados dentro del periodo: con ellos arranca la empresa,
+ * no son un flujo del mes.
+ */
+export async function flujoEfectivoDe(db: Db, desde: string, hasta: string): Promise<FlujoEfectivo> {
+  const [antes, alCorte, mov, apert, resultados] = await Promise.all([
+    saldosAl(db, diaAnterior(desde)), saldosAl(db, hasta), movimientosFlujo(db, desde, hasta, false), movimientosFlujo(db, desde, hasta, true), movimientosDe(db, desde, hasta),
+  ]);
+  const inicial = suma(sumaEfectivo(antes), sumaEfectivo(apert));
+  return construirFlujoEfectivo(mov, construirResultados(resultados).utilidadNeta, inicial, sumaEfectivo(alCorte));
+}
+
+export async function flujoEfectivoDelMes(db: Db, anio: number, mes: number): Promise<{ periodo: FlujoEfectivo; acumuladoAnio: FlujoEfectivo }> {
+  const m = rangoDeMes(anio, mes);
+  const [periodo, acumuladoAnio] = await Promise.all([flujoEfectivoDe(db, m.desde, m.hasta), flujoEfectivoDe(db, `${anio}-01-01`, m.hasta)]);
+  return { periodo, acumuladoAnio };
 }
 
 export function rangoDeMes(anio: number, mes: number): { desde: string; hasta: string; anterior: { anio: number; mes: number } } {
