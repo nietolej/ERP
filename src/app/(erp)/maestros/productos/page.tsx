@@ -21,6 +21,11 @@ export default async function ProductosPage() {
             Categorías, grupos y marcas
           </Link>
           {esAlmacen && (
+            <Link href="/maestros/productos/carga" className="rounded-lg border border-borde bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">
+              Carga masiva
+            </Link>
+          )}
+          {esAlmacen && (
             <Link href="/maestros/productos/nuevo" className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-acento-hover">
               Nuevo producto
             </Link>
