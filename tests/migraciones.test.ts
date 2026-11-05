@@ -62,6 +62,7 @@ describe('migraciones', () => {
       '0045_comprobantes_retencion.sql',
       '0046_igtf_percibido.sql',
       '0047_declaraciones_fiscales.sql',
+      '0048_apertura.sql',
     ]);
   });
 

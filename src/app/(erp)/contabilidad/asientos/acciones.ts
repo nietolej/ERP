@@ -38,6 +38,7 @@ export async function guardarAsiento(_: EstadoAccion, fd: FormData): Promise<Est
         descripcion: texto(fd, 'descripcion'),
         moneda: texto(fd, 'moneda'),
         lineas: leerLineas(fd),
+        tipo: texto(fd, 'tipo') === 'apertura' ? 'apertura' : 'manual',
       }, previo || undefined));
   } catch (e) {
     return { error: mensajeDeError(e) };

@@ -5,6 +5,7 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
+import { ROLES_VEN_APERTURA } from '@/lib/apertura/apertura';
 import { ROLES_VEN_COMPROBANTES } from '@/lib/fiscal/comprobantes';
 import { ROLES_VEN_LIBROS } from '@/lib/fiscal/libros';
 import { ROLES_VEN_PRODUCCION } from '@/lib/produccion/ordenes';
@@ -189,6 +190,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Motivos (descuentos, anulaciones…)', href: '/configuracion/motivos', roles: [...ROLES_MOTIVOS] },
       { texto: 'Parámetros de reportes e inventario', href: '/configuracion/parametros-reportes', roles: [...ROLES_PARAMETROS] },
       { texto: 'Bandeja de aprobaciones', href: '/aprobaciones' },
+      { texto: 'Apertura: saldos iniciales', href: '/configuracion/apertura', roles: [...ROLES_VEN_APERTURA] },
       { texto: 'Definición de flujos', href: '/configuracion/flujos', roles: ['administrador', 'gerencia', 'auditor'] },
     ],
   },

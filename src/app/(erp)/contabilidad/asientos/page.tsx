@@ -18,7 +18,7 @@ export default async function AsientosPage({ searchParams }: { searchParams: Pro
   const db = await getDb();
 
   const { rows: pendientes } = await db.query<{ n: number }>(
-    `select count(*)::int as n from asiento where tipo = 'manual' and estado = 'borrador'`);
+    `select count(*)::int as n from asiento where tipo in ('manual', 'apertura') and estado = 'borrador'`);
 
   // Los borradores se listan siempre (sin importar el rango de fechas) para que no queden olvidados.
   const { rows } = await db.query<{

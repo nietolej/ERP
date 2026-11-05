@@ -25,6 +25,8 @@ interface Props {
   cuentas: CuentaOpcion[];
   monedas: string[];
   inicial: { id?: string; fecha: string; descripcion: string; moneda: string; lineas: LineaFormulario[] };
+  /** 'apertura': asiento de apertura del contador (se guarda con ese tipo). */
+  tipo?: 'apertura';
 }
 
 const vacia = (): LineaFormulario => ({ cuentaId: '', debe: '', haber: '', glosa: '' });
@@ -32,7 +34,7 @@ const IMPORTE = /^\d{1,15}(\.\d{1,2})?$/;
 const valor = (v: string) => (IMPORTE.test(v.trim()) ? new Decimal(v.trim()) : new Decimal(0));
 
 /** Encabezado y líneas de un asiento manual, con totales y cuadre en vivo. */
-export function FormularioAsiento({ accion, cuentas, monedas, inicial }: Props) {
+export function FormularioAsiento({ accion, cuentas, monedas, inicial, tipo }: Props) {
   const [moneda, setMoneda] = useState(inicial.moneda);
   const [lineas, setLineas] = useState<LineaFormulario[]>(
     inicial.lineas.length >= 2 ? inicial.lineas : [vacia(), vacia()],
@@ -55,6 +57,7 @@ export function FormularioAsiento({ accion, cuentas, monedas, inicial }: Props) 
   return (
     <Formulario accion={accion} className="space-y-5">
       {inicial.id && <input type="hidden" name="id" value={inicial.id} />}
+      {tipo && <input type="hidden" name="tipo" value={tipo} />}
       <input type="hidden" name="lineas" value={JSON.stringify(lineas)} />
 
       <div className="grid gap-4 sm:grid-cols-[10rem_1fr_8rem]">

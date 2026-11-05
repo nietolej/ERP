@@ -15,7 +15,7 @@ export default async function EditarAsientoPage({ params }: { params: Promise<{ 
   const { rows } = await db.query<{ fecha: string; descripcion: string; estado: string; tipo: string; created_by: string }>(
     'select fecha, descripcion, estado, tipo, created_by from asiento where id = $1', [id]);
   const a = rows[0];
-  if (!a || a.tipo !== 'manual') notFound();
+  if (!a || !['manual', 'apertura'].includes(a.tipo)) notFound();
   if (a.estado !== 'borrador' || a.created_by !== u.id) redirect(`/contabilidad/asientos/${id}`);
 
   // Las líneas de redondeo (monto original 0) las recalcula el sistema al guardar.

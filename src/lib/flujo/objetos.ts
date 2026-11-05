@@ -4,6 +4,9 @@ import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
+import {
+  aprobarBanco, aprobarCxc, aprobarCxp, rechazarBanco, rechazarCxc, rechazarCxp,
+} from '@/lib/apertura/apertura';
 import { aprobarOrden as aprobarOrdenProduccion, rechazarOrden as rechazarOrdenProduccion } from '@/lib/produccion/ordenes';
 import { aprobarReposicion, rechazarReposicion } from '@/lib/gastos/caja-chica';
 import { aprobarGastoProveedor, rechazarGastoProveedor } from '@/lib/gastos/gastos';
@@ -102,6 +105,19 @@ export const MANEJADOR_REPOSICION_CAJA: Manejador<void> = {
 export const MANEJADOR_ORDEN_PRODUCCION: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarOrdenProduccion(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarOrdenProduccion(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_APERTURA_BANCO: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarBanco(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarBanco(tx, id, usuario, motivo),
+};
+export const MANEJADOR_APERTURA_CXC: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarCxc(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarCxc(tx, id, usuario, motivo),
+};
+export const MANEJADOR_APERTURA_CXP: Manejador<void> = {
+  alAprobar: async (tx, id, aprobador) => { await aprobarCxp(tx, id, aprobador); },
+  alRechazar: (tx, id, usuario, motivo) => rechazarCxp(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PROMOCION: Manejador<void> = {
@@ -227,6 +243,27 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select o.id::text as id, 'Producción ' || o.numero || ' · ' || p.codigo || ' × ' || o.cantidad as texto
          from orden_produccion o join producto p on p.id = o.producto_id where o.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_ORDEN_PRODUCCION,
+  },
+  apertura_banco: {
+    etiqueta: 'Saldo inicial de banco o caja',
+    ruta: () => '/configuracion/apertura',
+    resumenes: (db, ids) => consulta(db,
+      `select o.id::text as id, 'Apertura ' || cb.codigo || ' · ' || o.moneda || ' ' || o.saldo as texto from apertura_banco o join cuenta_bancaria cb on cb.id = o.cuenta_bancaria_id where o.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_APERTURA_BANCO,
+  },
+  apertura_cxc: {
+    etiqueta: 'Factura de venta pendiente (apertura)',
+    ruta: () => '/configuracion/apertura',
+    resumenes: (db, ids) => consulta(db,
+      `select o.id::text as id, 'Apertura AP-' || o.numero_original || ' · Bs ' || o.saldo as texto from apertura_cxc o where o.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_APERTURA_CXC,
+  },
+  apertura_cxp: {
+    etiqueta: 'Factura de compra pendiente (apertura)',
+    ruta: () => '/configuracion/apertura',
+    resumenes: (db, ids) => consulta(db,
+      `select o.id::text as id, 'Apertura ' || o.numero_documento || ' · ' || o.moneda || ' ' || o.saldo as texto from apertura_cxp o where o.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_APERTURA_CXP,
   },
   promocion: {
     etiqueta: 'Promoción',

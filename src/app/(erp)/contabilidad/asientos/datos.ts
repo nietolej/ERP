@@ -11,6 +11,15 @@ export async function cuentasParaManual(db: Db): Promise<CuentaOpcion[]> {
   return rows;
 }
 
+/** Cuentas para el asiento de apertura: las libres y «Saldos de apertura»; no las que mueve un auxiliar. */
+export async function cuentasParaApertura(db: Db): Promise<CuentaOpcion[]> {
+  const { rows } = await db.query<CuentaOpcion>(
+    `select id, codigo, nombre from cuenta_contable
+      where imputable and activa and (controlada_por is null or controlada_por = 'apertura')
+      order by string_to_array(codigo, '.')::int[]`);
+  return rows;
+}
+
 export async function monedasActivas(db: Db): Promise<string[]> {
   const { rows } = await db.query<{ codigo: string }>(
     `select codigo from moneda where activa order by case codigo when 'VES' then 0 when 'USD' then 1 else 2 end, codigo`);

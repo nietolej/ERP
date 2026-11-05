@@ -32,6 +32,8 @@ export interface DatosAsientoManual {
   descripcion: string;
   moneda: string;
   lineas: LineaManual[];
+  /** 'apertura': asiento de apertura del contador (§14.3), solo con la fecha de arranque y sin tocar cuentas de auxiliares. Por defecto, manual. */
+  tipo?: 'manual' | 'apertura';
 }
 
 const IMPORTE = /^\d{1,15}(\.\d{1,2})?$/;
@@ -83,6 +85,20 @@ export function validarAsientoManual(d: DatosAsientoManual): LineaOriginal[] {
 }
 
 /**
+ * El asiento de apertura del contador (§14.3): lleva el resto del balance contra «Saldos de apertura», con la fecha de arranque y mientras la
+ * apertura esté abierta. No toca las cuentas de bancos, por cobrar, por pagar ni inventario: esos saldos entran con sus documentos de apertura.
+ */
+async function validarApertura(tx: Db, d: DatosAsientoManual, lineas: LineaOriginal[]): Promise<void> {
+  const { rows } = await tx.query<{ fecha: string | null; cerrada: boolean }>(`select fecha_arranque::text as fecha, (cerrada_at is not null) as cerrada from arranque where id = 1`);
+  if (!rows[0]?.fecha) throw new ErrorContable('Gerencia debe fijar primero la fecha de arranque.');
+  if (rows[0].cerrada) throw new ErrorContable('La apertura está cerrada: no se registran más asientos de apertura.');
+  if (d.fecha !== rows[0].fecha) throw new ErrorContable(`El asiento de apertura lleva la fecha de arranque (${rows[0].fecha}).`);
+  const { rows: c } = await tx.query<{ codigo: string; controlada_por: string }>(
+    `select codigo, controlada_por from cuenta_contable where id = any($1::uuid[]) and controlada_por in ('cxc', 'cxp', 'inventario', 'banco', 'comisiones')`, [lineas.map((l) => l.cuentaId)]);
+  if (c.length) throw new ErrorContable(`La cuenta ${c[0].codigo} la mueve su auxiliar (${c[0].controlada_por}): ese saldo se registra con su documento de apertura.`);
+}
+
+/**
  * Crea un borrador, o reemplaza uno existente (`id`) si lo registró el mismo usuario.
  * Debe llamarse dentro de una transacción. Devuelve el id del asiento.
  */
@@ -90,6 +106,8 @@ export async function guardarBorrador(
   tx: Db, usuarioId: string, d: DatosAsientoManual, id?: string,
 ): Promise<string> {
   const lineas = validarAsientoManual(d);
+  const tipo = d.tipo === 'apertura' ? 'apertura' : 'manual';
+  if (tipo === 'apertura') await validarApertura(tx, d, lineas);
 
   // El periodo debe existir y admitir asientos manuales desde el borrador, no solo al aprobar.
   await tx.query(`select fn_validar_periodo(fn_periodo_de($1::date, 'manual'), 'manual')`, [d.fecha]);
@@ -103,8 +121,8 @@ export async function guardarBorrador(
     asientoId = id;
   } else {
     const { rows } = await tx.query<{ id: string }>(
-      `insert into asiento (fecha, tipo, descripcion, created_by) values ($1, 'manual', $2, $3) returning id`,
-      [d.fecha, d.descripcion.trim(), usuarioId],
+      `insert into asiento (fecha, tipo, descripcion, created_by) values ($1, $4, $2, $3) returning id`,
+      [d.fecha, d.descripcion.trim(), usuarioId, tipo],
     );
     asientoId = rows[0].id;
     await solicitarAprobacion(tx, { tipo: 'asiento_manual', objetoId: asientoId, solicitanteId: usuarioId });
@@ -124,7 +142,7 @@ async function exigirBorradorPropio(tx: Db, id: string, usuarioId: string): Prom
   const { rows } = await tx.query<{ estado: string; tipo: string; created_by: string }>(
     'select estado, tipo, created_by from asiento where id = $1 for update', [id]);
   const a = rows[0];
-  if (!a || a.tipo !== 'manual') throw new ErrorContable('El asiento manual no existe.');
+  if (!a || !['manual', 'apertura'].includes(a.tipo)) throw new ErrorContable('El asiento manual no existe.');
   if (a.estado !== 'borrador') throw new ErrorContable('El asiento ya está contabilizado: se corrige con un reverso.');
   if (a.created_by !== usuarioId) throw new ErrorContable('Solo quien registró el borrador puede modificarlo o eliminarlo.');
 }
@@ -147,7 +165,7 @@ export async function aprobarAsiento(tx: Db, id: string, aprobadorId: string, hu
   const { rows } = await tx.query<{ estado: string; tipo: string }>(
     'select estado, tipo from asiento where id = $1 for update', [id]);
   const a = rows[0];
-  if (!a || a.tipo !== 'manual') throw new ErrorContable('El asiento manual no existe.');
+  if (!a || !['manual', 'apertura'].includes(a.tipo)) throw new ErrorContable('El asiento manual no existe.');
   if (a.estado !== 'borrador') throw new ErrorContable('El asiento ya fue contabilizado.');
   if ((await huellaAsiento(tx, id)) !== huella) {
     throw new ErrorContable('El borrador cambió después de que lo abrió. Revíselo de nuevo antes de aprobarlo.');
