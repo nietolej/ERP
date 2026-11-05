@@ -58,6 +58,7 @@ describe('migraciones', () => {
       '0041_conciliacion_bancaria.sql',
       '0042_igtf_pagado.sql',
       '0043_produccion.sql',
+      '0044_libros_fiscales.sql',
     ]);
   });
 

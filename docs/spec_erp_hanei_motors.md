@@ -1160,6 +1160,12 @@ La condición fiscal de la empresa **no es una decisión del código: es configu
   - Documentos emitidos, **anulados** y NC/ND, con número y número de control.
   - Base, alícuota, IVA, exentos y retenciones.
   - Resumen de débitos, créditos y retenciones.
+**Construido (migración 0044): libros de ventas y de compras** (pantalla Fiscal; `vw_libro_ventas`, `vw_libro_compras`, `vw_libro_compras_retencion`).
+- **Una sola fuente:** son vistas sobre los documentos emitidos. Grano documento × alícuota (la alícuota sale de la línea, nunca del código), en bolívares (los documentos en otra moneda se convierten con su tasa congelada). Las notas de crédito restan y las de débito suman. Periodo = mes calendario de la fecha del documento.
+- **Ventas:** facturas, notas de crédito y de débito emitidas, con número y número de control, documento al que afectan, RIF y cliente. Las **anuladas** salen marcadas (con su fecha de anulación) y no suman. El IGTF no entra.
+- **Compras:** facturas de mercancía, gastos de importación, facturas de gasto y notas del proveedor aprobadas. El IVA de un gasto sin derecho a crédito fiscal se muestra pero su crédito fiscal es cero. Las retenciones de IVA e ISLR practicadas van por documento (una sola vez por documento, y las notas de crédito restan lo retenido).
+- **Resumen:** por alícuota (base e IVA), débito fiscal (ventas), crédito fiscal (compras) y retenciones. Exporta a CSV con las columnas que se ven.
+- **Pendiente:** los vales de caja chica (no guardan el RIF del proveedor), la retención de IVA recibida de clientes, el archivo exacto del portal del SENIAT, la quincena de contribuyentes especiales, la declaración de IVA y el cierre fiscal que bloquea el periodo.
 - **Declaración de IVA** (resumen para el portal), **declaración de retenciones de IVA** (archivo del portal) y **retenciones de ISLR** (XML).
 - **Cierre fiscal:** al declarar un periodo, sus documentos fiscales quedan **bloqueados**. Cualquier corrección se hace con documentos nuevos, NC o ND, en el periodo abierto.
 

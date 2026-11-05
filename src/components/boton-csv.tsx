@@ -5,19 +5,19 @@ import { useRef } from 'react';
 import { aCsv, tablaAFilas } from '@/lib/csv';
 
 /**
- * "Exportar CSV" de una tabla de reporte (spec_reportes §1.4). Solo aparece en /reportes y exporta lo que se ve, con los filtros
+ * "Exportar CSV" de una tabla de reporte (spec_reportes §1.4). Solo aparece en /reportes y en los libros de /fiscal, y exporta lo que se ve, con los filtros
  * aplicados. Va dentro de la tabla (`Tabla`), así que cubre todas las de los módulos M1 a M7 sin repetir código en cada pantalla.
  */
 export function BotonCsv() {
   const ruta = usePathname();
   const q = useSearchParams();
   const ref = useRef<HTMLButtonElement>(null);
-  if (!ruta.startsWith('/reportes')) return null;
+  if (!ruta.startsWith('/reportes') && !ruta.startsWith('/fiscal')) return null;
 
   function exportar() {
     const tabla = ref.current?.closest('[data-tabla]')?.querySelector('table');
     if (!tabla) return;
-    const nombre = [ruta.replace(/^\/reportes\/?/, '').replace(/\//g, '-') || 'reporte', q.get('tab')].filter(Boolean).join('-');
+    const nombre = [ruta.replace(/^\/(reportes|fiscal)\/?/, '').replace(/\//g, '-') || 'reporte', q.get('tab'), q.get('periodo')].filter(Boolean).join('-');
     const hoy = new Date().toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Caracas' }).replace(/\//g, '-');
     const blob = new Blob([aCsv(tablaAFilas(tabla))], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
