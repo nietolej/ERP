@@ -5,6 +5,7 @@ import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { textoDeAnulacion, type MotivoDocumento } from '@/lib/maestros/motivos';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { registrarIgtfPago, revertirIgtfPago } from './igtf';
 import type { Usuario } from './ordenes';
 
 /**
@@ -169,6 +170,7 @@ export async function aprobarPago(tx: Db, id: string, aprobador: string): Promis
     banco: { original: c[0].monto, ves: c[0].monto_ves, usd: c[0].monto_usd },
     anticipo: { original: c[0].por_aplicar, ves: c[0].por_aplicar_ves, usd: c[0].por_aplicar_usd },
   });
+  await registrarIgtfPago(tx, id, aprobador);   // IGTF a cargo de la empresa, aparte del pago (R-CO)
   return { asiento, anticipo: c[0].por_aplicar };
 }
 
@@ -219,6 +221,7 @@ export async function anularPago(tx: Db, _u: Usuario, id: string, motivo: Motivo
   if (!a[0]) throw new ErrorMaestro('El pago no tiene asiento: avise al administrador.');
   await tx.query(`update pago set estado = 'anulado', anulado_motivo = $2, anulado_motivo_id = $3 where id = $1`, [id, texto, motivo.motivoId]);
   await tx.query(`select fn_reversar_asiento($1, ((now() at time zone 'America/Caracas')::date), $2)`, [a[0].id, `Anulación del pago: ${texto}`]);
+  await revertirIgtfPago(tx, id);
 }
 
 // ---------------------------------------------------------------------
@@ -256,7 +259,7 @@ export interface AplicacionPagoDetalle {
 export interface LineaPagoSolicitada { partida_id: string; factura: string; moneda: string; monto: string; liquida: boolean; saldo: string }
 
 export interface DetallePago extends FilaPago {
-  cuenta_bancaria_id: string; tasa: string; monto_ves: string; monto_usd: string; por_aplicar_ves: string; por_aplicar_usd: string;
+  cuenta_bancaria_id: string; instrumento_id: string; tasa: string; monto_ves: string; monto_usd: string; por_aplicar_ves: string; por_aplicar_usd: string;
   observaciones: string | null; creador_id: string; creador: string; creado: string; aprobado_por: string | null; aprobado: string | null;
   rechazo_motivo: string | null; anulado_motivo: string | null; anulado: string | null; asiento: string | null; asiento_id: string | null;
   lineas: LineaPagoSolicitada[]; aplicaciones: AplicacionPagoDetalle[];
@@ -268,7 +271,7 @@ const JOIN_ORIGEN = `left join factura_compra f on f.id = c.factura_id left join
 export async function detallePago(db: Db, id: string): Promise<DetallePago | null> {
   const { rows } = await db.query<Omit<DetallePago, 'lineas' | 'aplicaciones'>>(
     `select p.id, p.numero::text, p.fecha::text, p.proveedor_id, pr.codigo || ' · ' || t.razon_social as proveedor, p.moneda, p.monto::text,
-            p.por_aplicar::text, i.nombre as instrumento, cb.nombre as cuenta, p.referencia, p.estado, p.cuenta_bancaria_id,
+            p.por_aplicar::text, i.nombre as instrumento, cb.nombre as cuenta, p.referencia, p.estado, p.cuenta_bancaria_id, p.instrumento_id,
             p.tasa::text, p.monto_ves::text, p.monto_usd::text, p.por_aplicar_ves::text, p.por_aplicar_usd::text, p.observaciones,
             p.created_by as creador_id, cr.nombre as creador, to_char(p.created_at at time zone 'America/Caracas', 'DD-MM-YYYY HH24:MI') as creado,
             ap.nombre as aprobado_por, to_char(p.aprobado_at at time zone 'America/Caracas', 'DD-MM-YYYY HH24:MI') as aprobado,

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { BotonEnviar, Formulario } from '@/components/formulario';
 import { Aviso, Campo, Celda, Encabezado, Etiqueta, Panel, Tabla } from '@/components/ui';
 import { exigirRol, tieneRol } from '@/lib/auth/dal';
+import { estimarIgtf, igtfDe } from '@/lib/compras/igtf';
 import { NOMBRE_ESTADO_PAGO, ROLES_PAGAN, ROLES_VEN_PAGOS, detallePago, partidasPorPagar } from '@/lib/compras/pagos';
 import { getDb } from '@/lib/db';
 import { puedeDecidirObjeto } from '@/lib/flujo/flujo';
@@ -26,6 +27,10 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
   const puedeDecidir = solicitado && (await puedeDecidirObjeto(db, u.id, 'pago_proveedor', id));
   const puedeOperar = tieneRol(u, ROLES_PAGAN);
   const anticipo = pagado && Number(d.por_aplicar) > 0;
+  const [igtf, estimado] = await Promise.all([
+    igtfDe(db, id),
+    solicitado ? estimarIgtf(db, { proveedorId: d.proveedor_id, instrumentoId: d.instrumento_id, cuentaBancariaId: d.cuenta_bancaria_id, fecha: d.fecha, monto: d.monto }) : Promise.resolve(null),
+  ]);
   const [motivos, abiertas] = await Promise.all([
     pagado && puedeOperar ? listarMotivos(db, { tipo: 'anulacion', soloActivos: true }) : Promise.resolve([]),
     anticipo && puedeOperar ? partidasPorPagar(db, d.proveedor_id) : Promise.resolve([]),
@@ -47,6 +52,15 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
       {d.estado === 'rechazado' && <div className="mb-5"><Aviso tono="peligro">Rechazado: {d.rechazo_motivo}</Aviso></div>}
       {d.estado === 'anulado' && <div className="mb-5"><Aviso tono="peligro">Anulado el {d.anulado}: {d.anulado_motivo}</Aviso></div>}
       {pagado && <div className="mb-5"><Aviso tono="exito">Aprobado por {d.aprobado_por} el {d.aprobado}. Asiento {d.asiento ?? '—'}.{anticipo ? ` Anticipo por aplicar: ${d.moneda} ${monto(d.por_aplicar)}.` : ''}</Aviso></div>}
+
+      {estimado?.aplica && (
+        <div className="mb-5"><Aviso tono="info">Este pago causa IGTF a cargo de la empresa: {estimado.moneda} {monto(estimado.monto ?? '0')} ({Number(estimado.porcentaje)} %). Se fija al aprobar y sale del banco aparte, además del pago.</Aviso></div>
+      )}
+      {igtf && (
+        <div className="mb-5"><Aviso tono={igtf.revertido ? 'peligro' : 'info'}>
+          IGTF pagado: {igtf.moneda} {monto(igtf.monto)} ({Number(igtf.porcentaje)} % de {monto(igtf.base)}), gasto financiero. Asiento {igtf.asiento ?? '—'}.{igtf.revertido ? ' Revertido al anular el pago.' : ''}
+        </Aviso></div>
+      )}
 
       <Panel titulo="Datos del pago">
         <dl className="grid gap-x-8 gap-y-2 text-sm md:grid-cols-3">

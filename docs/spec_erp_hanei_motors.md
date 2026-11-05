@@ -895,12 +895,13 @@ flowchart LR
 - **ISLR:** el proveedor tiene un concepto (Decreto 1.808) y la retención sale de `concepto_islr_tarifa`: porcentaje, base mínima y sustraendo en UT, por tipo de persona y domicilio, con vigencia (no se editan: se cierra la vigencia y se registra otra; no se solapan). Retención = base sin IVA × % − sustraendo, solo si la base llega al mínimo; la UT (`UNIDAD_TRIBUTARIA`, en bolívares) se lleva a la moneda de la factura con su tasa. **Contabilidad carga las tarifas** desde Configuración → Conceptos de ISLR; no se precarga normativa. Un proveedor con concepto y sin tarifa vigente **no se contabiliza** (nunca se omite la retención en silencio). Un proveedor sin concepto no tiene ISLR.
 - **Registro:** cada retención queda en `retencion_compra` (base, porcentaje, sustraendo, monto en moneda original y en USD, tarifa usada), inmutable, y se muestra en el detalle de la factura o del gasto.
 - **Pendiente:** el **comprobante** de retención con su numeración, los libros y las declaraciones (Fase 4); la retención sobre las notas de crédito y débito del proveedor y sobre servicios sin recepción (gastos, caja chica) cuando existan.
-- **Pendiente de la Fase 3:** IGTF pagado y producción (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
+- **Pendiente de la Fase 3:** producción (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
 
 ### 7.3 Cuentas por pagar y pagos
 - `partida_cxp`, `pago` y `aplicacion_pago`, simétricos a CxC.
 - **Programación de pagos** por vencimiento, con aprobación de Gerencia y descuentos por pronto pago del proveedor.
 - **IGTF pagado:** si se paga en divisas a un agente de percepción, el IGTF se registra como gasto financiero.
+  **Construido (migración 0042):** se causa cuando el pago es en divisas, el instrumento tiene la marca «genera IGTF» (Zelle, USDT, efectivo en dólares) y el proveedor es contribuyente especial (agente de percepción). Se **paga aparte**: el banco sale por el pago más el IGTF y la deuda con el proveedor baja solo por el pago. La solicitud muestra el IGTF estimado; **al aprobar** se calcula con el porcentaje de `parametro_fiscal` (IGTF) vigente a la fecha del pago, sobre el monto pagado en divisas, y se guarda inmutable en `igtf_pago`. Su asiento (`igtf_pagado`): gasto financiero 6.3.01 contra el banco. Anular el pago revierte también el IGTF. Sin porcentaje vigente el pago no se aprueba. Pendiente: IGTF percibido en cobros y su declaración (Fase 4).
 - **Validaciones antes de pagar:** proveedor activo, factura conciliada o aprobada y cuenta bancaria del proveedor verificada. Un cambio reciente en la cuenta bancaria del proveedor exige doble aprobación, como control antifraude.
 
 **Construido (migración 0038): pagos a proveedores.**
