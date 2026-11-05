@@ -159,6 +159,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Libro de compras', href: '/fiscal/libro-compras', roles: [...ROLES_VEN_LIBROS] },
       { texto: 'Comprobantes de retención de IVA e ISLR', href: '/fiscal/comprobantes', roles: [...ROLES_VEN_COMPROBANTES] },
       { texto: 'IGTF', href: '/fiscal/igtf', roles: [...ROLES_VEN_LIBROS] },
+      { texto: 'Declaraciones y cierre fiscal', href: '/fiscal/declaraciones', roles: [...ROLES_VEN_LIBROS] },
     ],
   },
   {
