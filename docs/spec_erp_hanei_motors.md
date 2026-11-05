@@ -1152,6 +1152,7 @@ La condición fiscal de la empresa **no es una decisión del código: es configu
 
 ### 11.3 IGTF en la práctica
 - Al registrar un **cobro** en divisas, si la empresa es agente de percepción, se calcula el IGTF sobre el monto en divisas. Se registra como pasivo "IGTF percibido por enterar" y se refleja en el recibo o la factura.
+  **Construido (migración 0046):** se percibe cuando `empresa.agente_percepcion_igtf` está activo, el cobro es en una cuenta en divisas y el instrumento tiene la marca «genera IGTF». Se percibe **aparte, además del cobro**: el cobro y sus aplicaciones no cambian. Se calcula al registrar el cobro con el porcentaje de `parametro_fiscal` (IGTF) vigente a su fecha, se guarda inmutable en `igtf_cobro` y su asiento (`igtf_percibido`) es banco contra 2.1.06. Anular el cobro lo revierte. El cobro muestra el IGTF en su detalle. El reporte propio (Fiscal → IGTF) lista lo percibido, lo pagado y el saldo por enterar. **Pendiente:** reflejarlo en la factura impresa (línea separada), la declaración y el entero.
 - Al registrar un **pago** en divisas a un agente de percepción, el IGTF es un **gasto financiero**. No se recupera.
 - El IGTF **no forma parte** de la base del IVA y va en su propio reporte, no mezclado con los libros de IVA.
 

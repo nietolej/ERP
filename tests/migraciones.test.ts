@@ -60,6 +60,7 @@ describe('migraciones', () => {
       '0043_produccion.sql',
       '0044_libros_fiscales.sql',
       '0045_comprobantes_retencion.sql',
+      '0046_igtf_percibido.sql',
     ]);
   });
 

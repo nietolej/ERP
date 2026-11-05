@@ -1,3 +1,4 @@
+import { registrarIgtfCobro, revertirIgtfCobro } from './igtf';
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import { contabilizar } from '@/lib/contabilidad/motor';
@@ -113,7 +114,7 @@ async function insertarAplicaciones(
   return calculadas;
 }
 
-export interface ResultadoCobro { id: string; numero: string; asiento: string; anticipo: string }
+export interface ResultadoCobro { id: string; numero: string; asiento: string; anticipo: string; igtf: string | null }
 
 /** Registra un cobro, lo aplica a las facturas indicadas (lo demás queda como anticipo) y genera su asiento. */
 export async function registrarCobro(tx: Db, u: Usuario, d: DatosCobro): Promise<ResultadoCobro> {
@@ -145,7 +146,8 @@ export async function registrarCobro(tx: Db, u: Usuario, d: DatosCobro): Promise
     banco: { original: c[0].monto, ves: c[0].monto_ves, usd: c[0].monto_usd },
     anticipo: { original: c[0].por_aplicar, ves: c[0].por_aplicar_ves, usd: c[0].por_aplicar_usd },
   });
-  return { id: cobro.id, numero: cobro.numero, asiento, anticipo: c[0].por_aplicar };
+  const igtf = await registrarIgtfCobro(tx, cobro.id, u.id);       // IGTF percibido, aparte del cobro (R-DB)
+  return { id: cobro.id, numero: cobro.numero, asiento, anticipo: c[0].por_aplicar, igtf: igtf?.monto ?? null };
 }
 
 /** Aplica lo que queda de un cobro (su anticipo) a facturas del mismo cliente, y genera el asiento de la aplicación. */
@@ -188,6 +190,7 @@ export async function anularCobro(tx: Db, u: Usuario, id: string, motivo: Motivo
   await tx.query(`update cobro set estado = 'anulado', anulado_motivo = $2, anulado_motivo_id = $3 where id = $1`, [id, texto, motivo.motivoId]);
   await tx.query(
     `select fn_reversar_asiento($1, ((now() at time zone 'America/Caracas')::date), $2)`, [a[0].id, `Anulación del cobro: ${texto}`]);
+  await revertirIgtfCobro(tx, id);
 }
 
 // ---------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { getDb } from '@/lib/db';
 import { fecha, hoyCaracas, monto } from '@/lib/formato';
 import { listarMotivos } from '@/lib/maestros/motivos';
 import { ROLES_COBRAN, ROLES_VEN_COBROS, detalleCobro, partidasAbiertas } from '@/lib/ventas/cobros';
+import { igtfDeCobro } from '@/lib/ventas/igtf';
 import { anularCobroAccion, aplicarAnticipoAccion } from '../../acciones';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,6 +30,7 @@ export default async function CobroPage({ params }: { params: Promise<{ id: stri
   const vigente = c.estado === 'registrado';
   const anticipo = Number(c.por_aplicar) > 0;
   const hayAnticipoAplicado = c.aplicaciones.some((a) => a.origen === 'anticipo' && !a.revertida);
+  const igtf = await igtfDeCobro(db, id);
   const [partidas, motivos] = await Promise.all([
     vigente && anticipo && puedeCobrar ? partidasAbiertas(db, c.cliente_id) : Promise.resolve([]),
     vigente && puedeCobrar ? listarMotivos(db, { tipo: 'anulacion', soloActivos: true }) : Promise.resolve([]),
@@ -43,6 +45,11 @@ export default async function CobroPage({ params }: { params: Promise<{ id: stri
         </div>
       </Encabezado>
 
+      {igtf && (
+        <div className="mb-5"><Aviso tono={igtf.revertido ? 'peligro' : 'info'}>
+          IGTF percibido aparte, además del cobro: {igtf.moneda} {monto(igtf.monto)} ({Number(igtf.porcentaje)} % de {monto(igtf.base)}), pasivo por enterar. Asiento {igtf.asiento ?? '—'}.{igtf.revertido ? ' Revertido al anular el cobro.' : ''}
+        </Aviso></div>
+      )}
       {c.estado === 'anulado' && <div className="mb-5"><Aviso tono="peligro">Anulado el {c.anulado}: {c.anulado_motivo}</Aviso></div>}
       {vigente && anticipo && <div className="mb-5"><Aviso tono="info">Quedan {c.moneda} {monto(c.por_aplicar)} sin aplicar: es un anticipo del cliente (pasivo) hasta que se aplique a una factura.</Aviso></div>}
 
