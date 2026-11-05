@@ -265,8 +265,8 @@ export interface DetallePago extends FilaPago {
   lineas: LineaPagoSolicitada[]; aplicaciones: AplicacionPagoDetalle[];
 }
 
-const FACTURA = `coalesce(f.numero_factura, g.numero_factura, 'ND ' || n.numero_documento, gp.numero_factura, ap.numero_documento)`;
-const JOIN_ORIGEN = `left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id left join nota_proveedor n on n.id = c.nota_id left join gasto_proveedor gp on gp.id = c.gasto_proveedor_id left join apertura_cxp ap on ap.id = c.apertura_cxp_id`;
+const FACTURA = `coalesce(f.numero_factura, g.numero_factura, 'ND ' || n.numero_documento, gp.numero_factura, apc.numero_documento)`;
+const JOIN_ORIGEN = `left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id left join nota_proveedor n on n.id = c.nota_id left join gasto_proveedor gp on gp.id = c.gasto_proveedor_id left join apertura_cxp apc on apc.id = c.apertura_cxp_id`;
 
 export async function detallePago(db: Db, id: string): Promise<DetallePago | null> {
   const { rows } = await db.query<Omit<DetallePago, 'lineas' | 'aplicaciones'>>(

@@ -311,13 +311,13 @@ export async function cuentasPorPagar(db: Db, u: Usuario, limite = 300): Promise
     `select c.id, c.factura_id, c.gasto_id,
             case when c.factura_id is not null then '/compras/facturas/' || c.factura_id when c.gasto_id is not null then '/compras/gastos/' || c.gasto_id
                  when c.nota_id is not null then '/compras/notas/' || c.nota_id when c.gasto_proveedor_id is not null then '/gastos/' || c.gasto_proveedor_id else '/configuracion/apertura' end as ruta,
-            p.codigo || ' · ' || t.razon_social as proveedor, coalesce(f.numero_factura, g.numero_factura, 'ND ' || nt.numero_documento, gp.numero_factura, ap.numero_documento) as numero_factura,
+            p.codigo || ' · ' || t.razon_social as proveedor, coalesce(f.numero_factura, g.numero_factura, 'ND ' || nt.numero_documento, gp.numero_factura, apc.numero_documento) as numero_factura,
             to_char(c.fecha, 'DD-MM-YYYY') as fecha,
             to_char(c.vencimiento, 'DD-MM-YYYY') as vencimiento, c.moneda, c.monto_original::text, c.saldo::text,
             round(c.monto_usd * c.saldo / c.monto_original, 2)::text as saldo_usd,
             greatest(((now() at time zone 'America/Caracas')::date - c.vencimiento), 0)::int as dias_vencida
        from partida_cxp c left join factura_compra f on f.id = c.factura_id left join gasto_importacion g on g.id = c.gasto_id
-       left join nota_proveedor nt on nt.id = c.nota_id left join gasto_proveedor gp on gp.id = c.gasto_proveedor_id left join apertura_cxp ap on ap.id = c.apertura_cxp_id
+       left join nota_proveedor nt on nt.id = c.nota_id left join gasto_proveedor gp on gp.id = c.gasto_proveedor_id left join apertura_cxp apc on apc.id = c.apertura_cxp_id
        join proveedor p on p.tercero_id = c.proveedor_id join tercero t on t.id = p.tercero_id
       where c.estado = 'abierta' order by c.vencimiento, c.created_at limit $1`, [limite]);
   return rows;

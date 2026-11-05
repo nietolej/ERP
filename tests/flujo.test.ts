@@ -71,7 +71,7 @@ describe('flujo de trabajo y aprobaciones (§4.5)', () => {
     const porTipo = Object.fromEntries(defs.map((d) => [d.objeto_tipo, d.pasos.map((p) => p.rol_aprobador)]));
     expect(porTipo).toEqual({
       cliente: ['gerencia'], proveedor: ['gerencia'], proveedor_cambio: ['gerencia'], asiento_manual: ['jefe_contabilidad'], meta_lote: ['gerencia'],
-      pedido_credito: ['gerencia'], ajuste_inventario: ['gerencia'], orden_compra: ['gerencia'], factura_compra: ['gerencia'], nota_proveedor: ['gerencia'], pago_proveedor: ['gerencia'], gasto_proveedor: ['gerencia'], reposicion_caja: ['gerencia'], orden_produccion: ['gerencia'], promocion: ['gerencia'], nota_credito: ['supervisor_ventas'], nota_debito: ['supervisor_ventas'],
+      pedido_credito: ['gerencia'], ajuste_inventario: ['gerencia'], orden_compra: ['gerencia'], factura_compra: ['gerencia'], nota_proveedor: ['gerencia'], pago_proveedor: ['gerencia'], gasto_proveedor: ['gerencia'], reposicion_caja: ['gerencia'], orden_produccion: ['gerencia'], apertura_banco: ['gerencia'], apertura_cxc: ['gerencia'], apertura_cxp: ['gerencia'], promocion: ['gerencia'], nota_credito: ['supervisor_ventas'], nota_debito: ['supervisor_ventas'],
     });
     expect(defs.every((d) => d.activo && d.pasos.every((p) => p.distinto_del_creador))).toBe(true);
   });
