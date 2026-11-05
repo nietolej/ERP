@@ -6,6 +6,7 @@ import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
 import { ROLES_VEN_APERTURA } from '@/lib/apertura/apertura';
+import { ROLES_VEN_CONTEO } from '@/lib/apertura/inventario';
 import { ROLES_VEN_COMPROBANTES } from '@/lib/fiscal/comprobantes';
 import { ROLES_VEN_LIBROS } from '@/lib/fiscal/libros';
 import { ROLES_VEN_PRODUCCION } from '@/lib/produccion/ordenes';
@@ -82,6 +83,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Proveedores', href: '/maestros/proveedores', roles: ROLES_COMPRAS },
       { texto: 'Existencias', href: '/inventario/existencias', roles: [...ROLES_VEN_EXISTENCIAS] },
       { texto: 'Ajustes de inventario', href: '/inventario/ajustes', roles: [...ROLES_VEN_AJUSTES] },
+      { texto: 'Conteo inicial (apertura)', href: '/inventario/apertura', roles: [...ROLES_VEN_CONTEO] },
       { texto: 'Disponibilidad y velocidad de venta', href: '/reportes/inventario', roles: [...ROLES_VEN_DISPONIBILIDAD] },
       { texto: 'Kardex de movimientos', fase: 2 },
       { texto: 'Órdenes de compra', href: '/compras/ordenes', roles: [...ROLES_VEN_COMPRAS] },

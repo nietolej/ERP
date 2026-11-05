@@ -10,7 +10,7 @@ import { fecha, hoyCaracas, monto } from '@/lib/formato';
 import { cerrarAperturaAccion, decidirAperturaAccion, fijarFechaAccion, registrarBancoAccion, registrarCxcAccion, registrarCxpAccion } from './acciones';
 
 const TONO = { pendiente: 'advertencia', aprobado: 'exito', rechazado: 'peligro' } as const;
-const OBJETO = { banco: 'apertura_banco', cxc: 'apertura_cxc', cxp: 'apertura_cxp' } as const;
+const OBJETO = { banco: 'apertura_banco', cxc: 'apertura_cxc', cxp: 'apertura_cxp', inventario: 'apertura_inventario' } as const;
 
 export default async function AperturaPage() {
   const u = await exigirRol(...ROLES_VEN_APERTURA);
@@ -55,6 +55,8 @@ export default async function AperturaPage() {
         <KpiCard titulo="Saldos de apertura (Bs)" valor={monto(c.saldoPuenteVes)} tono={Number(c.saldoPuenteVes) === 0 ? 'exito' : 'advertencia'}
           subtitulo={`US$ ${monto(c.saldoPuenteUsd)} de residuo por tasas históricas (informativo)`} />
       </div>
+
+      <p className="mb-5 text-sm"><Link href="/inventario/apertura" className="font-semibold text-acento hover:underline">Conteo físico inicial de inventario por almacén →</Link></p>
 
       <Panel titulo="Control de cierre" className="mb-5">
         {c.impedimentos.map((i) => <div key={i} className="mb-3"><Aviso tono="advertencia">{i}</Aviso></div>)}

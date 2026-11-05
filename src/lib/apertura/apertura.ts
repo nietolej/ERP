@@ -19,7 +19,7 @@ export const ROLES_APERTURA_CXP = ['compras', 'tesoreria', 'gerencia'] as const 
 export const ROLES_VEN_APERTURA = ['tesoreria', 'cobranzas', 'compras', 'gerencia', 'contabilidad', 'jefe_contabilidad', 'auditor'] as const satisfies readonly Rol[];
 
 export type UsuarioApertura = { id: string; roles: readonly string[] };
-export type TipoApertura = 'banco' | 'cxc' | 'cxp';
+export type TipoApertura = 'banco' | 'cxc' | 'cxp' | 'inventario';
 const tiene = (u: UsuarioApertura, roles: readonly string[]) => u.roles.some((r) => roles.includes(r));
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -29,7 +29,7 @@ const NUMERO = /^\d{1,15}$/;
 const dos = (v: Decimal.Value) => new Decimal(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
 
 export const NOMBRE_ESTADO_APERTURA: Record<string, string> = { pendiente: 'Pendiente de Gerencia', aprobado: 'Aprobado', rechazado: 'Rechazado' };
-export const NOMBRE_TIPO_APERTURA: Record<TipoApertura, string> = { banco: 'Saldo de banco o caja', cxc: 'Factura de venta pendiente', cxp: 'Factura de compra pendiente' };
+export const NOMBRE_TIPO_APERTURA: Record<TipoApertura, string> = { banco: 'Saldo de banco o caja', cxc: 'Factura de venta pendiente', cxp: 'Factura de compra pendiente', inventario: 'Inventario inicial (conteo)' };
 
 function exigirRol(u: UsuarioApertura, roles: readonly string[], texto: string) {
   if (!tiene(u, roles)) throw new ErrorMaestro(texto);
@@ -74,17 +74,20 @@ export async function controlApertura(db: Db): Promise<ControlApertura> {
        from asiento_linea l join asiento a on a.id = l.asiento_id and a.estado = 'contabilizado' join cuenta_contable c on c.id = l.cuenta_id where c.codigo = '3.9.01'`);
   const { rows: p } = await db.query<{ n: number }>(
     `select ((select count(*) from apertura_banco where estado = 'pendiente') + (select count(*) from apertura_cxc where estado = 'pendiente')
-           + (select count(*) from apertura_cxp where estado = 'pendiente'))::int as n`);
+           + (select count(*) from apertura_cxp where estado = 'pendiente') + (select count(*) from apertura_inventario where estado in ('borrador', 'pendiente')))::int as n`);
   const { rows: c } = await db.query<{ dif: string }>('select (abs(diferencia_ves) + abs(diferencia_usd))::text as dif from vw_control_cuadre');
   const { rows: t } = await db.query<{ tipo: TipoApertura; documentos: number; ves: string; usd: string }>(
     `select 'banco' as tipo, count(*)::int as documentos, coalesce(sum(saldo_ves), 0)::text as ves, coalesce(sum(saldo_usd), 0)::text as usd from apertura_banco where estado = 'aprobado'
      union all select 'cxc', count(*)::int, coalesce(sum(saldo), 0)::text, coalesce(sum(saldo_usd), 0)::text from apertura_cxc where estado = 'aprobado'
-     union all select 'cxp', count(*)::int, coalesce(sum(saldo_ves), 0)::text, coalesce(sum(saldo_usd), 0)::text from apertura_cxp where estado = 'aprobado'`);
+     union all select 'cxp', count(*)::int, coalesce(sum(saldo_ves), 0)::text, coalesce(sum(saldo_usd), 0)::text from apertura_cxp where estado = 'aprobado'
+     union all select 'inventario', count(*)::int,
+            coalesce(sum((select sum(round(l.cantidad * l.costo_unitario_usd, 2)) from apertura_inventario_linea l where l.apertura_id = o.id)), 0)::text,
+            coalesce(sum((select sum(round(l.cantidad * l.costo_unitario_usd, 2)) from apertura_inventario_linea l where l.apertura_id = o.id)), 0)::text from apertura_inventario o where estado = 'aprobado'`);
   const mayorCuadra = new Decimal(c[0]?.dif ?? 0).isZero();
   const impedimentos: string[] = [];
   if (!e.fecha) impedimentos.push('Falta fijar la fecha de arranque.');
   if (e.cerrada) impedimentos.push('La apertura ya está cerrada.');
-  if (p[0].n > 0) impedimentos.push(`Hay ${p[0].n} documentos de apertura pendientes de Gerencia.`);
+  if (p[0].n > 0) impedimentos.push(`Hay ${p[0].n} documentos de apertura sin aprobar (incluye conteos de inventario en borrador).`);
   // En bolívares: el residuo en dólares sale de mezclar tasas históricas con la del arranque; se informa pero no impide el cierre.
   if (!new Decimal(s[0].ves).isZero()) {
     impedimentos.push(`«Saldos de apertura» no está en cero (Bs ${dos(s[0].ves)}): falta el asiento de apertura del contador.`);

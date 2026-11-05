@@ -74,7 +74,7 @@ export async function decidirAperturaAccion(_: EstadoAccion, fd: FormData): Prom
     const u = await autorizarSesion();
     const tipo = texto(fd, 'tipo');
     const id = texto(fd, 'id');
-    if (!['apertura_banco', 'apertura_cxc', 'apertura_cxp'].includes(tipo) || !UUID.test(id)) return { error: 'Documento inválido.' };
+    if (!['apertura_banco', 'apertura_cxc', 'apertura_cxp', 'apertura_inventario'].includes(tipo) || !UUID.test(id)) return { error: 'Documento inválido.' };
     const aprobar = texto(fd, 'decision') === 'aprobar';
     await conUsuario(u.id, (tx) => resolverAprobacion(tx, tipo, id, u.id, aprobar ? 'aprobada' : 'rechazada', aprobar ? {} : { comentario: texto(fd, 'motivo') || 'Rechazado por Gerencia' }));
     recargar();
