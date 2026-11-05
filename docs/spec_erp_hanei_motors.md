@@ -1166,6 +1166,11 @@ La condición fiscal de la empresa **no es una decisión del código: es configu
 - **Compras:** facturas de mercancía, gastos de importación, facturas de gasto y notas del proveedor aprobadas. El IVA de un gasto sin derecho a crédito fiscal se muestra pero su crédito fiscal es cero. Las retenciones de IVA e ISLR practicadas van por documento (una sola vez por documento, y las notas de crédito restan lo retenido).
 - **Resumen:** por alícuota (base e IVA), débito fiscal (ventas), crédito fiscal (compras) y retenciones. Exporta a CSV con las columnas que se ven.
 - **Pendiente:** los vales de caja chica (no guardan el RIF del proveedor), la retención de IVA recibida de clientes, el archivo exacto del portal del SENIAT, la quincena de contribuyentes especiales, la declaración de IVA y el cierre fiscal que bloquea el periodo.
+**Construido (migración 0045): comprobantes de retención de IVA e ISLR** (pantalla Fiscal → Comprobantes; `comprobante_retencion`).
+- **Uno por retención de un documento** (factura de compra, gasto de importación o factura de gasto), nacido de la retención ya guardada (inmutable). El comprobante no se edita ni se borra.
+- **Numeración de 14 caracteres:** AAAAMM del periodo de la retención + correlativo de 8 dígitos, por impuesto y periodo, sin huecos (se asigna en la misma transacción, con bloqueo del numerador; un lote que falla no consume números).
+- **Emisión por lotes del mes** por Contabilidad, Jefe de contabilidad o Gerencia, en orden de fecha. La pantalla avisa los pendientes y el plazo (segundo día hábil del mes siguiente, sin considerar feriados) y muestra el comprobante imprimible con agente, sujeto retenido, factura, base, porcentaje y monto.
+- **Pendiente:** las retenciones que revierte una nota de crédito del proveedor se listan como «ajustes por emitir» y no se numeran hasta que el contador confirme cómo se documentan; la anulación de un comprobante; el archivo de la declaración de retenciones de IVA y el XML de ISLR; la retención de IVA recibida de clientes.
 - **Declaración de IVA** (resumen para el portal), **declaración de retenciones de IVA** (archivo del portal) y **retenciones de ISLR** (XML).
 - **Cierre fiscal:** al declarar un periodo, sus documentos fiscales quedan **bloqueados**. Cualquier corrección se hace con documentos nuevos, NC o ND, en el periodo abierto.
 

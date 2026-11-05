@@ -5,6 +5,7 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
+import { ROLES_VEN_COMPROBANTES } from '@/lib/fiscal/comprobantes';
 import { ROLES_VEN_LIBROS } from '@/lib/fiscal/libros';
 import { ROLES_VEN_PRODUCCION } from '@/lib/produccion/ordenes';
 import { ROLES_VEN_CONCILIACION } from '@/lib/tesoreria/conciliacion';
@@ -156,7 +157,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Conceptos de ISLR', href: '/configuracion/conceptos-islr', roles: [...CONTABLES, 'compras'] },
       { texto: 'Libro de ventas', href: '/fiscal/libro-ventas', roles: [...ROLES_VEN_LIBROS] },
       { texto: 'Libro de compras', href: '/fiscal/libro-compras', roles: [...ROLES_VEN_LIBROS] },
-      { texto: 'Retenciones de IVA e ISLR', fase: 4 },
+      { texto: 'Comprobantes de retención de IVA e ISLR', href: '/fiscal/comprobantes', roles: [...ROLES_VEN_COMPROBANTES] },
       { texto: 'IGTF', fase: 4 },
     ],
   },
