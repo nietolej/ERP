@@ -4,6 +4,7 @@ import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
+import { aprobarOrden as aprobarOrdenProduccion, rechazarOrden as rechazarOrdenProduccion } from '@/lib/produccion/ordenes';
 import { aprobarReposicion, rechazarReposicion } from '@/lib/gastos/caja-chica';
 import { aprobarGastoProveedor, rechazarGastoProveedor } from '@/lib/gastos/gastos';
 import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
@@ -96,6 +97,11 @@ export const MANEJADOR_GASTO_PROVEEDOR: Manejador<void> = {
 export const MANEJADOR_REPOSICION_CAJA: Manejador<void> = {
   alAprobar: async (tx, id, aprobador) => { await aprobarReposicion(tx, id, aprobador); },
   alRechazar: (tx, id, usuario, motivo) => rechazarReposicion(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_ORDEN_PRODUCCION: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarOrdenProduccion(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarOrdenProduccion(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PROMOCION: Manejador<void> = {
@@ -213,6 +219,14 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select r.id::text as id, case when r.tipo = 'constitucion' then 'Constitución ' else 'Reposición ' end || f.codigo || ' · ' || r.moneda || ' ' || r.monto as texto
          from reposicion_caja r join fondo_caja f on f.id = r.fondo_id where r.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_REPOSICION_CAJA,
+  },
+  orden_produccion: {
+    etiqueta: 'Orden de producción',
+    ruta: (id) => `/inventario/produccion/${id}`,
+    resumenes: (db, ids) => consulta(db,
+      `select o.id::text as id, 'Producción ' || o.numero || ' · ' || p.codigo || ' × ' || o.cantidad as texto
+         from orden_produccion o join producto p on p.id = o.producto_id where o.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_ORDEN_PRODUCCION,
   },
   promocion: {
     etiqueta: 'Promoción',

@@ -5,8 +5,7 @@ import { validarPeriodo } from '@/lib/inventario/disponibilidad';
 
 /**
  * M6 · Inventario (spec_reportes §9). Los indicadores de rotación salen de fn_disponibilidad (migración 0027): aquí se
- * agregan por grupo, se valoran al costo promedio y se cruzan con lo pendiente de recibir. Lo pendiente en producción
- * no existe todavía (no hay órdenes de producción): el sugerido solo descuenta el tránsito.
+ * agregan por grupo, se valoran al costo promedio y se cruzan con lo pendiente de recibir y de producir.
  */
 
 export interface TarjetasInventario {
@@ -51,7 +50,7 @@ export async function valorizacionMensual(db: Db, meses = 12): Promise<PuntoValo
 }
 
 export interface FilaSugerido {
-  productoId: string; codigo: string; descripcion: string; stock: string; transito: string; velocidadAjustada: string;
+  productoId: string; codigo: string; descripcion: string; stock: string; transito: string; produccion: string; velocidadAjustada: string;
   /** Demanda del horizonte: velocidad ajustada × días de cobertura. */
   demanda: string; sugerido: number;
 }
@@ -59,8 +58,9 @@ export interface FilaSugerido {
 export interface SugeridoCompra { diasCobertura: number; filas: FilaSugerido[]; }
 
 /**
- * Sugerido de compra (§9.1): max(0, ⌈velocidad ajustada × días de cobertura − (stock comercial + tránsito)⌉), con la
- * velocidad vigente (vw_disponibilidad). Tránsito = lo ordenado y no recibido en órdenes de compra aprobadas.
+ * Sugerido de compra (§9.1): max(0, ⌈velocidad ajustada × días de cobertura − (stock comercial + tránsito + producción)⌉),
+ * con la velocidad vigente (vw_disponibilidad). Tránsito = lo ordenado y no recibido en órdenes de compra aprobadas; producción = lo que
+ * falta producir en órdenes liberadas o en proceso.
  * Solo se listan los productos con sugerido mayor que cero, del mayor al menor.
  */
 export async function sugeridoCompra(db: Db, f: { texto?: string } = {}): Promise<SugeridoCompra> {
@@ -68,25 +68,27 @@ export async function sugeridoCompra(db: Db, f: { texto?: string } = {}): Promis
   const { rows: par } = await db.query<{ dias: string }>("select fn_parametro_inventario('DIAS_COBERTURA_COMPRA')::text as dias");
   const dias = Number(par[0].dias);
   const { rows } = await db.query<{
-    producto_id: string; codigo: string; descripcion: string; stock: string; transito: string; velocidad: string; demanda: string; sugerido: string;
+    producto_id: string; codigo: string; descripcion: string; stock: string; transito: string; produccion: string; velocidad: string; demanda: string; sugerido: string;
   }>(
     `with transito as (
        select l.producto_id, sum(greatest(l.cantidad - fn_orden_linea_recibida(l.id), 0)) as cantidad
          from documento_compra_linea l join documento_compra d on d.id = l.documento_id
-        where d.tipo = 'orden_compra' and d.estado = 'aprobada' group by l.producto_id)
-     select v.producto_id, v.codigo, v.descripcion, v.stock_comercial::text as stock, coalesce(t.cantidad, 0)::text as transito,
+        where d.tipo = 'orden_compra' and d.estado = 'aprobada' group by l.producto_id),
+     produccion as (
+       select producto_id, sum(cantidad) as cantidad from orden_produccion where estado in ('liberada', 'en_proceso') group by producto_id)
+     select v.producto_id, v.codigo, v.descripcion, v.stock_comercial::text as stock, coalesce(t.cantidad, 0)::text as transito, coalesce(pr.cantidad, 0)::text as produccion,
             v.velocidad_ajustada::text as velocidad, (v.velocidad_ajustada * $1::numeric)::numeric(16,2)::text as demanda,
-            ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0)))::text as sugerido
-       from vw_disponibilidad v left join transito t on t.producto_id = v.producto_id
+            ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0) + coalesce(pr.cantidad, 0)))::text as sugerido
+       from vw_disponibilidad v left join transito t on t.producto_id = v.producto_id left join produccion pr on pr.producto_id = v.producto_id
       where v.velocidad_ajustada > 0
-        and ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0))) > 0
+        and ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0) + coalesce(pr.cantidad, 0))) > 0
         and ($2 = '' or v.codigo ilike '%' || $2 || '%' or fn_nombre_normalizado(v.descripcion) like '%' || fn_nombre_normalizado($2) || '%')
-      order by ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0))) desc, v.codigo
+      order by ceil(v.velocidad_ajustada * $1::numeric - (v.stock_comercial + coalesce(t.cantidad, 0) + coalesce(pr.cantidad, 0))) desc, v.codigo
       limit 500`, [dias, texto]);
   return {
     diasCobertura: dias,
     filas: rows.map((r) => ({
-      productoId: r.producto_id, codigo: r.codigo, descripcion: r.descripcion, stock: r.stock, transito: r.transito,
+      productoId: r.producto_id, codigo: r.codigo, descripcion: r.descripcion, stock: r.stock, transito: r.transito, produccion: r.produccion,
       velocidadAjustada: r.velocidad, demanda: r.demanda, sugerido: Number(r.sugerido),
     })),
   };

@@ -43,12 +43,12 @@ export function PanelSugerido({ s, texto, puedeComprar, proveedores, almacenes }
       </form>
       <Panel>
         <p className="mb-3 text-sm text-texto-2">
-          Sugerido = velocidad ajustada × {s.diasCobertura} días de cobertura − (stock comercial + tránsito), redondeado hacia arriba. El tránsito es lo
-          ordenado y no recibido en órdenes aprobadas. Las órdenes de producción aún no existen en el ERP, por eso no se descuentan.
+          Sugerido = velocidad ajustada × {s.diasCobertura} días de cobertura − (stock comercial + tránsito + producción), redondeado hacia arriba. El tránsito es lo
+          ordenado y no recibido en órdenes aprobadas; la producción, lo que falta producir en órdenes liberadas o en proceso.
         </p>
         {s.filas.length === 0 ? <Aviso tono="exito">Ningún producto necesita reposición con la velocidad actual.</Aviso> : (
           <Formulario accion={crearOrdenDesdeSugeridoAccion} className="space-y-4">
-            <Tabla columnas={[...(puedeComprar ? ['Incluir'] : []), 'Producto', { t: 'Stock', derecha: true }, { t: 'En tránsito', derecha: true },
+            <Tabla columnas={[...(puedeComprar ? ['Incluir'] : []), 'Producto', { t: 'Stock', derecha: true }, { t: 'En tránsito', derecha: true }, { t: 'En producción', derecha: true },
               { t: 'Vel. ajustada', derecha: true }, { t: `Demanda ${s.diasCobertura} d`, derecha: true }, { t: 'Sugerido', derecha: true }]}>
               {s.filas.map((f) => (
                 <tr key={f.productoId} className="hover:bg-white/[0.03]">
@@ -56,6 +56,7 @@ export function PanelSugerido({ s, texto, puedeComprar, proveedores, almacenes }
                   <Celda><span className="font-mono">{f.codigo}</span><span className="block text-xs text-texto-2">{f.descripcion}</span></Celda>
                   <Celda derecha mono>{num(f.stock)}</Celda>
                   <Celda derecha mono>{num(f.transito)}</Celda>
+                  <Celda derecha mono>{num(f.produccion)}</Celda>
                   <Celda derecha mono>{num(f.velocidadAjustada, 3)}</Celda>
                   <Celda derecha mono>{num(f.demanda, 1)}</Celda>
                   <Celda derecha>

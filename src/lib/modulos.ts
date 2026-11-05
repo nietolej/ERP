@@ -5,6 +5,7 @@ import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
+import { ROLES_VEN_PRODUCCION } from '@/lib/produccion/ordenes';
 import { ROLES_VEN_CONCILIACION } from '@/lib/tesoreria/conciliacion';
 import { ROLES_CUSTODIO, ROLES_VEN_CAJA, ROLES_VEN_GASTOS } from '@/lib/gastos/roles';
 import { ROLES_VEN_AJUSTES, ROLES_VEN_EXISTENCIAS } from '@/lib/inventario/ajustes';
@@ -91,7 +92,7 @@ export const MODULOS: Modulo[] = [
     codigo: 'PP',
     nombre: 'Producción',
     descripcion: 'Órdenes de producción o ensamblaje simples, sin listas de materiales.',
-    items: [{ texto: 'Órdenes de producción', fase: 3 }],
+    items: [{ texto: 'Órdenes de producción', href: '/inventario/produccion', roles: [...ROLES_VEN_PRODUCCION] }],
   },
   {
     codigo: 'FI',

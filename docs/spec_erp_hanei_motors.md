@@ -895,7 +895,7 @@ flowchart LR
 - **ISLR:** el proveedor tiene un concepto (Decreto 1.808) y la retención sale de `concepto_islr_tarifa`: porcentaje, base mínima y sustraendo en UT, por tipo de persona y domicilio, con vigencia (no se editan: se cierra la vigencia y se registra otra; no se solapan). Retención = base sin IVA × % − sustraendo, solo si la base llega al mínimo; la UT (`UNIDAD_TRIBUTARIA`, en bolívares) se lleva a la moneda de la factura con su tasa. **Contabilidad carga las tarifas** desde Configuración → Conceptos de ISLR; no se precarga normativa. Un proveedor con concepto y sin tarifa vigente **no se contabiliza** (nunca se omite la retención en silencio). Un proveedor sin concepto no tiene ISLR.
 - **Registro:** cada retención queda en `retencion_compra` (base, porcentaje, sustraendo, monto en moneda original y en USD, tarifa usada), inmutable, y se muestra en el detalle de la factura o del gasto.
 - **Pendiente:** el **comprobante** de retención con su numeración, los libros y las declaraciones (Fase 4); la retención sobre las notas de crédito y débito del proveedor y sobre servicios sin recepción (gastos, caja chica) cuando existan.
-- **Pendiente de la Fase 3:** producción (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
+- **Fase 3 completa** con producción (§8.4); lo anterior (los pagos a proveedores, sus anticipos y las notas del proveedor con devolución ya están: §7.3; los gastos y la caja chica, §10.1).
 
 ### 7.3 Cuentas por pagar y pagos
 - `partida_cxp`, `pago` y `aplicacion_pago`, simétricos a CxC.
@@ -993,6 +993,13 @@ Se adopta el alcance de **órdenes simples** (decisión 12). No hay listas de ma
 - Al terminar: salida de los componentes al costo promedio vigente y entrada del producto terminado a la suma de esos costos (más mano de obra o gastos si Gerencia los asigna). Todo en una sola transacción y con su asiento del motor contable.
 - No se consume más de la existencia disponible ni se termina una orden sin todos sus componentes.
 - Si el negocio llega a requerir listas de materiales, se agrega como ampliación y se actualiza esta sección.
+
+**Construido (migración 0043): órdenes de producción simples** (`orden_produccion`, `orden_produccion_componente`; pantalla Producción).
+- **Estados:** `borrador` → `pendiente` (enviada a Gerencia) → `liberada` → `en_proceso` → `terminada`; o `rechazada` / `anulada` (con motivo, mientras no esté terminada). Crea Almacén (de sus almacenes) o Gerencia; **libera Gerencia, distinta de quien la creó** (motor de flujo `orden_produccion`); Almacén la pone en proceso y la termina.
+- **Liberar no reserva nada.** Al terminar se verifica la existencia disponible (menos lo reservado para pedidos) de cada componente en el almacén de la orden; si falta alguno no se termina y no se mueve nada.
+- **Terminar** (una sola transacción): cada componente sale al costo promedio vigente (`consumo_produccion`) y el producto terminado entra (`entrada_produccion`) a la suma de esos costos dividida por la cantidad (4 decimales). Como la cuenta de inventario es la misma, no hay asiento; solo si el redondeo del costo unitario deja una diferencia de centavos se asienta contra «Diferencias por redondeo» (6.3.03) para que el auxiliar siga igual al mayor. Una orden terminada no se modifica.
+- **Sugerido de compra:** descuenta también lo que falta producir en órdenes liberadas o en proceso (M6).
+- **Pendiente:** mano de obra y gastos indirectos en el costo del terminado (necesita su cuenta de absorción), producción parcial, componentes con merma y listas de materiales.
 
 ---
 

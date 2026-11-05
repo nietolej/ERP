@@ -57,6 +57,7 @@ describe('migraciones', () => {
       '0040_gastos_caja_chica.sql',
       '0041_conciliacion_bancaria.sql',
       '0042_igtf_pagado.sql',
+      '0043_produccion.sql',
     ]);
   });
 
