@@ -44,7 +44,6 @@ describe('cierre mensual (R-DP a R-DS)', () => {
      values ('iva', $1::int, $2::int, make_date($1::int, $2::int, 1), (make_date($1::int, $2::int, 1) + interval '1 month - 1 day')::date, '{}'::jsonb, $3)`, [m.anio, m.mes, contador.id]));
   const confirmarTodo = async (m: { anio: number; mes: number }) => {
     await como(contador, (tx) => confirmarCierre(tx, contador, m.anio, m.mes, 'recurrentes', 'Sin depreciación ni nómina este mes'));
-    await como(contador, (tx) => confirmarCierre(tx, contador, m.anio, m.mes, 'diferencial_cambiario'));
   };
 
   beforeAll(async () => {
@@ -158,7 +157,6 @@ describe('cierre mensual (R-DP a R-DS)', () => {
   });
 
   it('con todo en orden se cierra el mes más antiguo y queda la foto del checklist', async () => {
-    await como(contador, (tx) => confirmarCierre(tx, contador, q.anio, q.mes, 'diferencial_cambiario'));       // 'recurrentes' ya estaba confirmada
     await declararIva(q);
     const c = await checklistCierre(db, q.anio, q.mes);
     expect(c.puntos.filter((x) => !x.ok).map((x) => x.codigo)).toEqual([]);
@@ -175,7 +173,7 @@ describe('cierre mensual (R-DP a R-DS)', () => {
 
   it('cerrado el mes no admite asientos, ni confirmaciones nuevas, y el historial no se modifica', async () => {
     await esperarError(manual(q.dia, [['1.1.01.01', '5', ''], ['3.1.01', '', '5']]), 'está cerrado');
-    await esperarError(como(contador, (tx) => confirmarCierre(tx, contador, q.anio, q.mes, 'diferencial_cambiario')), 'ya no está abierto');
+    await esperarError(como(contador, (tx) => confirmarCierre(tx, contador, q.anio, q.mes, 'recurrentes')), 'ya no está abierto');
     await esperarError(db.query(`update cierre_periodo set motivo = 'x'`), 'no se modifica');
     await esperarError(db.query(`delete from cierre_periodo`), 'no se modifica');
     await esperarError(como(contador, (tx) => cerrarMes(tx, contador, q.anio, q.mes)), 'ya está cerrado');

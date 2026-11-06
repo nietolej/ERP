@@ -3,6 +3,7 @@ import type { Db } from '@/lib/db/tipos';
 import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
+import { aprobarRevaluacion, rechazarRevaluacion } from '@/lib/contabilidad/revaluacion';
 import { aprobarLiquidacion, aprobarPlan, rechazarLiquidacion, rechazarPlan } from '@/lib/comisiones/comisiones';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
 import {
@@ -92,6 +93,11 @@ export const MANEJADOR_NOTA_PROVEEDOR: Manejador<void> = {
 export const MANEJADOR_PAGO: Manejador<void> = {
   alAprobar: async (tx, id, aprobador) => { await aprobarPago(tx, id, aprobador); },
   alRechazar: (tx, id, usuario, motivo) => rechazarPago(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_REVALUACION: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarRevaluacion(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarRevaluacion(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PLAN_COMISION: Manejador<void> = {
@@ -236,6 +242,17 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select p.id::text as id, 'Pago ' || p.numero || ' · ' || pr.codigo || ' · ' || p.moneda || ' ' || p.monto as texto
          from pago p join proveedor pr on pr.tercero_id = p.proveedor_id where p.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_PAGO,
+  },
+  revaluacion_cambiaria: {
+    etiqueta: 'Revaluación cambiaria mensual',
+    ruta: async (id, db) => {
+      const { rows } = db ? await db.query<{ p: string }>(`select p.anio || '-' || lpad(p.mes::text, 2, '0') as p from revaluacion_cambiaria r join periodo_contable p on p.id = r.periodo_id where r.id = $1`, [id]) : { rows: [] };
+      return `/contabilidad/revaluacion${rows[0] ? `?periodo=${rows[0].p}` : ''}`;
+    },
+    resumenes: (db, ids) => consulta(db,
+      `select r.id::text as id, 'Revaluación cambiaria ' || lpad(p.mes::text, 2, '0') || '-' || p.anio || ' · ganancia Bs ' || r.ganancia_ves || ' · pérdida Bs ' || r.perdida_ves as texto
+         from revaluacion_cambiaria r join periodo_contable p on p.id = r.periodo_id where r.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_REVALUACION,
   },
   plan_comision: {
     etiqueta: 'Plan de comisión',

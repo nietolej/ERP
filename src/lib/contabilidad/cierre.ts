@@ -4,7 +4,8 @@ import type { Db } from '@/lib/db/tipos';
 import { declaraPorQuincena } from '@/lib/fiscal/declaraciones';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { saldoAuxiliarComisiones } from '@/lib/comisiones/comisiones';
-import { construirResultados, construirSituacion, movimientosDe, rangoDeMes, saldosAl } from './estados';
+import { construirSituacion, rangoDeMes, saldosAl } from './estados';
+import { estadoRevaluacion } from './revaluacion';
 
 /**
  * Cierre mensual (spec §12.4; migración 0051). El checklist junta lo que el sistema puede comprobar solo (documentos pendientes, conciliaciones,
@@ -18,7 +19,7 @@ export const ROLES_REABREN_PERIODO = ['gerencia'] as const satisfies readonly Ro
 export const ROLES_RETIRAN_CIERRE = ['jefe_contabilidad', 'gerencia'] as const satisfies readonly Rol[];
 export const ROLES_VEN_CIERRE = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'] as const satisfies readonly Rol[];
 
-export type CodigoCierre = 'recurrentes' | 'diferencial_cambiario';
+export type CodigoCierre = 'recurrentes';
 export type UsuarioCierre = { id: string; roles: readonly string[] };
 
 const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -206,11 +207,10 @@ export async function checklistCierre(db: Db, anio: number, mes: number): Promis
     enlace: { texto: 'Asientos contables', href: '/contabilidad/asientos' },
   });
 
-  const dif = construirResultados(await movimientosDe(db, desde, hasta)).diferencialCambiario.total.ves;
+  const rev = await estadoRevaluacion(db, anio, mes);
   agrega({
-    codigo: 'diferencial_cambiario', titulo: 'Diferencial cambiario del mes revisado', ok: conf.has('diferencial_cambiario'),
-    detalle: `Resultado por diferencial cambiario del mes: Bs. ${dos(dif).toFixed(2)}. ${conf.has('diferencial_cambiario') ? 'Revisado por Contabilidad.' : 'Contabilidad confirma su revisión.'}`,
-    confirmacion: { codigo: 'diferencial_cambiario', hecha: conf.get('diferencial_cambiario') ?? null },
+    codigo: 'diferencial_cambiario', titulo: 'Partidas en divisas revaluadas al cierre del mes (diferencial cambiario)', ok: rev.ok, detalle: rev.detalle,
+    enlace: { texto: 'Revaluación cambiaria', href: `/contabilidad/revaluacion?periodo=${anio}-${String(mes).padStart(2, '0')}` },
   });
 
   const control = (await db.query<{ ves: string; usd: string }>('select diferencia_ves::text as ves, diferencia_usd::text as usd from vw_control_cuadre')).rows[0];
@@ -233,7 +233,7 @@ const tiene = (u: UsuarioCierre, roles: readonly string[]) => u.roles.some((r) =
 
 export async function confirmarCierre(tx: Db, u: UsuarioCierre, anio: number, mes: number, codigo: CodigoCierre, nota?: string): Promise<void> {
   if (!tiene(u, ROLES_CIERRAN_PERIODO)) throw new ErrorMaestro('Solo Contabilidad o Gerencia confirman puntos del cierre.');
-  if (codigo !== 'recurrentes' && codigo !== 'diferencial_cambiario') throw new ErrorMaestro('Confirmación desconocida.');
+  if (codigo !== 'recurrentes') throw new ErrorMaestro('Confirmación desconocida.');
   const p = await periodoDeMes(tx, anio, mes);
   if (p.estado !== 'abierto') throw new ErrorMaestro('El periodo ya no está abierto.');
   const { rows } = await tx.query('select 1 from cierre_confirmacion where periodo_id = $1 and codigo = $2 and retirada_at is null', [p.id, codigo]);

@@ -7,6 +7,7 @@ import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
 import { ROLES_VEN_COMISIONES, ROLES_VEN_TODO_COMISIONES } from '@/lib/comisiones/comisiones';
 import { ROLES_VEN_CIERRE } from '@/lib/contabilidad/cierre';
+import { ROLES_VEN_REVALUACION } from '@/lib/contabilidad/revaluacion';
 import { ROLES_VEN_ESTADOS } from '@/lib/contabilidad/estados';
 import { ROLES_VEN_APERTURA } from '@/lib/apertura/apertura';
 import { ROLES_VEN_CHECKLIST } from '@/lib/apertura/checklist';
@@ -121,6 +122,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Pagos a proveedores', href: '/compras/pagos', roles: [...ROLES_VEN_PAGOS] },
       { texto: 'Activos fijos y depreciación', fase: 6 },
       { texto: 'Estados financieros', href: '/contabilidad/estados', roles: [...ROLES_VEN_ESTADOS] },
+      { texto: 'Revaluación cambiaria', href: '/contabilidad/revaluacion', roles: [...ROLES_VEN_REVALUACION] },
       { texto: 'Cierre mensual', href: '/contabilidad/cierre', roles: [...ROLES_VEN_CIERRE] },
     ],
   },

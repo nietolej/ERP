@@ -68,6 +68,7 @@ describe('migraciones', () => {
       '0051_cierre_mensual.sql',
       '0052_rentabilidad.sql',
       '0053_comisiones.sql',
+      '0054_revaluacion_cambiaria.sql',
     ]);
   });
 
