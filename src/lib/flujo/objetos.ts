@@ -3,6 +3,7 @@ import type { Db } from '@/lib/db/tipos';
 import { aprobarFactura, rechazarFactura } from '@/lib/compras/facturas';
 import { aprobarOrden, rechazarOrden } from '@/lib/compras/ordenes';
 import { aprobarNota as aprobarNotaProveedor, rechazarNota as rechazarNotaProveedor } from '@/lib/compras/notas-proveedor';
+import { aprobarActivo, aprobarBaja, rechazarActivo, rechazarBaja } from '@/lib/contabilidad/activos';
 import { aprobarRevaluacion, rechazarRevaluacion } from '@/lib/contabilidad/revaluacion';
 import { aprobarLiquidacion, aprobarPlan, rechazarLiquidacion, rechazarPlan } from '@/lib/comisiones/comisiones';
 import { aprobarPago, rechazarPago } from '@/lib/compras/pagos';
@@ -98,6 +99,16 @@ export const MANEJADOR_PAGO: Manejador<void> = {
 export const MANEJADOR_REVALUACION: Manejador<void> = {
   alAprobar: (tx, id, aprobador) => aprobarRevaluacion(tx, id, aprobador),
   alRechazar: (tx, id, usuario, motivo) => rechazarRevaluacion(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_ACTIVO_FIJO: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarActivo(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarActivo(tx, id, usuario, motivo),
+};
+
+export const MANEJADOR_BAJA_ACTIVO: Manejador<void> = {
+  alAprobar: (tx, id, aprobador) => aprobarBaja(tx, id, aprobador),
+  alRechazar: (tx, id, usuario, motivo) => rechazarBaja(tx, id, usuario, motivo),
 };
 
 export const MANEJADOR_PLAN_COMISION: Manejador<void> = {
@@ -253,6 +264,22 @@ export const TIPOS_OBJETO: Record<string, TipoObjeto> = {
       `select r.id::text as id, 'Revaluación cambiaria ' || lpad(p.mes::text, 2, '0') || '-' || p.anio || ' · ganancia Bs ' || r.ganancia_ves || ' · pérdida Bs ' || r.perdida_ves as texto
          from revaluacion_cambiaria r join periodo_contable p on p.id = r.periodo_id where r.id = any($1::uuid[])`, ids),
     manejador: MANEJADOR_REVALUACION,
+  },
+  activo_fijo: {
+    etiqueta: 'Alta de activo fijo',
+    ruta: (id) => `/contabilidad/activos/${id}`,
+    resumenes: (db, ids) => consulta(db, `select f.id::text as id, 'Activo ' || f.codigo || ' · ' || f.descripcion || ' · US$ ' || f.costo_usd as texto from activo_fijo f where f.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_ACTIVO_FIJO,
+  },
+  baja_activo_fijo: {
+    etiqueta: 'Baja de activo fijo',
+    ruta: async (id, db) => {
+      const { rows } = db ? await db.query<{ a: string }>('select activo_id::text as a from baja_activo where id = $1', [id]) : { rows: [] };
+      return rows[0] ? `/contabilidad/activos/${rows[0].a}` : '/contabilidad/activos';
+    },
+    resumenes: (db, ids) => consulta(db,
+      `select b.id::text as id, 'Baja ' || b.numero || ' · ' || f.codigo || ' · ' || f.descripcion as texto from baja_activo b join activo_fijo f on f.id = b.activo_id where b.id = any($1::uuid[])`, ids),
+    manejador: MANEJADOR_BAJA_ACTIVO,
   },
   plan_comision: {
     etiqueta: 'Plan de comisión',

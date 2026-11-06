@@ -1357,7 +1357,7 @@ Las reglas viven en una tabla `regla_contable` (evento, condición, cuenta del d
 - **Flujo:** Contabilidad o Gerencia proponen; el Jefe de contabilidad, distinto de quien propone, aprueba por el motor de flujo. Al aprobar, la base recalcula (si las cifras cambiaron desde la propuesta, no aprueba) y contabiliza el asiento `ajuste_cambiario` con fecha del último día y **su reverso el primer día del mes siguiente**: la revaluación vale solo para el balance del cierre y los pagos, cobros y anticipos que siguen usan los valores históricos y liquidan su diferencial como siempre. Hay una revaluación vigente por mes; una rechazada se propone de nuevo. Las cuentas de la revaluación se configuran en `configuracion_contable`.
 - **Cierre mensual:** el punto «partidas en divisas revaluadas» es ahora una comprobación automática (reemplaza la confirmación manual del diferencial): está resuelto si no hay diferencia por registrar o si la revaluación aprobada sigue coincidiendo con el cálculo de hoy; sin la tasa BCV del último día queda pendiente.
 - **Limitación:** las cuentas por pagar y los anticipos se leen con su saldo de hoy (como el cuadre de auxiliares), así que la revaluación se hace al cerrar el mes, no meses después; los bancos sí se leen del mayor a la fecha de corte.
-- **Pendiente:** el cierre del ejercicio (asiento de cierre contra el resultado del ejercicio y apertura del año siguiente) y las provisiones automáticas (depreciación, cuando existan los activos fijos).
+- **Pendiente:** el cierre del ejercicio (asiento de cierre contra el resultado del ejercicio y apertura del año siguiente) y las provisiones automáticas distintas de la depreciación (nómina).
 
 ### 12.5 Estados financieros y reportes
 Todos se generan **desde el mayor**, por periodo y comparativos, en **VES (legal)** y en **USD (gestión)**:
@@ -1412,6 +1412,15 @@ Todos se generan **desde el mayor**, por periodo y comparativos, en **VES (legal
 - **Baja o venta:** documento con aprobación (§4.5); depreciación hasta la fecha y asiento de ganancia o pérdida.
 - Cuadre: el auxiliar de activos (costo y depreciación acumulada) debe cuadrar con las cuentas del mayor.
 - Los métodos de depreciación fiscal y la vida útil por categoría los define el contador (§16).
+
+**Construido (Fase 6; migración 0055; decisión 15; Contabilidad → Activos fijos y depreciación):**
+- **Método:** línea recta, mensual, **una sola depreciación** (la contable es la fiscal; sin impuesto diferido) y valor residual cero por defecto, editable por activo. Cuota = (costo − residual − depreciación de apertura) ÷ meses que le quedan, calculada en bolívares y en dólares a partir del costo de cada moneda; la **última cuota ajusta el resto** y el activo nunca pasa de su valor depreciable.
+- **Categorías** (`categoria_activo`): cuenta de activo, de depreciación acumulada y de gasto, y vida útil en meses, en una tabla. Vienen sembradas con **valores de ejemplo** (edificaciones 240, maquinaria 120, vehículos 60, mobiliario 120, computación 48) y cuentas 1.4.03 a 1.4.06, 6.2.04 (depreciación) y 6.2.05 (pérdida por baja). **El contador confirma o cambia cada vida útil** (queda quién y cuándo) y la pantalla avisa mientras sea un valor de ejemplo. Cambiarla solo rige para los activos que se registren después.
+- **Alta (primera entrega: activos que ya existen al arranque):** Contabilidad o Gerencia lo registran con su costo, su depreciación acumulada y los meses ya depreciados; nace pendiente y **Gerencia, distinta de quien lo registró, lo aprueba** por el motor de flujo; al aprobar se contabiliza el costo y la depreciación acumulada contra «Saldos de apertura» a la fecha de arranque (la base rechaza altas con la apertura cerrada). Código AF00001…
+- **Depreciación del mes:** un asiento por mes (gasto contra depreciación acumulada, por categoría), solo de un mes terminado y abierto. No se repite un mes ni se salta uno (cada activo debe tener sus cuotas anteriores). Las cuotas quedan inmutables en `depreciacion_activo`.
+- **Baja:** documento con aprobación de Gerencia (distinta de quien la solicita); saca el costo y la depreciación acumulada y lleva la diferencia a pérdida por baja (6.2.05). Antes deben estar depreciados los meses anteriores a la fecha de la baja; el mes de la baja no se deprecia.
+- **Auxiliar y cierre mensual:** el costo y la depreciación acumulada de los activos vigentes (VES y USD) se comparan con las cuentas de sus categorías en el cuadre del cierre. El punto «recurrentes» del cierre exige ahora la depreciación del mes hecha, además de la confirmación de Contabilidad por los demás asientos recurrentes (nómina).
+- **Pendiente:** alta desde una factura de compra marcada como activo fijo; venta de un activo (hoy solo baja); depreciación parcial del mes de alta o de baja; mejoras que alargan la vida útil; y la confirmación del contador de categorías y años (decisión 15).
 
 ---
 

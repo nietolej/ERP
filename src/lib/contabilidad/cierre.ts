@@ -4,6 +4,7 @@ import type { Db } from '@/lib/db/tipos';
 import { declaraPorQuincena } from '@/lib/fiscal/declaraciones';
 import { ErrorMaestro } from '@/lib/maestros/terceros';
 import { saldoAuxiliarComisiones } from '@/lib/comisiones/comisiones';
+import { activosSinDepreciar, saldoAuxiliarActivos } from './activos';
 import { construirSituacion, rangoDeMes, saldosAl } from './estados';
 import { estadoRevaluacion } from './revaluacion';
 
@@ -123,11 +124,16 @@ export async function cuadreAuxiliares(db: Db): Promise<Cuadre[]> {
   const inv = await un(`select coalesce(sum(valor_usd), 0)::text as v from producto_costo`);
   const puente = await mayor('2.1.02', 'usd', -1);
   const com = await saldoAuxiliarComisiones(db);
+  const af = await saldoAuxiliarActivos(db);
   return [
     cuadre('Cuentas por cobrar (1.2.01)', 'VES', await mayor('1.2.01', 'ves', 1), dos(cxc.rows[0].ves)),
     cuadre('Cuentas por cobrar (1.2.01)', 'USD', await mayor('1.2.01', 'usd', 1), dos(cxc.rows[0].usd)),
     cuadre('Cuentas por pagar (2.1.01)', 'USD', await mayor('2.1.01', 'usd', -1), cxp),
     cuadre('Inventario de mercancía (1.3.01)', 'USD', await mayor('1.3.01', 'usd', 1), inv),
+    cuadre('Activos fijos: costo', 'VES', dos(af.mayorCostoVes), dos(af.costoVes)),
+    cuadre('Activos fijos: costo', 'USD', dos(af.mayorCostoUsd), dos(af.costoUsd)),
+    cuadre('Activos fijos: depreciación acumulada', 'VES', dos(af.mayorDepVes), dos(af.depVes)),
+    cuadre('Activos fijos: depreciación acumulada', 'USD', dos(af.mayorDepUsd), dos(af.depUsd)),
     cuadre('Comisiones por pagar (2.1.07)', 'VES', await mayor('2.1.07', 'ves', -1), dos(com.ves)),
     cuadre('Comisiones por pagar (2.1.07)', 'USD', await mayor('2.1.07', 'usd', -1), dos(com.usd)),
     // La cuenta puente de la conciliación a tres vías no tiene auxiliar propio: no puede quedar con saldo deudor (se facturó más de lo recibido).
@@ -200,9 +206,11 @@ export async function checklistCierre(db: Db, anio: number, mes: number): Promis
     enlace: { texto: 'Declaraciones', href: '/fiscal/declaraciones' },
   });
 
+  const sinDepreciar = await activosSinDepreciar(db, anio, mes);
   agrega({
-    codigo: 'recurrentes', titulo: 'Asientos recurrentes y provisiones del mes contabilizados (depreciación, nómina)', ok: conf.has('recurrentes'),
-    detalle: conf.has('recurrentes') ? 'Confirmado por Contabilidad.' : 'Contabilidad confirma que registró los asientos recurrentes y las provisiones del mes.',
+    codigo: 'recurrentes', titulo: 'Depreciación del mes contabilizada y demás asientos recurrentes y provisiones (nómina)', ok: conf.has('recurrentes') && sinDepreciar.length === 0,
+    detalle: sinDepreciar.length ? 'Falta depreciar el mes (Contabilidad → Activos fijos).' : conf.has('recurrentes') ? 'Depreciación hecha y resto confirmado por Contabilidad.' : 'Depreciación al día. Contabilidad confirma que registró los demás asientos recurrentes y provisiones del mes.',
+    pendientes: sinDepreciar.map((x) => `Sin depreciar: ${x}`),
     confirmacion: { codigo: 'recurrentes', hecha: conf.get('recurrentes') ?? null },
     enlace: { texto: 'Asientos contables', href: '/contabilidad/asientos' },
   });

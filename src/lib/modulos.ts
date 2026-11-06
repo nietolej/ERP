@@ -6,6 +6,7 @@ import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
 import { ROLES_VEN_PAGOS } from '@/lib/compras/pagos';
 import { ROLES_VEN_COMISIONES, ROLES_VEN_TODO_COMISIONES } from '@/lib/comisiones/comisiones';
+import { ROLES_VEN_ACTIVOS } from '@/lib/contabilidad/activos';
 import { ROLES_VEN_CIERRE } from '@/lib/contabilidad/cierre';
 import { ROLES_VEN_REVALUACION } from '@/lib/contabilidad/revaluacion';
 import { ROLES_VEN_ESTADOS } from '@/lib/contabilidad/estados';
@@ -120,7 +121,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Cobros', href: '/cobranzas/cobros', roles: [...ROLES_VEN_COBROS] },
       { texto: 'Cuentas por pagar', href: '/compras/cuentas-por-pagar', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Pagos a proveedores', href: '/compras/pagos', roles: [...ROLES_VEN_PAGOS] },
-      { texto: 'Activos fijos y depreciación', fase: 6 },
+      { texto: 'Activos fijos y depreciación', href: '/contabilidad/activos', roles: [...ROLES_VEN_ACTIVOS] },
       { texto: 'Estados financieros', href: '/contabilidad/estados', roles: [...ROLES_VEN_ESTADOS] },
       { texto: 'Revaluación cambiaria', href: '/contabilidad/revaluacion', roles: [...ROLES_VEN_REVALUACION] },
       { texto: 'Cierre mensual', href: '/contabilidad/cierre', roles: [...ROLES_VEN_CIERRE] },
