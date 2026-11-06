@@ -70,6 +70,7 @@ describe('migraciones', () => {
       '0053_comisiones.sql',
       '0054_revaluacion_cambiaria.sql',
       '0055_activos_fijos.sql',
+      '0056_indices_reportes.sql',
     ]);
   });
 
