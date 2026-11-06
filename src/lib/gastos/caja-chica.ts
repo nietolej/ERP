@@ -3,7 +3,7 @@ import { guardarAdjunto } from '@/lib/adjuntos/adjuntos';
 import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import type { Soporte, UsuarioGasto } from './gastos';
 import { ROLES_CUSTODIO, ROLES_SOLICITAN_REPOSICION, ROLES_VEN_CAJA } from './roles';
 

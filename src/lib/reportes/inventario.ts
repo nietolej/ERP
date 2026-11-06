@@ -1,6 +1,6 @@
 import { crearOrden, guardarLinea, type Usuario } from '@/lib/compras/ordenes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { validarPeriodo } from '@/lib/inventario/disponibilidad';
 
 /**

@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Reparto de gastos de importación entre las líneas de una compra (§7.2, regla 3).

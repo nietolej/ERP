@@ -4,7 +4,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { cancelarSolicitud, solicitarAprobacion } from '@/lib/flujo/flujo';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Producción o ensamblaje: órdenes simples, sin listas de materiales (spec §8.4, decisión 12; migración 0043).

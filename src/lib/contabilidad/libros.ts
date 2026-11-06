@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Libro diario y libro mayor (spec §12.5): legales, en bolívares y con numeración. Son lecturas del mayor —los asientos contabilizados son inmutables y su

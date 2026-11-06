@@ -1,6 +1,6 @@
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Disponibilidad y velocidad de venta (spec_reportes §9.1, migración 0027). Todo se calcula en la base, en fn_disponibilidad:

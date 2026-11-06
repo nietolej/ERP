@@ -4,7 +4,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Ajuste de inventario (§4.3, §8.3): conteo contra el sistema, con aprobación. Migración 0020.

@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Almacenes (§5.3) y almacenes visibles por usuario (§4.3). Los administra Gerencia.

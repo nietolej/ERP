@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Libros de ventas y de compras (spec §11.4; migración 0044). Salen de las vistas vw_libro_ventas y vw_libro_compras: una sola fuente.

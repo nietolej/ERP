@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Parámetros de reportes e inventario (spec_reportes §1.4: ningún umbral vive en el código). Los edita Gerencia, y cada cambio

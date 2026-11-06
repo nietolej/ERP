@@ -6,7 +6,7 @@ import type { Db } from '@/lib/db/tipos';
 import type { ServicioNumeroControl } from '@/lib/fiscal/imprenta';
 import { cancelarSolicitud, solicitarAprobacion } from '@/lib/flujo/flujo';
 import { motivoSistema } from '@/lib/maestros/motivos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_VEN_FACTURAS, pedirControl } from './facturas';
 import { verTodosLosDocumentos, type Usuario } from './pedidos';
 

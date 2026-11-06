@@ -5,7 +5,7 @@ import { puedeVerCliente, ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import { ROLES_VEN_PRODUCTOS } from '@/lib/maestros/productos';
 import { ROLES_VEN_PROVEEDORES } from '@/lib/maestros/proveedores';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_REGISTRAN_GASTO, ROLES_VEN_CAJA, ROLES_VEN_GASTOS } from '@/lib/gastos/roles';
 import { ROLES_COBRAN, ROLES_VEN_COBROS } from '@/lib/ventas/cobros';
 import { ROLES_CONSTANCIA, ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';

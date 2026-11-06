@@ -3,7 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
 
 /**

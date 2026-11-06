@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { normalizarRif } from './rif';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Metas de venta (§5.4, spec_reportes §10).

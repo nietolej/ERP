@@ -1,8 +1,7 @@
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import type { Db } from '@/lib/db/tipos';
-import {
-  ErrorMaestro, exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero,
-} from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero } from './terceros';
 
 /**
  * Proveedores (§5.1, matriz de §4.3).

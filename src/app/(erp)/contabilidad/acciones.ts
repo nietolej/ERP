@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 export async function crearPeriodosDelAnio(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   try {

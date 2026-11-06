@@ -1,6 +1,7 @@
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro, vacioANull } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { vacioANull } from './terceros';
 
 /**
  * Transportistas, vehículos y tarifas (§6.4, migración 0026).

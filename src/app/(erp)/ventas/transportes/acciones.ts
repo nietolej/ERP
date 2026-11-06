@@ -6,7 +6,7 @@ import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import type { Usuario } from '@/lib/ventas/pedidos';
 import {
   ROLES_TRANSPORTE, agregarParada, anularTransporte, cambiarDireccionParada, cargarTransporte, cerrarTransporte, crearTransporte,

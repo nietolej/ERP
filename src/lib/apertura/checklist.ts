@@ -1,6 +1,6 @@
 import type { Db } from '@/lib/db/tipos';
 import { PROVEEDOR_SIMULADO } from '@/lib/fiscal/imprenta';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { controlApertura } from './apertura';
 
 /**

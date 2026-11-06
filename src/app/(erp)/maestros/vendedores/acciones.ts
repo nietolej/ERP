@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
-import { ErrorConfirmable } from '@/lib/maestros/terceros';
+import { ErrorConfirmable } from '@/lib/errores';
 import {
   TIPOS_VENDEDOR, actualizarVendedor, cambiarEstadoVendedor, crearVendedor, type DatosVendedor, type TipoVendedor,
 } from '@/lib/maestros/vendedores';

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_SALIDA, confirmarSalida, despacharParcial } from '@/lib/ventas/despacho';
 import {
   ROLES_DECIDEN_FALTANTE, ROLES_PICKING, cambiarPrioridad, empacarOrden, esperarFaltante, finalizarOrden, iniciarOrden,

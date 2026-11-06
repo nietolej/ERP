@@ -5,7 +5,7 @@ import { calcularRetenciones, guardarRetenciones, sumaRetenciones } from '@/lib/
 import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_CATEGORIAS, ROLES_REGISTRAN_GASTO, ROLES_VEN_GASTOS } from './roles';
 
 /**

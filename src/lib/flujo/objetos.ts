@@ -18,7 +18,7 @@ import { aplicarAjuste, rechazarAjuste } from '@/lib/inventario/ajustes';
 import { aprobarCliente, type DatosCredito } from '@/lib/maestros/clientes';
 import { aprobarLoteMetas, rechazarLoteMetas } from '@/lib/maestros/metas';
 import { aprobarCambio, aprobarProveedor, rechazarCambio } from '@/lib/maestros/proveedores';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { aprobarPedidoCredito, rechazarPedidoCredito } from '@/lib/ventas/pedidos';
 import { aprobarNota, rechazarNota } from '@/lib/ventas/notas';
 import { aprobarPromocion, rechazarPromocion } from '@/lib/ventas/promociones';

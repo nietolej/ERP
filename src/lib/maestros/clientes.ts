@@ -1,11 +1,11 @@
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import type { Db } from '@/lib/db/tipos';
 import { ROLES_VEN_TODOS } from './roles';
-import {
-  ErrorMaestro, exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero,
-} from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { exigirNombreDistinto, obtenerOCrearTercero, rifOError, vacioANull, validarTercero, type DatosTercero } from './terceros';
 
-export { ErrorConfirmable, ErrorMaestro, posiblesDuplicados, type DatosTercero } from './terceros';
+export { ErrorConfirmable, ErrorMaestro } from '@/lib/errores';
+export { posiblesDuplicados, type DatosTercero } from './terceros';
 
 /**
  * Clientes (§5.1, §5.5).

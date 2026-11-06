@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Productos (§5.3). Almacén crea y modifica el catálogo; Gerencia y Supervisor de ventas fijan precios.

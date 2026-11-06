@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { declaraPorQuincena } from '@/lib/fiscal/declaraciones';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { saldoAuxiliarComisiones } from '@/lib/comisiones/comisiones';
 import { activosSinDepreciar, saldoAuxiliarActivos } from './activos';
 import { construirSituacion, rangoDeMes, saldosAl } from './estados';

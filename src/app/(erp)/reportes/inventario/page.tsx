@@ -10,7 +10,7 @@ import {
   ESTADOS_SALUD, FILTRO_STOCK_CERO, NOMBRE_ESTADO_SALUD, ORDENES, ROLES_VEN_DISPONIBILIDAD, consultarDisponibilidad, resumenSalud,
   type OrdenDisponibilidad,
 } from '@/lib/inventario/disponibilidad';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { saludPorGrupo, sugeridoCompra, tarjetasInventario, valorizacionMensual } from '@/lib/reportes/inventario';
 import { opcionesOrden } from '../../compras/ordenes/datos';
 

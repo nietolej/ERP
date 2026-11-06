@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Rentabilidad por dimensión (spec §12.5; migración 0052). Una sola fuente: vw_rentabilidad_linea, en USD (gestión).

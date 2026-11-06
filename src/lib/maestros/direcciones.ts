@@ -1,7 +1,8 @@
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { puedeVerCliente } from './clientes';
-import { ErrorMaestro, vacioANull } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { vacioANull } from './terceros';
 
 /**
  * Direcciones de entrega del cliente con ubicación y horario de recepción (§5.1, migración 0026).

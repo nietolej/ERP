@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Retenciones de IVA e ISLR al contabilizar una factura de compra o un gasto de importación (spec §7.2 regla 4, §11.0, §11.2).

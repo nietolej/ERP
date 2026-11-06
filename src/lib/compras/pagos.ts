@@ -4,7 +4,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { textoDeAnulacion, type MotivoDocumento } from '@/lib/maestros/motivos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { registrarIgtfPago, revertirIgtfPago } from './igtf';
 import type { Usuario } from './ordenes';
 

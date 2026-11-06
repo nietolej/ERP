@@ -1,6 +1,6 @@
 import type { Db } from '@/lib/db/tipos';
 import { crearProducto, fijarPrecio, resolverProductoBase, ROLES_PRECIOS, LISTAS } from './productos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Carga masiva de productos (spec §14.4). El personal prepara un CSV con el formato del ERP y el sistema lo valida fila por fila:

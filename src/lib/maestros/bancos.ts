@@ -1,6 +1,6 @@
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Bancos (§5.4): catálogo de instituciones financieras. Los registra Tesorería o Gerencia.

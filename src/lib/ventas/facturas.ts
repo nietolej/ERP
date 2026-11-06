@@ -4,7 +4,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { servicioImprenta, type ServicioNumeroControl } from '@/lib/fiscal/imprenta';
 import { textoDeAnulacion, type MotivoDocumento } from '@/lib/maestros/motivos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { verTodosLosDocumentos, type Usuario } from './pedidos';
 
 /**

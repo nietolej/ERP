@@ -3,7 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import { contabilizar, tasasDelDia } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Comisiones de venta con base cobrada (spec §9; migración 0053; decisión 6).

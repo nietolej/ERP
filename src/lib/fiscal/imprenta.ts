@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Número de control de la factura (§11.1). Lo asigna una imprenta digital autorizada por el SENIAT; el proveedor todavía no

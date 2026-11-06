@@ -6,7 +6,7 @@ import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar, autorizarSesion } from '@/lib/auth/dal';
 import { conUsuario, getDb } from '@/lib/db';
 import { resolverAprobacion } from '@/lib/flujo/objetos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { productoPorCodigo } from '@/lib/ventas/pedidos';
 import {
   CLASES_NC, CLASES_ND, ROLES_CREAN_NOTAS, ROLES_EMITEN_NOTAS, asignarControlNota, crearNotaCredito, crearNotaDebito, eliminarNota, emitirNota,

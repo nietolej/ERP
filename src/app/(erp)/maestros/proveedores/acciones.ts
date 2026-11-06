@@ -11,7 +11,7 @@ import {
   cambiarCondicionProveedor, cambiarEstadoProveedor, corregirPendiente, crearProveedor, solicitarCambio,
   type DatosContacto, type DatosSensibles, type FilaProveedor, type TipoProveedor,
 } from '@/lib/maestros/proveedores';
-import { ErrorConfirmable } from '@/lib/maestros/terceros';
+import { ErrorConfirmable } from '@/lib/errores';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (fd: FormData, c: string) => (UUID.test(texto(fd, c)) ? texto(fd, c) : null);

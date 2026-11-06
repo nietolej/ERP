@@ -1,15 +1,11 @@
 import type { Db } from '@/lib/db/tipos';
+import { ErrorConfirmable, ErrorMaestro } from '@/lib/errores';
 import { normalizarRif, problemaDeRif, tipoPersona } from './rif';
 
 /**
  * Terceros (§5.1): un RIF es una sola persona, aunque sea cliente, proveedor o vendedor externo.
  * La base valida el RIF y su unicidad (migración 0007).
  */
-
-export class ErrorMaestro extends Error {}
-
-/** Error que el usuario puede superar confirmando (p. ej. un nombre parecido a otro tercero). */
-export class ErrorConfirmable extends ErrorMaestro {}
 
 export interface DatosTercero {
   razonSocial: string;

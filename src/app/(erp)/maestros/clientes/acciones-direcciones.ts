@@ -8,7 +8,7 @@ import {
   ROLES_EDITAN_DIRECCIONES, actualizarDireccion, crearDireccion, puedeEditarDirecciones, fijarVentanas,
   type DatosDireccion, type Ventana,
 } from '@/lib/maestros/direcciones';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

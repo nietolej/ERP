@@ -1,6 +1,7 @@
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro, vacioANull } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { vacioANull } from './terceros';
 
 /**
  * Cuentas bancarias y cajas de la empresa, donde entran los cobros (§5.4, §6.3, migración 0028).

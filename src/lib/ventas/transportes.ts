@@ -3,7 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
 import { type Ventana } from '@/lib/maestros/direcciones';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { confirmarSalida } from './despacho';
 import type { Usuario } from './pedidos';
 import { exigirAlmacen } from './picking';

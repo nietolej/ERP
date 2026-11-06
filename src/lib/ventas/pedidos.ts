@@ -3,7 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { cancelarSolicitud, solicitarAprobacion } from '@/lib/flujo/flujo';
 import { motivoSistema, textoDeAnulacion, type MotivoDocumento } from '@/lib/maestros/motivos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { cancelarOrdenDeNota, crearOrdenPicking } from './picking';
 import { promocionParaLinea } from './promociones';
 

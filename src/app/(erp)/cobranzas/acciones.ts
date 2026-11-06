@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_COBRAN, anularCobro, aplicarAnticipo, registrarCobro, type AplicacionEntrada } from '@/lib/ventas/cobros';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

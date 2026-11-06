@@ -1,5 +1,6 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro, obtenerOCrearTercero, rifOError } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
+import { obtenerOCrearTercero, rifOError } from './terceros';
 
 /**
  * Vendedores (§5.2). Los administran Gerencia y Supervisor de ventas.

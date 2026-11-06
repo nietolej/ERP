@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/db/tipos';
-import { ErrorMaestro } from './terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Catálogos de motivos (docs/catalogo_decisiones.md): descuento, devolución, anulación, venta perdida y merma.

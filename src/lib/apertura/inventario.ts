@@ -4,7 +4,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { almacenesVisibles } from '@/lib/maestros/almacenes';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 
 /**
  * Conteo físico inicial de inventario (spec §14.3; migración 0049).

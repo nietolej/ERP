@@ -7,7 +7,7 @@ import { autorizar, autorizarSesion } from '@/lib/auth/dal';
 import { conUsuario } from '@/lib/db';
 import type { Db } from '@/lib/db/tipos';
 import { resolverAprobacion } from '@/lib/flujo/objetos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import type { Usuario } from '@/lib/ventas/pedidos';
 import {
   ROLES_CREAN_PROMOCIONES, TIPOS_ALCANCE, TIPOS_PROMOCION, agregarAlcancePorCodigo, anularPromocion, crearPromocion, editarPromocion,

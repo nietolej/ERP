@@ -3,7 +3,7 @@ import type { Rol } from '@/lib/auth/constantes';
 import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { motivoSistema } from '@/lib/maestros/motivos';
-import { ErrorMaestro } from '@/lib/maestros/terceros';
+import { ErrorMaestro } from '@/lib/errores';
 import { crearNotaDesdeReservas, type ReservaPorNota, type Usuario } from './pedidos';
 import { exigirAlmacen, ordenDe } from './picking';
 
