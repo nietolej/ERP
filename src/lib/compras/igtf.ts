@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
+import { dos } from '@/lib/dinero';
 
 /**
  * IGTF pagado en los pagos a proveedores (spec §11.3; migración 0042).
@@ -10,7 +11,6 @@ import type { Db } from '@/lib/db/tipos';
  * El porcentaje sale de parametro_fiscal (IGTF) con su vigencia a la fecha del pago.
  */
 
-const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 export interface EstimacionIgtf {
   aplica: boolean;

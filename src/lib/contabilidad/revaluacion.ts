@@ -5,6 +5,7 @@ import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
 import { insertarLineasConvertidas, tasasDelDia, type LineaOriginal } from './motor';
 import { rangoDeMes } from './estados';
+import { dos } from '@/lib/dinero';
 
 /**
  * Revaluación mensual de partidas monetarias en divisas (decisión 1; migración 0054).
@@ -21,7 +22,6 @@ export const ROLES_PROPONEN_REVALUACION = ['contabilidad', 'jefe_contabilidad', 
 export const ROLES_VEN_REVALUACION = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'] as const satisfies readonly Rol[];
 export type UsuarioReval = { id: string; roles: readonly string[] };
 
-const dos = (v: Decimal.Value) => new Decimal(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 const NO_AJUSTE = `not (a.tipo = 'ajuste_cambiario' or (a.tipo = 'reverso' and exists (select 1 from asiento o where o.id = a.reversa_de and o.tipo = 'ajuste_cambiario')))`;
 
 export interface ItemRevaluacion {

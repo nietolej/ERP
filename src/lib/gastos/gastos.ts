@@ -7,6 +7,7 @@ import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_CATEGORIAS, ROLES_REGISTRAN_GASTO, ROLES_VEN_GASTOS } from './roles';
+import { dos } from '@/lib/dinero';
 
 /**
  * Categorías de gasto y factura de gasto de un proveedor (spec §10.1; migración 0040).
@@ -24,7 +25,6 @@ export type UsuarioGasto = { id: string; roles: readonly string[] };
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const MONTO = /^\d{1,12}(\.\d{1,2})?$/;
 const CODIGO = /^[A-Z0-9_]{2,30}$/;
-const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 export const NOMBRE_ESTADO_GASTO: Record<string, string> = { pendiente: 'Pendiente de Gerencia', contabilizado: 'Contabilizado', rechazado: 'Rechazado' };
 

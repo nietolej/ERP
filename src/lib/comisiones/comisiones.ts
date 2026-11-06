@@ -4,6 +4,7 @@ import { contabilizar, tasasDelDia } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
+import { dos } from '@/lib/dinero';
 
 /**
  * Comisiones de venta con base cobrada (spec §9; migración 0053; decisión 6).
@@ -29,7 +30,6 @@ export type UsuarioCom = { id: string; roles: readonly string[] };
 const tiene = (u: UsuarioCom, roles: readonly string[]) => u.roles.some((r) => roles.includes(r));
 const exigir = (u: UsuarioCom, roles: readonly string[], texto: string) => { if (!tiene(u, roles)) throw new ErrorMaestro(texto); };
 
-const dos = (v: Decimal.Value) => new Decimal(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const PORCENTAJE = /^\d{1,3}(\.\d{1,2})?$/;

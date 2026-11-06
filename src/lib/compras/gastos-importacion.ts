@@ -3,7 +3,7 @@ import { contabilizar } from '@/lib/contabilidad/motor';
 import type { Db } from '@/lib/db/tipos';
 import { ErrorMaestro } from '@/lib/errores';
 import { CRITERIOS_REPARTO, repartirCosto, type CriterioReparto, type LineaReparto } from './costo-destino';
-import { dos } from './facturas';
+import { dos } from '@/lib/dinero';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
 import { calcularRetenciones, guardarRetenciones, sumaRetenciones } from './retenciones';
 

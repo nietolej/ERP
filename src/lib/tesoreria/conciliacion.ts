@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import type { Rol } from '@/lib/auth/constantes';
 import type { Db } from '@/lib/db/tipos';
 import { ErrorMaestro } from '@/lib/errores';
+import { dos } from '@/lib/dinero';
 
 /**
  * Conciliación bancaria (spec §10.2; migración 0041).
@@ -21,7 +22,6 @@ const tiene = (u: UsuarioConc, roles: readonly string[]) => u.roles.some((r) => 
 
 const MONTO = /^-?\d{1,12}(\.\d{1,2})?$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 export const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 

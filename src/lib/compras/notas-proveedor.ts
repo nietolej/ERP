@@ -5,6 +5,7 @@ import type { Db } from '@/lib/db/tipos';
 import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
+import { dos } from '@/lib/dinero';
 
 /**
  * Notas de crédito y de débito del proveedor y devolución de mercancía (spec §7.1, §7.2; migración 0039).
@@ -21,7 +22,6 @@ export const ROLES_REGISTRAN_NOTA_PROVEEDOR = ['compras', 'contabilidad', 'geren
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const CANTIDAD = /^\d{1,10}(\.\d{1,4})?$/;
 const MONTO = /^\d{1,14}(\.\d{1,2})?$/;
-const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 const cero = new Decimal(0);
 
 export type TipoNota = 'nota_credito' | 'nota_debito';

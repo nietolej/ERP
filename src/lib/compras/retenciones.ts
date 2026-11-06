@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import type { Db } from '@/lib/db/tipos';
 import { ErrorMaestro } from '@/lib/errores';
+import { dos } from '@/lib/dinero';
 
 /**
  * Retenciones de IVA e ISLR al contabilizar una factura de compra o un gasto de importación (spec §7.2 regla 4, §11.0, §11.2).
@@ -8,7 +9,6 @@ import { ErrorMaestro } from '@/lib/errores';
  * también y el ISLR de concepto_islr_tarifa, que carga Contabilidad. Solo retiene una empresa marcada como agente (§11.0).
  */
 
-const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 export interface Retencion {
   impuesto: 'iva' | 'islr';

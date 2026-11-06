@@ -6,6 +6,7 @@ import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
 import { rangoDeMes } from './estados';
 import { insertarLineasConvertidas, tasasDelDia, type LineaOriginal } from './motor';
+import { dos } from '@/lib/dinero';
 
 /**
  * Activos fijos y depreciación (spec §12.6; migración 0055; decisión 15): línea recta mensual, una sola depreciación, residual cero por defecto.
@@ -21,7 +22,6 @@ export const ROLES_GESTIONAN_ACTIVOS = ['contabilidad', 'jefe_contabilidad', 'ge
 export const ROLES_VEN_ACTIVOS = ['contabilidad', 'jefe_contabilidad', 'gerencia', 'auditor'] as const satisfies readonly Rol[];
 export type UsuarioActivo = { id: string; roles: readonly string[] };
 
-const dos = (v: Decimal.Value) => new Decimal(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 const MONTO = /^\d{1,14}(\.\d{1,2})?$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

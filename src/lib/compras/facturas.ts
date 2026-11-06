@@ -6,6 +6,7 @@ import { solicitarAprobacion } from '@/lib/flujo/flujo';
 import { ErrorMaestro } from '@/lib/errores';
 import { ROLES_VEN_COMPRAS, type Usuario } from './ordenes';
 import { calcularRetenciones, guardarRetenciones, sumaRetenciones } from './retenciones';
+import { dos } from '@/lib/dinero';
 
 /**
  * Factura de compra de mercancía con conciliación a tres vías y cuenta por pagar (§7.2, §7.3). Migración 0024.
@@ -29,7 +30,6 @@ export const NOMBRE_ESTADO_FACTURA: Record<string, string> = {
 };
 
 /** Redondeo a centavos igual al del motor contable. */
-export const dos = (d: Decimal.Value) => new Decimal(d).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 interface Factura { id: string; estado: string; orden_id: string; created_by: string }
 

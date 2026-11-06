@@ -7,6 +7,7 @@ import { saldoAuxiliarComisiones } from '@/lib/comisiones/comisiones';
 import { activosSinDepreciar, saldoAuxiliarActivos } from './activos';
 import { construirSituacion, rangoDeMes, saldosAl } from './estados';
 import { estadoRevaluacion } from './revaluacion';
+import { dos } from '@/lib/dinero';
 
 /**
  * Cierre mensual (spec §12.4; migración 0051). El checklist junta lo que el sistema puede comprobar solo (documentos pendientes, conciliaciones,
@@ -25,7 +26,6 @@ export type UsuarioCierre = { id: string; roles: readonly string[] };
 
 const NOMBRE_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 export const etiquetaMes = (anio: number, mes: number) => `${NOMBRE_MES[mes - 1]} ${anio}`;
-const dos = (v: Decimal.Value) => new Decimal(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
 export interface ConfirmacionCierre { id: string; codigo: CodigoCierre; por: string; el: string; nota: string | null }
 
