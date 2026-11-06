@@ -48,3 +48,6 @@ Thumbs.db
 
 # Base de datos local de desarrollo (PGlite)
 .data/
+
+# Grafo de conocimiento (graphify): se regenera con /graphify
+graphify-out/
