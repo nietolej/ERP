@@ -122,9 +122,27 @@ ERP/
 └── docs/                 especificaciones y decisiones
 ```
 
+## Empresa ficticia de demostración
+
+Mientras el ERP se termina, se prueba de punta a punta con una **empresa ficticia** (no hay datos reales de nadie):
+
+```bash
+npm run db:sembrar-demo -- --reiniciar        # crea .data/demo con los últimos 30 días hasta ayer
+PGLITE_DIR=.data/demo ADJUNTOS_DIR=.data/demo-adjuntos npm run dev   # (en Windows, la configuración "erp-demo" de .claude/launch.json hace lo mismo en el puerto 3200)
+```
+
+- Crea una base **aparte** (`.data/demo`): no usa `DATABASE_URL` ni toca la base de desarrollo. La empresa queda marcada como demostración (`empresa.es_demo`, migración 0057) y la pantalla muestra un letrero.
+- Recorre los flujos reales con un **reloj simulado**: el **arranque** (fecha de arranque, saldos de bancos, conteo físico de inventario, facturas pendientes de clientes y proveedores, asiento de apertura del contador y cierre de la apertura), orden de compra → aprobación → recepción → factura del proveedor → pago, pedido → nota de entrega → salida → factura con número de control → cobro, **notas de crédito y débito** de ventas (devolución, descuento comercial, intereses por mora) y del proveedor (devolución y ajuste de precio), **gastos** de proveedores de servicios y **caja chica** (vales con soporte y reposiciones), y el **cierre de cada mes terminado** (revaluación cambiaria, conciliación bancaria, **retenciones de IVA e ISLR con sus comprobantes y declaraciones**, **comisiones** liquidadas y pagadas, **depreciación** de los activos fijos, declaración de IVA y checklist del cierre). La apertura incluye 3 activos fijos, y uno se da de baja a las pocas semanas; el plan de comisión (por grupo y marca, base cobrada) se asigna a los tres vendedores. La empresa ficticia es agente de retención y contribuyente especial, con tarifas de ISLR de demostración. Con la misma semilla y las mismas fechas da siempre los mismos datos.
+- Al terminar verifica que el mayor cuadra y que cada auxiliar (CxC, CxP, inventario…) cuadra con su cuenta. [tests/siembra-demo.test.ts](tests/siembra-demo.test.ts) lo corre en la integración continua.
+- Usuarios `<rol>@demo.test` (administrador, gerencia, ventas1, facturacion…); la clave, solo válida en esta base, está en [scripts/demo/fundaciones.mts](scripts/demo/fundaciones.mts).
+- **Producción y ajustes:** cada martes Almacén ensambla un kit (orden de producción creada por Almacén, liberada por Gerencia, en proceso y terminada; a veces Gerencia la rechaza o se anula por falta de componentes) y cada viernes hace un conteo cíclico con faltantes y sobrantes que Gerencia aprueba.
+- **Simulación larga con ruido (`--ruido`):** estacionalidad (diciembre alto, enero y agosto bajos), feriados fijos sin operación, alzas trimestrales de costo con ajuste de precios por Gerencia, clientes que pagan con mucho retraso o no pagan (cartera vencida) y dos saltos cambiarios al año. Los parámetros fiscales sembrados rigen desde 2026-01-01, así que la corrida más larga posible hoy va del 10-01-2026 al 08-11-2026 (unos 10 meses; `npm run db:sembrar-demo -- --ruido --desde 2026-01-10 --hasta 2026-11-08`): 6 a 8 minutos, unas 1.100 facturas de venta, mayor y auxiliares cuadrados. Es reproducible con la misma semilla.
+- **Todavía no recorre:** las firmas del checklist de arranque (la imprenta es simulada). Se agregan por etapas.
+
 ## Próximos pasos
 
-1. **Tomar las decisiones abiertas** de [docs/decisiones.md](docs/decisiones.md), empezando por la 1 y la 2, que la Fase 0 asumió de forma provisional.
-2. **Validar con el contador** el plan de cuentas y los parámetros fiscales cargados como referencia.
-3. **Crear el repositorio remoto** (GitHub u otro), separado del repositorio del dashboard, para que corra la integración continua.
-4. **Cerrar los pendientes de la Fase 0** e iniciar la **Fase 1: Maestros**.
+1. **Ampliar la siembra de demostración** a los flujos que faltan y a 12 meses con ruido, y medir rendimiento.
+2. **Cerrar lo pendiente de la Fase 6** (cierre del ejercicio) y de las fases 2 a 5 (ver [docs/spec_erp_hanei_motors.md](docs/spec_erp_hanei_motors.md), notas «Pendiente»), incluido el respaldo automático.
+3. **Tomar las decisiones abiertas** de [docs/decisiones.md](docs/decisiones.md): 2, 8, 9, 10, 11 y 13 condicionan el arranque en producción.
+4. **Validar con el contador** el plan de cuentas, los parámetros fiscales y los archivos del portal.
+5. **Generalizar a varias empresas** (una base de datos por empresa, plantillas de configuración, asistente de alta y marca configurable) y empaquetar la instalación desde cero.

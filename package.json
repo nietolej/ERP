@@ -10,7 +10,8 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "db:migrar": "tsx scripts/migrar.mts",
-        "db:crear-admin": "tsx scripts/crear-admin.mts"
+        "db:crear-admin": "tsx scripts/crear-admin.mts",
+        "db:sembrar-demo": "tsx scripts/sembrar-demo.mts"
     },
     "dependencies": {
         "@electric-sql/pglite": "^0.5.8",

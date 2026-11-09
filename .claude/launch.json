@@ -6,6 +6,12 @@
             "runtimeExecutable": "npm",
             "runtimeArgs": ["run", "dev"],
             "port": 3000
+        },
+        {
+            "name": "erp-demo",
+            "runtimeExecutable": "cmd",
+            "runtimeArgs": ["/c", "set PGLITE_DIR=.data/demo&& set ADJUNTOS_DIR=.data/demo-adjuntos&& set PORT=3200&& npm run dev"],
+            "port": 3200
         }
     ]
 }

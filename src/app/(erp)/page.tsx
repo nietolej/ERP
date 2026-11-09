@@ -43,7 +43,7 @@ export default async function InicioPage() {
 
   return (
     <>
-      <Encabezado titulo={`Bienvenido, ${u.nombre}`} descripcion="Dashboard central · Distribuciones Hanei Motors" />
+      <Encabezado titulo={`Bienvenido, ${u.nombre}`} descripcion={`Dashboard central · ${e.empresa ?? 'Empresa sin configurar'}`} />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard titulo="Ventas del mes" valor={monto(venta.ventaUsd, 'US$ ')}

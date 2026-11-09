@@ -71,6 +71,7 @@ describe('migraciones', () => {
       '0054_revaluacion_cambiaria.sql',
       '0055_activos_fijos.sql',
       '0056_indices_reportes.sql',
+      '0057_empresa_demo.sql',
     ]);
   });
 
