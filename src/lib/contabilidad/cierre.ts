@@ -118,9 +118,11 @@ export async function cuadreAuxiliares(db: Db): Promise<Cuadre[]> {
   const un = async (sql: string): Promise<Decimal> => dos((await db.query<{ v: string }>(sql)).rows[0].v);
   const cuadre = (nombre: string, moneda: 'VES' | 'USD', m: Decimal, a: Decimal): Cuadre => ({ nombre, moneda, mayor: m.toFixed(2), auxiliar: a.toFixed(2), ok: m.equals(a) });
 
+  // El auxiliar es la columna saldo_usd que mantiene la base (R-BR): recalcular monto_usd × saldo / monto_original difiere un centavo
+  // del mayor cuando un pago parcial deja una mitad en medio centavo.
   const cxc = await db.query<{ ves: string; usd: string }>(
-    `select coalesce(sum(saldo), 0)::text as ves, coalesce(sum(round(monto_usd * saldo / monto_original, 2)), 0)::text as usd from partida_cxc where estado = 'abierta'`);
-  const cxp = await un(`select coalesce(sum(round(monto_usd * saldo / monto_original, 2)), 0)::text as v from partida_cxp where estado = 'abierta'`);
+    `select coalesce(sum(saldo), 0)::text as ves, coalesce(sum(saldo_usd), 0)::text as usd from partida_cxc where estado = 'abierta'`);
+  const cxp = await un(`select coalesce(sum(saldo_usd), 0)::text as v from partida_cxp where estado = 'abierta'`);
   const inv = await un(`select coalesce(sum(valor_usd), 0)::text as v from producto_costo`);
   const puente = await mayor('2.1.02', 'usd', -1);
   const com = await saldoAuxiliarComisiones(db);
