@@ -19,6 +19,7 @@ import { sembrarApertura } from './apertura.mts';
 import { sembrarPlanComision } from './comisiones.mts';
 import { gastosDelDia } from './gastos.mts';
 import { notasDeVenta } from './postventa.mts';
+import { crmDelDia } from './crm.mts';
 import { ajustarCostos, esFeriado, factorEstacional, retrasoExtra, saltoCambiario } from './ruido.mts';
 import { ajustarInventario, producirUnKit, sembrarKits } from './produccion.mts';
 import { solicitarBaja } from '../../src/lib/contabilidad/activos';
@@ -149,7 +150,7 @@ async function cobrar(ctx: Ctx, cliente: Cliente, partidaId: string, fecha: stri
 }
 
 async function venderUnPedido(ctx: Ctx, fecha: string, stock: Map<string, number>): Promise<void> {
-  const { azar, u } = ctx;
+  const { azar } = ctx;
   const cliente = azar.elegir(ctx.clientes);
   const vendedor = cliente.vendedorUsuario;
   const lineas = azar.barajar(ctx.productos.filter((p) => (stock.get(p.id) ?? 0) > 0)).slice(0, azar.entero(1, 5))
@@ -163,6 +164,24 @@ async function venderUnPedido(ctx: Ctx, fecha: string, stock: Map<string, number
       for (const l of lineas) await agregarLinea(tx, vendedor, id, { productoId: l.producto.id, cantidad: String(l.cantidad) });
       return id;
     });
+    await cerrarVenta(ctx, cliente, pedido, lineas.map((l) => ({ productoId: l.producto.id, cantidad: l.cantidad })), fecha, stock);
+  } catch (e) {
+    if (!(e instanceof ErrorMaestro)) throw e;
+    avisar(ctx, e.message);
+    if (process.env.DEMO_DEBUG) console.log(`[${fecha}] venta: ${e.message}`);
+  }
+}
+
+/**
+ * Lleva un pedido en borrador hasta el cobro: emisión (con crédito), nota de entrega, salida, factura y cobro según el hábito
+ * del cliente. Lo usan las ventas del día y los pedidos que generan las oportunidades ganadas del CRM.
+ */
+export async function cerrarVenta(
+  ctx: Ctx, cliente: Cliente, pedido: string, lineas: { productoId: string; cantidad: number }[], fecha: string, stock: Map<string, number>,
+): Promise<void> {
+  const { azar, u } = ctx;
+  const vendedor = cliente.vendedorUsuario;
+  {
     const emision = await como(ctx, vendedor, (tx) => emitirPedido(tx, vendedor, pedido));
     if (emision.situacion === 'retenido_credito') {
       contar(ctx, 'pedidos_retenidos_por_credito');
@@ -170,7 +189,7 @@ async function venderUnPedido(ctx: Ctx, fecha: string, stock: Map<string, number
       await como(ctx, u.gerencia, (tx) => resolverAprobacion(tx, 'pedido_credito', pedido, u.gerencia.id, aprobar ? 'aprobada' : 'rechazada', aprobar ? {} : { comentario: 'Cliente con mora' }));
       if (!aprobar) { contar(ctx, 'pedidos_rechazados_por_credito'); return; }
     }
-    for (const l of lineas) stock.set(l.producto.id, (stock.get(l.producto.id) ?? 0) - l.cantidad);
+    for (const l of lineas) stock.set(l.productoId, (stock.get(l.productoId) ?? 0) - l.cantidad);
     contar(ctx, 'pedidos');
     const nota = await como(ctx, vendedor, (tx) => generarNotaEntrega(tx, vendedor, pedido));
     await como(ctx, u.almacen, (tx) => confirmarSalida(tx, u.almacen, nota));
@@ -184,10 +203,6 @@ async function venderUnPedido(ctx: Ctx, fecha: string, stock: Map<string, number
     const parcial = cliente.condicionDias > 0 && azar() < 0.15;
     if (pago <= fecha) await cobrar(ctx, cliente, rows[0].id, fecha, parcial ? 0.5 : 1);
     else if (pago <= ctx.hasta) programar(ctx, pago, () => cobrar(ctx, cliente, rows[0].id, pago, parcial ? 0.5 : 1));
-  } catch (e) {
-    if (!(e instanceof ErrorMaestro)) throw e;
-    avisar(ctx, e.message);
-    if (process.env.DEMO_DEBUG) console.log(`[${fecha}] venta: ${e.message}`);
   }
 }
 
@@ -264,6 +279,8 @@ export async function simular(ctx: Ctx, log: (texto: string) => void = () => {})
       }
       fijarReloj(fecha, 17);
       await notasDeVenta(ctx, fecha);
+      // CRM: visitas y llamadas, oportunidades por etapas y casos de postventa, de lunes a viernes.
+      if (dia <= 5) { await crmDelDia(ctx, fecha, dia, stock, (c, p, l, d) => cerrarVenta(ctx, c, p, l, d, new Map())); }
     }
     // Conteo cíclico de los viernes, al final de la jornada.
     if (fecha > inicio && dia === 5 && !(ctx.ruido && esFeriado(fecha))) { fijarReloj(fecha, 18); await ajustarInventario(ctx); }

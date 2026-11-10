@@ -59,6 +59,16 @@ describe('siembra de la empresa ficticia de demostración', () => {
     expect(r.verificacion.filter((l) => l.startsWith('✘'))).toEqual([]);
   });
 
+  it('recorre el CRM: actividades, prospectos, oportunidades por etapas hasta el pedido y casos de postventa', () => {
+    expect(r.resumen.actividades_crm).toBeGreaterThan(0);
+    expect(r.resumen.oportunidades).toBeGreaterThan(0);
+    expect(r.resumen.cotizaciones).toBeGreaterThan(0);
+    expect((r.resumen.oportunidades_ganadas ?? 0) + (r.resumen.oportunidades_perdidas ?? 0)).toBeGreaterThan(0);
+    expect(r.resumen.casos_postventa).toBeGreaterThan(0);
+    expect(r.verificacion.filter((l) => l.includes('CRM:')).every((l) => l.startsWith('✔'))).toBe(true);
+    expect(r.verificacion.filter((l) => l.includes('CRM:'))).toHaveLength(3);
+  });
+
   it('marca la empresa como demostración y la marca no se cambia', async () => {
     const { rows } = await db.query<{ es_demo: boolean; razon_social: string }>('select es_demo, razon_social from empresa');
     expect(rows).toHaveLength(1);

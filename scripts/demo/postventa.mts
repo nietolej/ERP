@@ -3,6 +3,7 @@
  * y cargos por intereses de mora. Las crea quien vende (su cartera), las aprueba el Supervisor de ventas por el motor de flujo
  * y las emite Facturación con número de control.
  */
+import { abrirCaso, cambiarEstadoCaso, enlazarNotaCredito } from '../../src/lib/crm/casos';
 import { ErrorMaestro } from '../../src/lib/errores';
 import { ImprentaSimulada } from '../../src/lib/fiscal/imprenta';
 import { resolverAprobacion } from '../../src/lib/flujo/objetos';
@@ -47,11 +48,20 @@ export async function notasDeVenta(ctx: Ctx, fecha: string): Promise<void> {
         const lineas = (await lineasFacturables(db, f.id)).filter((l) => l.inventariable && Number(l.disponible) >= 1);
         if (!lineas.length) continue;
         const l = azar.elegir(lineas);
-        const id = await como(ctx, creador, (tx) => crearNotaCredito(tx, creador, {
-          facturaId: f.id, clase: 'devolucion', motivoId: motivos.get('devolucion:DEFECTO'), observaciones: 'Producto con defecto de fábrica', lineas: [{ lineaId: l.id, cantidad: '1' }],
-        }));
+        // El cliente reporta la devolución como caso de postventa (§6.5): no mueve inventario, se resuelve con la NC.
+        const { caso, id } = await como(ctx, creador, async (tx) => {
+          const k = await abrirCaso(tx, creador, { clienteId: f.cliente_id, tipo: 'devolucion', facturaId: f.id, descripcion: 'Una pieza llegó con defecto de fábrica' });
+          const nc = await crearNotaCredito(tx, creador, {
+            facturaId: f.id, clase: 'devolucion', motivoId: motivos.get('devolucion:DEFECTO'), observaciones: 'Producto con defecto de fábrica', lineas: [{ lineaId: l.id, cantidad: '1' }],
+          });
+          await enlazarNotaCredito(tx, creador, k.id, nc);
+          return { caso: k, id: nc };
+        });
         await emitir(ctx, 'nota_credito', id, creador);
+        await como(ctx, creador, (tx) => cambiarEstadoCaso(tx, creador, caso.id, 'resuelto', 'Se acreditó la pieza con la nota de crédito por devolución'));
+        await como(ctx, creador, (tx) => cambiarEstadoCaso(tx, creador, caso.id, 'cerrado'));
         contar(ctx, 'notas_credito_devolucion');
+        contar(ctx, 'casos_postventa');
       } else if (clase === 'descuento') {
         const id = await como(ctx, creador, (tx) => crearNotaCredito(tx, creador, {
           facturaId: f.id, clase: 'descuento_comercial', motivoId: motivos.get('descuento:VOLUMEN'), porcentaje: String(azar.ponderado([[3, 50], [5, 35], [8, 15]] as const)),

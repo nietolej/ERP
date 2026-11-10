@@ -31,6 +31,7 @@ import { ROLES_VEN_CUENTAS } from '@/lib/maestros/cuentas-bancarias';
 import { ROLES_VEN_PROMOCIONES } from '@/lib/ventas/promociones';
 import { ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
 import { ROLES_VEN_TRANSPORTISTAS } from '@/lib/maestros/transportistas';
+import { ROLES_VEN_CASOS, ROLES_VEN_CRM } from '@/lib/crm/comun';
 
 /**
  * Mapa de módulos del ERP, al estilo SAP. Es la única fuente de la navegación:
@@ -156,10 +157,12 @@ export const MODULOS: Modulo[] = [
     nombre: 'CRM y Postventa',
     descripcion: 'Prospectos, contactos, oportunidades, actividades y casos de postventa.',
     items: [
-      { texto: 'Prospectos y contactos', fase: 7 },
-      { texto: 'Oportunidades', fase: 7 },
-      { texto: 'Actividades y visitas', fase: 7 },
-      { texto: 'Casos de postventa', fase: 7 },
+      { texto: 'Tablero del CRM', href: '/crm', roles: [...ROLES_VEN_CRM] },
+      { texto: 'Prospectos', href: '/crm/prospectos', roles: [...ROLES_VEN_CRM] },
+      { texto: 'Oportunidades', href: '/crm/oportunidades', roles: [...ROLES_VEN_CRM] },
+      { texto: 'Cotizaciones', href: '/crm/cotizaciones', roles: [...ROLES_VEN_CRM] },
+      { texto: 'Actividades y visitas', href: '/crm/actividades', roles: [...ROLES_VEN_CRM] },
+      { texto: 'Casos de postventa', href: '/crm/casos', roles: [...ROLES_VEN_CASOS] },
     ],
   },
   {

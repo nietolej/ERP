@@ -72,6 +72,7 @@ describe('migraciones', () => {
       '0055_activos_fijos.sql',
       '0056_indices_reportes.sql',
       '0057_empresa_demo.sql',
+      '0058_crm.sql',
     ]);
   });
 

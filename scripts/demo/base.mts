@@ -97,6 +97,10 @@ export interface EstadoSiembra {
   activoIds: string[];
   /** Kits que Almacén ensambla (se crean el día 0; entran a la venta cuando tienen existencia). */
   kits: { id: string; codigo: string; marcaId: string; costoUsd: number; precioBUsd: number; componentes: { productoId: string; cantidad: number }[]; enVenta: boolean }[];
+  /** Azar propio del CRM (semilla derivada): sus flujos no alteran la secuencia de los demás. */
+  azarCrm: Azar;
+  /** Prospectos sembrados (para el RIF y el nombre de los siguientes). */
+  prospectos: number;
 }
 
 export interface Ctx {

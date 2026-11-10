@@ -57,6 +57,22 @@ export async function verificar(ctx: Ctx): Promise<{ ok: boolean; lineas: string
   const ajustesAbiertos = Number((await db.query<{ n: string }>(`select count(*)::text as n from ajuste_inventario where estado in ('borrador', 'pendiente')`)).rows[0].n);
   marca(ajustesAbiertos === 0, `Sin ajustes de inventario a medias (${ajustesAbiertos})`);
 
+  // CRM (§6.5): toda oportunidad ganada generó su pedido desde la cotización, y todo prospecto convertido es un cliente activo.
+  const crm = (await db.query<{ ganadas: string; sin_pedido: string; convertidas: string; prospectos: string; sin_cliente: string; casos_dev: string; casos_dev_sin_nc: string }>(
+    `select (select count(*) from oportunidad where etapa = 'ganada')::text as ganadas,
+            (select count(*) from oportunidad where etapa = 'ganada' and pedido_id is null)::text as sin_pedido,
+            (select count(*) from cotizacion where estado = 'convertida')::text as convertidas,
+            (select count(*) from prospecto where estado = 'convertido')::text as prospectos,
+            (select count(*) from prospecto p where p.estado = 'convertido'
+                and not exists (select 1 from cliente c where c.tercero_id = p.tercero_id and c.estado = 'activo'))::text as sin_cliente,
+            (select count(*) from caso_postventa where tipo = 'devolucion')::text as casos_dev,
+            (select count(*) from caso_postventa k where k.tipo = 'devolucion' and k.estado in ('resuelto', 'cerrado')
+                and not exists (select 1 from documento_venta n where n.id = k.nota_credito_id and n.estado = 'emitido'))::text as casos_dev_sin_nc`)).rows[0];
+  marca(Number(crm.sin_pedido) === 0 && crm.ganadas === crm.convertidas,
+    `CRM: ${crm.ganadas} oportunidades ganadas, todas con su pedido (${crm.sin_pedido} sin pedido; ${crm.convertidas} cotizaciones convertidas)`);
+  marca(Number(crm.sin_cliente) === 0, `CRM: ${crm.prospectos} prospectos convertidos, todos clientes activos (${crm.sin_cliente} sin ficha activa)`);
+  marca(Number(crm.casos_dev_sin_nc) === 0, `CRM: ${crm.casos_dev} casos de devolución, los resueltos con su nota de crédito emitida (${crm.casos_dev_sin_nc} sin ella)`);
+
   const mes = (await db.query<{ mes: string; facturas: string; venta_usd: string }>(
     `select to_char(fecha, 'YYYY-MM') as mes, count(*)::text as facturas, sum(base_usd)::text as venta_usd
        from vw_venta_documento group by 1 order by 1`)).rows;
