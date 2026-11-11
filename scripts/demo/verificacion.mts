@@ -57,6 +57,14 @@ export async function verificar(ctx: Ctx): Promise<{ ok: boolean; lineas: string
   const ajustesAbiertos = Number((await db.query<{ n: string }>(`select count(*)::text as n from ajuste_inventario where estado in ('borrador', 'pendiente')`)).rows[0].n);
   marca(ajustesAbiertos === 0, `Sin ajustes de inventario a medias (${ajustesAbiertos})`);
 
+  // Retenciones de clientes (migración 0059): el IVA retenido por clientes (1.2.04) cuadra con los comprobantes vigentes.
+  const rv = (await db.query<{ mayor: string; registrado: string; n: string }>(
+    `select coalesce((select sum(l.debe_ves - l.haber_ves) from asiento_linea l join asiento a on a.id = l.asiento_id and a.estado = 'contabilizado'
+                        join cuenta_contable c on c.id = l.cuenta_id where c.codigo = '1.2.04'), 0)::text as mayor,
+            coalesce((select sum(monto) from retencion_venta where impuesto = 'iva' and estado = 'registrada'), 0)::text as registrado,
+            (select count(*) from retencion_venta where estado = 'registrada')::text as n`)).rows[0];
+  marca(Number(rv.mayor) === Number(rv.registrado), `IVA retenido por clientes (1.2.04): mayor Bs. ${rv.mayor} · ${rv.n} comprobantes vigentes Bs. ${rv.registrado}`);
+
   // CRM (§6.5): toda oportunidad ganada generó su pedido desde la cotización, y todo prospecto convertido es un cliente activo.
   const crm = (await db.query<{ ganadas: string; sin_pedido: string; convertidas: string; prospectos: string; sin_cliente: string; casos_dev: string; casos_dev_sin_nc: string }>(
     `select (select count(*) from oportunidad where etapa = 'ganada')::text as ganadas,

@@ -112,7 +112,7 @@ async function nuevaOportunidad(ctx: Ctx, fecha: string, stock: Map<string, numb
       }));
       const { rows } = await ctx.db.query<{ codigo: string; razon_social: string }>(
         `select c.codigo, t.razon_social from cliente c join tercero t on t.id = c.tercero_id where c.tercero_id = $1`, [terceroId]);
-      quien = { id: terceroId, codigo: rows[0].codigo, nombre: rows[0].razon_social, vendedorUsuario: vendedor, retrasoDias: 0, pagaEnDivisas: false, condicionDias: 0 };
+      quien = { id: terceroId, codigo: rows[0].codigo, nombre: rows[0].razon_social, vendedorUsuario: vendedor, retrasoDias: 0, pagaEnDivisas: false, condicionDias: 0, agenteRetencion: false };
       ctx.clientes.push(quien);
       contar(ctx, 'prospectos_convertidos');
       pedido = (await como(ctx, vendedor, (tx) => generarPedidoDeOportunidad(tx, vendedor, op))).pedidoId;

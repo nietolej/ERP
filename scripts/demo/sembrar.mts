@@ -42,7 +42,7 @@ export async function sembrarDemo(o: OpcionesSiembra): Promise<ResultadoSiembra>
   fijarReloj(preparacion, 8);
   try {
     const ctx = { db: o.db, azar: crearAzar(o.semilla), desde: o.desde, hasta: o.hasta, ruido: o.ruido ?? false, agenda: new Map(), resumen: {}, avisos: new Map(),
-      estado: { secuencia: 0, enCamino: new Map(), fondoId: null, valesSinReponer: 0, activoIds: [] as string[], kits: [] as Ctx['estado']['kits'], azarCrm: crearAzar((o.semilla ^ 0x5eed) >>> 0), prospectos: 0 },
+      estado: { secuencia: 0, enCamino: new Map(), fondoId: null, valesSinReponer: 0, activoIds: [] as string[], kits: [] as Ctx['estado']['kits'], azarCrm: crearAzar((o.semilla ^ 0x5eed) >>> 0), prospectos: 0, comprobantesRecibidos: 0 },
       archivos: almacenEnDisco(o.adjuntosDir ?? mkdtempSync(path.join(tmpdir(), 'erp-demo-adjuntos-'))) } as Ctx;
     const anios = [...new Set([preparacion.slice(0, 4), o.hasta.slice(0, 4)])].map(Number);
     Object.assign(ctx, await sembrarFundaciones(ctx.db, anios));

@@ -14,6 +14,7 @@ import { recibirMercancia } from '../../src/lib/compras/recepciones';
 import { registrarCobro } from '../../src/lib/ventas/cobros';
 import { confirmarSalida } from '../../src/lib/ventas/despacho';
 import { facturarNotas } from '../../src/lib/ventas/facturas';
+import { registrarRetencion } from '../../src/lib/ventas/retenciones';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega } from '../../src/lib/ventas/pedidos';
 import { sembrarApertura } from './apertura.mts';
 import { sembrarPlanComision } from './comisiones.mts';
@@ -195,6 +196,15 @@ export async function cerrarVenta(
     await como(ctx, u.almacen, (tx) => confirmarSalida(tx, u.almacen, nota));
     const factura = await como(ctx, u.facturacion, (tx) => facturarNotas(tx, u.facturacion, [nota], { servicio: new ImprentaSimulada() }));
     contar(ctx, 'facturas_venta');
+    // Un cliente agente de retención entrega con el pago su comprobante: retiene el 75 % del IVA y paga el resto.
+    if (cliente.agenteRetencion) {
+      const n = ++ctx.estado.comprobantesRecibidos;
+      await como(ctx, u.cobranzas, (tx) => registrarRetencion(tx, u.cobranzas, {
+        documentoId: factura.facturaId, impuesto: 'iva', numeroComprobante: `${fecha.slice(0, 4)}${fecha.slice(5, 7)}${String(n).padStart(8, '0')}`,
+        fechaComprobante: fecha, porcentaje: '75',
+      }));
+      contar(ctx, 'retenciones_recibidas');
+    }
 
     // Cuándo paga: contado, ese mismo día; a crédito, al vencimiento más el retraso habitual del cliente.
     const { rows } = await ctx.db.query<{ id: string; vencimiento: string }>('select id, vencimiento::text from partida_cxc where documento_id = $1', [factura.facturaId]);

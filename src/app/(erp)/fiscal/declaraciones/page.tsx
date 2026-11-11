@@ -62,7 +62,16 @@ export default async function DeclaracionesPage({ searchParams }: { searchParams
               <KpiCard titulo={Number(iva.cuotaPagar) > 0 ? 'Cuota tributaria a pagar (Bs.)' : 'Excedente que se traslada (Bs.)'} valor={monto(Number(iva.cuotaPagar) > 0 ? iva.cuotaPagar : iva.excedenteSiguiente)}
                 tono={Number(iva.cuotaPagar) > 0 ? 'peligro' : 'exito'} />
             </div>
-            <p className="mt-3 text-xs text-texto-2">Resultado = débito − crédito − excedente anterior. Las retenciones de IVA que practican los clientes todavía no existen en el sistema y no restan.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-4">
+              <KpiCard titulo="Retenciones de clientes del mes (Bs.)" valor={monto(iva.retencionesSoportadas)} subtitulo="Comprobantes recibidos que se descuentan aquí" />
+              <KpiCard titulo="Retenciones del mes anterior (Bs.)" valor={monto(iva.retencionesAnteriores)} subtitulo="Sin descontar todavía" />
+              <KpiCard titulo="Retenciones descontadas (Bs.)" valor={monto(iva.retencionesDescontadas)} />
+              <KpiCard titulo="Retenciones que se trasladan (Bs.)" valor={monto(iva.retencionesSiguiente)} />
+            </div>
+            <p className="mt-3 text-xs text-texto-2">
+              Resultado = débito − crédito − excedente anterior. Si es positivo, se le descuentan las retenciones de IVA que practicaron los clientes en el mes
+              y las que trae el mes anterior; lo que no alcanza a descontarse se traslada al mes siguiente.
+            </p>
           </>
         ) : (
           <div className="grid gap-4 sm:grid-cols-3">

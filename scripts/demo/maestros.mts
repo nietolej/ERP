@@ -104,7 +104,8 @@ export async function sembrarMaestros(
     const cond = azar.ponderado([['CONTADO', 25], ['CR15', 25], ['CR30', 35], ['CR45', 15]] as const);
     const c = await como(ctx, u.facturacion, (tx) => crearCliente(tx, u.facturacion.id, {
       rif: rifDe('J', 30_000_100 + i * 7),
-      tercero: { razonSocial: nombre, domiciliado: true, contribuyenteEspecial: false, agenteRetencionIva: false },
+      // Uno de cada seis clientes es contribuyente especial y agente de retención de IVA (sin tocar la secuencia del azar).
+      tercero: { razonSocial: nombre, domiciliado: true, contribuyenteEspecial: i % 6 === 0, agenteRetencionIva: i % 6 === 0 },
       comercial: { vendedorId: v.id, zona: azar.elegir(ZONAS), sucursalId: ctx.sucursalId },
     }));
     await como(ctx, u.gerencia, (tx) => resolverAprobacion(tx, 'cliente', c.id, u.gerencia.id, 'aprobada', {
@@ -114,7 +115,7 @@ export async function sembrarMaestros(
       },
     }));
     clientes.push({
-      id: c.id, codigo: c.codigo, nombre, vendedorUsuario: v.usuario,
+      id: c.id, codigo: c.codigo, nombre, vendedorUsuario: v.usuario, agenteRetencion: i % 6 === 0,
       condicionDias: { CONTADO: 0, CR15: 15, CR30: 30, CR45: 45 }[cond],
       // Cuántos días después del vencimiento paga: la mayoría puntual, algunos morosos.
       retrasoDias: cond === 'CONTADO' ? 0 : azar.ponderado([[0, 40], [3, 25], [10, 20], [25, 10], [50, 5]] as const),

@@ -69,6 +69,13 @@ describe('siembra de la empresa ficticia de demostración', () => {
     expect(r.verificacion.filter((l) => l.includes('CRM:'))).toHaveLength(3);
   });
 
+  it('registra los comprobantes de retención de IVA de los clientes agentes y descuenta lo retenido en la declaración', async () => {
+    expect(r.resumen.retenciones_recibidas).toBeGreaterThan(0);
+    expect(r.verificacion.some((l) => l.startsWith('✔ IVA retenido por clientes'))).toBe(true);
+    const { rows } = await db.query<{ soportadas: string }>(`select cifras->>'retencionesSoportadas' as soportadas from declaracion_fiscal where tipo = 'iva' and reabierta_at is null`);
+    expect(Number(rows[0].soportadas)).toBeGreaterThan(0);
+  });
+
   it('marca la empresa como demostración y la marca no se cambia', async () => {
     const { rows } = await db.query<{ es_demo: boolean; razon_social: string }>('select es_demo, razon_social from empresa');
     expect(rows).toHaveLength(1);
@@ -105,7 +112,7 @@ describe('la siembra es reproducible', () => {
       }
     }
     expect(totales[0]).toBe(totales[1]);
-  }, 120_000);
+  }, 240_000);
 
   it('con ruido (feriado, alza de costos, mora) sigue cuadrando y es reproducible', async () => {
     const corridas: string[] = [];

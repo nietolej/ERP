@@ -8,7 +8,8 @@ import { libroCompras, libroVentas, validarPeriodo } from './libros';
  * Declaraciones fiscales y cierre fiscal (spec §11.4; migración 0047).
  *
  *   IVA mensual: débito fiscal (libro de ventas) − crédito fiscal (libro de compras) − excedente del mes anterior; si el crédito supera al
- *     débito, el excedente se traslada al mes siguiente. Las retenciones de IVA que practican los clientes aún no existen y no restan.
+ *     débito, el excedente se traslada al mes siguiente. De la cuota se descuentan las retenciones de IVA que nos practicaron los clientes
+ *     en el periodo más las que trae el mes anterior; lo que sobra se traslada al mes siguiente (migración 0059).
  *   Retenciones de IVA: por quincena si la empresa es contribuyente especial, si no por mes. CSV con las columnas del comprobante.
  *   Retenciones de ISLR: por mes, en XML.
  * Al declarar se guarda la foto de las cifras (y el archivo tal como se declaró) y la base bloquea los documentos fechados en el periodo (R-DF).
@@ -84,35 +85,62 @@ export function csvRetencionesIva(filas: RetencionIvaArchivo[]): string {
 // ---------------------------------------------------------------------
 
 export interface CifrasIva {
-  baseVentas: string; debito: string; baseCompras: string; credito: string; excedenteAnterior: string; retencionesSoportadas: string;
-  resultado: string; cuotaPagar: string; excedenteSiguiente: string;
+  baseVentas: string; debito: string; baseCompras: string; credito: string; excedenteAnterior: string;
+  /** Retenciones de IVA que nos practicaron los clientes y se descuentan en este mes. */
+  retencionesSoportadas: string;
+  /** Retenciones que vienen del mes anterior sin descontar. */
+  retencionesAnteriores: string;
+  /** Débito − crédito − excedente anterior. */
+  resultado: string;
+  /** Retenciones descontadas de la cuota de este mes. */
+  retencionesDescontadas: string;
+  cuotaPagar: string; excedenteSiguiente: string;
+  /** Retenciones que no alcanzaron a descontarse: se trasladan al mes siguiente. */
+  retencionesSiguiente: string;
 }
 
+const CIFRAS_IVA_CERO: CifrasIva = {
+  baseVentas: '0.00', debito: '0.00', baseCompras: '0.00', credito: '0.00', excedenteAnterior: '0.00', retencionesSoportadas: '0.00',
+  retencionesAnteriores: '0.00', resultado: '0.00', retencionesDescontadas: '0.00', cuotaPagar: '0.00', excedenteSiguiente: '0.00', retencionesSiguiente: '0.00',
+};
+
 async function declaracionVigente(db: Db, tipo: TipoDeclaracion, anio: number, mes: number, quincena: number | null) {
-  const { rows } = await db.query<{ id: string; excedente_siguiente: string | null }>(
-    `select id, excedente_siguiente::text from declaracion_fiscal where tipo = $1 and anio = $2 and mes = $3 and coalesce(quincena, 0) = $4 and reabierta_at is null`,
+  const { rows } = await db.query<{ id: string; excedente_siguiente: string | null; retenciones_siguiente: string | null }>(
+    `select id, excedente_siguiente::text, retenciones_siguiente::text from declaracion_fiscal where tipo = $1 and anio = $2 and mes = $3 and coalesce(quincena, 0) = $4 and reabierta_at is null`,
     [tipo, anio, mes, quincena ?? 0]);
   return rows[0] ?? null;
 }
 
-/** Excedente de crédito fiscal que trae el mes: el de la declaración vigente del mes anterior. Exige que ese mes esté declarado si hay declaraciones previas. */
-async function excedenteAnterior(db: Db, anio: number, mes: number): Promise<string> {
+/**
+ * Lo que trae el mes de la declaración vigente del mes anterior: el excedente de crédito fiscal y las retenciones sin descontar.
+ * Exige que ese mes esté declarado si hay declaraciones previas.
+ */
+async function arrastreAnterior(db: Db, anio: number, mes: number): Promise<{ excedente: string; retenciones: string }> {
   const ant = mes === 1 ? { a: anio - 1, m: 12 } : { a: anio, m: mes - 1 };
   const d = await declaracionVigente(db, 'iva', ant.a, ant.m, null);
-  if (d) return dec(d.excedente_siguiente ?? 0).toFixed(2);
-  const { rows } = await db.query('select 1 from declaracion_fiscal where tipo = \'iva\' and (anio, mes) < ($1, $2) limit 1', [anio, mes]);
-  if (rows.length) throw new ErrorMaestro(`Declare primero el IVA de ${pad(ant.m)}-${ant.a}: el excedente de crédito fiscal se traslada de un mes al siguiente.`);
-  return '0.00';
+  if (d) return { excedente: dec(d.excedente_siguiente ?? 0).toFixed(2), retenciones: dec(d.retenciones_siguiente ?? 0).toFixed(2) };
+  const { rows } = await db.query("select 1 from declaracion_fiscal where tipo = 'iva' and (anio, mes) < ($1, $2) limit 1", [anio, mes]);
+  if (rows.length) throw new ErrorMaestro(`Declare primero el IVA de ${pad(ant.m)}-${ant.a}: el excedente de crédito fiscal y las retenciones sin descontar se trasladan de un mes al siguiente.`);
+  return { excedente: '0.00', retenciones: '0.00' };
 }
 
 export async function cifrasIva(db: Db, anio: number, mes: number): Promise<CifrasIva> {
-  const [v, c, ex] = await Promise.all([libroVentas(db, anio, mes), libroCompras(db, anio, mes), excedenteAnterior(db, anio, mes)]);
-  const resultado = dec(v.debito).minus(c.credito).minus(ex);
+  const [v, c, ant, ret] = await Promise.all([
+    libroVentas(db, anio, mes), libroCompras(db, anio, mes), arrastreAnterior(db, anio, mes),
+    db.query<{ s: string }>('select fn_retenciones_iva_recibidas($1, $2)::text as s', [anio, mes]),
+  ]);
+  const resultado = dec(v.debito).minus(c.credito).minus(ant.excedente);
+  const cuota = resultado.isPositive() ? resultado : dec(0);
+  const disponibles = dec(ret.rows[0].s).plus(ant.retenciones);
+  const descontadas = Decimal.min(cuota, disponibles);
   return {
-    baseVentas: v.base, debito: v.debito, baseCompras: c.base, credito: c.credito, excedenteAnterior: ex, retencionesSoportadas: '0.00',
+    baseVentas: v.base, debito: v.debito, baseCompras: c.base, credito: c.credito, excedenteAnterior: ant.excedente,
+    retencionesSoportadas: dec(ret.rows[0].s).toFixed(2), retencionesAnteriores: ant.retenciones,
     resultado: resultado.toFixed(2),
-    cuotaPagar: resultado.isPositive() ? resultado.toFixed(2) : '0.00',
+    retencionesDescontadas: descontadas.toFixed(2),
+    cuotaPagar: cuota.minus(descontadas).toFixed(2),
     excedenteSiguiente: resultado.isNegative() ? resultado.abs().toFixed(2) : '0.00',
+    retencionesSiguiente: disponibles.minus(descontadas).toFixed(2),
   };
 }
 
@@ -176,7 +204,7 @@ export async function previsualizar(db: Db, tipo: TipoDeclaracion, anio: number,
     } catch (e) {
       if (!(e instanceof ErrorMaestro)) throw e;
       impedimentos.push(e.message);
-      cifras = { baseVentas: '0.00', debito: '0.00', baseCompras: '0.00', credito: '0.00', excedenteAnterior: '0.00', retencionesSoportadas: '0.00', resultado: '0.00', cuotaPagar: '0.00', excedenteSiguiente: '0.00' };
+      cifras = CIFRAS_IVA_CERO;
     }
     return { tipo, periodo: p, cifras, archivo: null, archivoNombre: null, impedimentos, declarada };
   }
@@ -219,10 +247,11 @@ export async function declarar(tx: Db, u: UsuarioDecl, d: { tipo: TipoDeclaracio
   const prev = await previsualizar(tx, d.tipo, d.anio, d.mes, d.quincena ?? null);
   if (prev.impedimentos.length) throw new ErrorMaestro(prev.impedimentos[0]);
   const excedente = d.tipo === 'iva' ? (prev.cifras as CifrasIva).excedenteSiguiente : null;
+  const retenciones = d.tipo === 'iva' ? (prev.cifras as CifrasIva).retencionesSiguiente : null;
   const { rows } = await tx.query<{ id: string }>(
-    `insert into declaracion_fiscal (tipo, anio, mes, quincena, desde, hasta, cifras, excedente_siguiente, archivo, archivo_nombre, declarada_por)
-     values ($1, $2, $3, $4, $5::date, $6::date, $7::jsonb, $8, $9, $10, $11) returning id`,
-    [d.tipo, d.anio, d.mes, prev.periodo.quincena, prev.periodo.desde, prev.periodo.hasta, JSON.stringify(prev.cifras), excedente, prev.archivo, prev.archivoNombre, u.id]);
+    `insert into declaracion_fiscal (tipo, anio, mes, quincena, desde, hasta, cifras, excedente_siguiente, retenciones_siguiente, archivo, archivo_nombre, declarada_por)
+     values ($1, $2, $3, $4, $5::date, $6::date, $7::jsonb, $8, $9, $10, $11, $12) returning id`,
+    [d.tipo, d.anio, d.mes, prev.periodo.quincena, prev.periodo.desde, prev.periodo.hasta, JSON.stringify(prev.cifras), excedente, retenciones, prev.archivo, prev.archivoNombre, u.id]);
   return rows[0].id;
 }
 

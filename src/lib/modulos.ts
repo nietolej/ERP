@@ -27,6 +27,7 @@ import { ROLES_VEN_NOTAS } from '@/lib/ventas/notas';
 import { ROLES_VEN_VENTAS } from '@/lib/ventas/pedidos';
 import { ROLES_VEN_PICKING } from '@/lib/ventas/picking';
 import { ROLES_VEN_COBROS } from '@/lib/ventas/cobros';
+import { ROLES_VEN_RETENCIONES } from '@/lib/ventas/retenciones';
 import { ROLES_VEN_CUENTAS } from '@/lib/maestros/cuentas-bancarias';
 import { ROLES_VEN_PROMOCIONES } from '@/lib/ventas/promociones';
 import { ROLES_VEN_TRANSPORTE } from '@/lib/ventas/transportes';
@@ -120,6 +121,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Plan de cuentas', href: '/contabilidad/plan-de-cuentas', roles: CONTABLES },
       { texto: 'Cuentas por cobrar', href: '/cobranzas/cuentas', roles: [...ROLES_VEN_COBROS] },
       { texto: 'Cobros', href: '/cobranzas/cobros', roles: [...ROLES_VEN_COBROS] },
+      { texto: 'Retenciones de clientes (IVA e ISLR)', href: '/cobranzas/retenciones', roles: [...ROLES_VEN_RETENCIONES] },
       { texto: 'Cuentas por pagar', href: '/compras/cuentas-por-pagar', roles: [...ROLES_VEN_COMPRAS] },
       { texto: 'Pagos a proveedores', href: '/compras/pagos', roles: [...ROLES_VEN_PAGOS] },
       { texto: 'Activos fijos y depreciación', href: '/contabilidad/activos', roles: [...ROLES_VEN_ACTIVOS] },

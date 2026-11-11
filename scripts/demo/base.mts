@@ -83,7 +83,11 @@ export function crearAzar(semilla: number): Azar {
 // ---------------------------------------------------------------------------------------------------------------------
 // Contexto de la siembra
 // ---------------------------------------------------------------------------------------------------------------------
-export interface Cliente { id: string; codigo: string; nombre: string; vendedorUsuario: Usuario; retrasoDias: number; pagaEnDivisas: boolean; condicionDias: number }
+export interface Cliente {
+  id: string; codigo: string; nombre: string; vendedorUsuario: Usuario; retrasoDias: number; pagaEnDivisas: boolean; condicionDias: number;
+  /** Contribuyente especial agente de retención de IVA: entrega su comprobante al recibir cada factura (migración 0059). */
+  agenteRetencion: boolean;
+}
 export interface Proveedor { id: string; nombre: string; marcaId: string; plazoDias: number }
 export interface Producto { id: string; codigo: string; marcaId: string; costoUsd: number; precioBUsd: number }
 
@@ -101,6 +105,8 @@ export interface EstadoSiembra {
   azarCrm: Azar;
   /** Prospectos sembrados (para el RIF y el nombre de los siguientes). */
   prospectos: number;
+  /** Comprobantes de retención que entregan los clientes agentes (para numerarlos). */
+  comprobantesRecibidos: number;
 }
 
 export interface Ctx {

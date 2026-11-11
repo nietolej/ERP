@@ -12,7 +12,9 @@ import { reabrirAccion } from '../acciones';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ETIQUETAS: Record<string, string> = {
   baseVentas: 'Base de ventas', debito: 'Débito fiscal', baseCompras: 'Base de compras', credito: 'Crédito fiscal', excedenteAnterior: 'Excedente del mes anterior',
-  retencionesSoportadas: 'Retenciones de IVA soportadas', resultado: 'Resultado (débito − crédito − excedente)', cuotaPagar: 'Cuota tributaria a pagar', excedenteSiguiente: 'Excedente que se traslada',
+  retencionesSoportadas: 'Retenciones de IVA de clientes del mes', retencionesAnteriores: 'Retenciones del mes anterior sin descontar',
+  resultado: 'Resultado (débito − crédito − excedente)', retencionesDescontadas: 'Retenciones descontadas', cuotaPagar: 'Cuota tributaria a pagar',
+  excedenteSiguiente: 'Excedente que se traslada', retencionesSiguiente: 'Retenciones que se trasladan',
   comprobantes: 'Comprobantes', baseVes: 'Base (Bs.)', retenidoVes: 'Retenido (Bs.)', pendientes: 'Retenciones sin comprobante', ajustesPorNotas: 'Ajustes por notas de crédito, sin numerar (Bs.)',
 };
 
