@@ -9,7 +9,7 @@ import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { ErrorMaestro } from '@/lib/errores';
 import { productoPorCodigo } from '@/lib/ventas/pedidos';
 import {
-  CLASES_NC, CLASES_ND, ROLES_CREAN_NOTAS, ROLES_EMITEN_NOTAS, asignarControlNota, crearNotaCredito, crearNotaDebito, eliminarNota, emitirNota,
+  CLASES_NC, CLASES_ND, ROLES_CREAN_NOTAS, ROLES_EMITEN_NOTAS, asignarControlNota, crearNotaCredito, crearNotaDebito, crearNotaProntoPago, eliminarNota, emitirNota,
   enviarAprobacion, type ClaseNC, type ClaseND,
 } from '@/lib/ventas/notas';
 
@@ -21,6 +21,22 @@ function recargar(notaId: string, facturaId?: string) {
   revalidatePath(`/ventas/notas/${notaId}`);
   if (facturaId) revalidatePath(`/ventas/facturas/${facturaId}`);
   revalidatePath('/cobranzas/cuentas');
+}
+
+export async function crearNotaProntoPagoAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  let nueva: string;
+  try {
+    const u = await autorizar(...ROLES_CREAN_NOTAS);
+    const facturaId = id(fd, 'factura_id');
+    const cobroId = id(fd, 'cobro_id');
+    if (!facturaId || !cobroId) return { error: 'Factura o cobro inválido.' };
+    nueva = await conUsuario(u.id, (tx) => crearNotaProntoPago(tx, u, facturaId, cobroId));
+    recargar(nueva, facturaId);
+    revalidatePath(`/cobranzas/cobros/${cobroId}`);
+  } catch (e) {
+    return { error: mensajeDeError(e) };
+  }
+  redirect(`/ventas/notas/${nueva}`);
 }
 
 export async function crearNotaCreditoAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {

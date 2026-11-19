@@ -83,6 +83,81 @@ export interface DatosNotaCredito {
   lineaIds?: string[];
 }
 
+export async function propuestasProntoPago(
+  db: Db, filtro: { facturaId?: string; cobroId?: string; notaId?: string },
+) {
+  const { rows } = await db.query<{
+    factura_id: string; factura: string; aplicacion_id: string; cobro_id: string; porcentaje: string; total: string;
+    lineas: { id: string; base: string }[];
+  }>(
+    `with elegibles as (
+       select f.id, f.serie || '-' || f.numero as factura, p.saldo, a.id as aplicacion_id, a.cobro_id,
+              f.descuento_pronto_pago_pct as porcentaje
+         from partida_cxc p
+         join documento_venta f on f.id = p.documento_id
+         join lateral (
+           select a.id, a.cobro_id, a.fecha, a.saldo_tras_aplicar from aplicacion_cobro a
+            where a.partida_id = p.id and not a.revertida
+            order by a.created_at desc, a.id desc limit 1
+         ) a on true
+         join cobro c on c.id = a.cobro_id
+        where f.tipo = 'factura' and f.estado = 'emitido' and p.estado = 'abierta'
+          and c.estado <> 'anulado' and f.descuento_pronto_pago_pct > 0
+          and a.fecha between p.fecha and p.fecha + f.dias_pronto_pago
+          and a.saldo_tras_aplicar = p.saldo
+          and ($1::uuid is null or f.id = $1)
+          and ($2::uuid is null or a.cobro_id = $2)
+          and not exists (
+            select 1 from documento_venta n
+             where n.documento_origen_id = f.id and n.tipo = 'nota_credito' and n.motivo_nc = 'pronto_pago'
+               and n.situacion is distinct from 'rechazada' and n.id is distinct from $3::uuid
+          )
+     ), descuentos as (
+       select e.id, l.id as linea_id, l.linea, l.alicuota_pct,
+              round(greatest(l.base - coalesce(ajustes.base, 0), 0) * e.porcentaje / 100, 2) as base
+         from elegibles e join documento_venta_linea l on l.documento_id = e.id
+         left join lateral (
+           select sum(nl.base) as base
+             from documento_venta_linea nl join documento_venta n on n.id = nl.documento_id
+            where nl.linea_origen_id = l.id and n.tipo = 'nota_credito' and n.estado = 'emitido'
+         ) ajustes on true
+     )
+     select e.id as factura_id, e.factura, e.aplicacion_id, e.cobro_id, e.porcentaje::text, e.saldo::text as total,
+            jsonb_agg(jsonb_build_object('id', d.linea_id, 'base', d.base::text) order by d.linea) as lineas
+       from elegibles e join descuentos d on d.id = e.id and d.base > 0
+      group by e.id, e.factura, e.aplicacion_id, e.cobro_id, e.porcentaje, e.saldo
+     having sum(d.base + round(d.base * d.alicuota_pct / 100, 2)) = e.saldo
+      order by e.factura`,
+    [filtro.facturaId ?? null, filtro.cobroId ?? null, filtro.notaId ?? null]);
+  return rows;
+}
+
+export async function crearNotaProntoPago(tx: Db, u: Usuario, facturaId: string, cobroId: string): Promise<string> {
+  if (!u.roles.some((rol) => (ROLES_CREAN_NOTAS as readonly string[]).includes(rol))) {
+    throw new ErrorMaestro('No tiene permiso para crear notas de crédito.');
+  }
+  const f = await facturaDe(tx, u, facturaId);
+  await tx.query('select id from cobro where id = $1 for update', [cobroId]);
+  await tx.query('select id from partida_cxc where documento_id = $1 for update', [facturaId]);
+  const [propuesta] = await propuestasProntoPago(tx, { facturaId, cobroId });
+  if (!propuesta) throw new ErrorMaestro('La factura ya no cumple las condiciones para proponer el pronto pago.');
+
+  const motivoId = await motivoSistema(tx, 'descuento', 'PRONTO_PAGO');
+  const id = await insertarEncabezado(tx, u, f, { tipo: 'nota_credito', motivo: 'pronto_pago', motivoId });
+  await tx.query('update documento_venta set aplicacion_pronto_pago_id = $2 where id = $1', [id, propuesta.aplicacion_id]);
+  await tx.query(
+    `insert into documento_venta_linea (documento_id, linea, producto_id, descripcion, alicuota_iva_id, alicuota_pct,
+                                       producto_base_id, cantidad, precio_unitario, descuento_pct, linea_origen_id)
+     select $1, l.linea, l.producto_id, l.descripcion, l.alicuota_iva_id, l.alicuota_pct,
+            l.producto_base_id,
+            case when d.base >= 1000000000000 then 100 else 1 end,
+            case when d.base >= 1000000000000 then d.base / 100 else d.base end, 0, l.id
+       from jsonb_to_recordset($2::jsonb) as d(id uuid, base numeric)
+       join documento_venta_linea l on l.id = d.id`, [id, JSON.stringify(propuesta.lineas)]);
+  await tx.query('select fn_venta_calcular($1)', [id]);
+  return id;
+}
+
 export async function crearNotaCredito(tx: Db, u: Usuario, d: DatosNotaCredito): Promise<string> {
   if (!CLASES_NC.includes(d.clase)) throw new ErrorMaestro('Seleccione la clase de nota de crédito.');
   const f = await facturaDe(tx, u, d.facturaId);
@@ -247,6 +322,14 @@ export async function emitirNota(tx: Db, u: Usuario, id: string, opciones: { ser
   const { rows: emp } = await tx.query<{ rif: string }>('select rif from empresa');
   if (!emp[0]) throw new ErrorMaestro('Configure la empresa (RIF, razón social y domicilio fiscal) antes de emitir.');
 
+  const { rows: [origenProntoPago] } = await tx.query<{ aplicacion_id: string; cobro_id: string }>(
+    `select a.id as aplicacion_id, a.cobro_id from documento_venta d
+       join aplicacion_cobro a on a.id = d.aplicacion_pronto_pago_id
+      where d.id = $1`, [id]);
+  if (origenProntoPago) {
+    await tx.query('select id from cobro where id = $1 for update', [origenProntoPago.cobro_id]);
+  }
+
   let partidaFactura: { id: string; saldo: string } | undefined;
   if (n.tipo === 'nota_credito') {
     const { rows: p } = await tx.query<{ id: string; saldo: string; estado: string }>(
@@ -258,6 +341,17 @@ export async function emitirNota(tx: Db, u: Usuario, id: string, opciones: { ser
       throw new ErrorMaestro(`La nota de crédito (Bs. ${n.total}) supera el saldo de la factura (Bs. ${p[0].saldo}).`);
     }
     partidaFactura = p[0];
+  }
+
+  if (origenProntoPago) {
+    const [propuesta] = await propuestasProntoPago(tx, { facturaId: n.origen, cobroId: origenProntoPago.cobro_id, notaId: id });
+    const { rows: lineas } = await tx.query<{ id: string; base: string }>(
+      'select linea_origen_id as id, base::text from documento_venta_linea where documento_id = $1 order by linea', [id]);
+    if (!propuesta || propuesta.aplicacion_id !== origenProntoPago.aplicacion_id || propuesta.total !== n.total ||
+        lineas.length !== propuesta.lineas.length ||
+        lineas.some((l, i) => l.id !== propuesta.lineas[i].id || !new Decimal(l.base).eq(propuesta.lineas[i].base))) {
+      throw new ErrorMaestro('Cambió el cobro o la base del descuento por pronto pago. Revise la propuesta antes de emitir.');
+    }
   }
 
   const { rows: e } = await tx.query<{ numero: string; serie: string; fecha: string }>(

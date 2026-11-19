@@ -9,6 +9,8 @@ import { fecha, hoyCaracas, monto } from '@/lib/formato';
 import { listarMotivos } from '@/lib/maestros/motivos';
 import { ROLES_COBRAN, ROLES_VEN_COBROS, detalleCobro, partidasAbiertas } from '@/lib/ventas/cobros';
 import { igtfDeCobro } from '@/lib/ventas/igtf';
+import { propuestasProntoPago } from '@/lib/ventas/notas';
+import { ROLES_VEN_FACTURAS } from '@/lib/ventas/facturas';
 import { anularCobroAccion, aplicarAnticipoAccion } from '../../acciones';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,9 +33,10 @@ export default async function CobroPage({ params }: { params: Promise<{ id: stri
   const anticipo = Number(c.por_aplicar) > 0;
   const hayAnticipoAplicado = c.aplicaciones.some((a) => a.origen === 'anticipo' && !a.revertida);
   const igtf = await igtfDeCobro(db, id);
-  const [partidas, motivos] = await Promise.all([
+  const [partidas, motivos, propuestas] = await Promise.all([
     vigente && anticipo && puedeCobrar ? partidasAbiertas(db, c.cliente_id) : Promise.resolve([]),
     vigente && puedeCobrar ? listarMotivos(db, { tipo: 'anulacion', soloActivos: true }) : Promise.resolve([]),
+    c.estado !== 'anulado' ? propuestasProntoPago(db, { cobroId: id }) : Promise.resolve([]),
   ]);
 
   return (
@@ -52,6 +55,20 @@ export default async function CobroPage({ params }: { params: Promise<{ id: stri
       )}
       {c.estado === 'anulado' && <div className="mb-5"><Aviso tono="peligro">Anulado el {c.anulado}: {c.anulado_motivo}</Aviso></div>}
       {vigente && anticipo && <div className="mb-5"><Aviso tono="info">Quedan {c.moneda} {monto(c.por_aplicar)} sin aplicar: es un anticipo del cliente (pasivo) hasta que se aplique a una factura.</Aviso></div>}
+
+      {propuestas.length > 0 && (
+        <Panel titulo="Notas de crédito propuestas por pronto pago" className="mb-5">
+          <ul className="space-y-2 text-sm">
+            {propuestas.map((p) => (
+              <li key={p.factura_id}>
+                Factura {tieneRol(u, [...ROLES_VEN_FACTURAS])
+                  ? <Link href={`/ventas/facturas/${p.factura_id}`} className="text-acento hover:underline">{p.factura}</Link>
+                  : p.factura} · Bs. {monto(p.total)} ({monto(p.porcentaje)} %)
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel titulo="Datos del cobro">
         <dl className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-3">

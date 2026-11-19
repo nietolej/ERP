@@ -6,12 +6,12 @@ import { aprobarCliente, crearCliente } from '@/lib/maestros/clientes';
 import { crearCuentaBancaria, listarInstrumentos } from '@/lib/maestros/cuentas-bancarias';
 import { crearCatalogo, crearProducto, fijarPrecio, resolverProductoBase } from '@/lib/maestros/productos';
 import { crearVendedor } from '@/lib/maestros/vendedores';
-import { cuadreCxC, registrarCobro } from '@/lib/ventas/cobros';
+import { anularCobro, cuadreCxC, registrarCobro } from '@/lib/ventas/cobros';
 import { confirmarSalida } from '@/lib/ventas/despacho';
 import { anularFactura, facturarNotas } from '@/lib/ventas/facturas';
 import {
   ROLES_CREAN_NOTAS, ROLES_EMITEN_NOTAS, asignarControlNota, buscarNotas, crearNotaCredito, crearNotaDebito, detalleNota, eliminarNota, emitirNota,
-  enviarAprobacion, lineasFacturables, notasDeFactura, type DatosNotaCredito,
+  crearNotaProntoPago, enviarAprobacion, lineasFacturables, notasDeFactura, propuestasProntoPago, type DatosNotaCredito,
 } from '@/lib/ventas/notas';
 import { agregarLinea, crearPedido, emitirPedido, generarNotaEntrega, type Usuario } from '@/lib/ventas/pedidos';
 import type { Db } from '@/lib/db/tipos';
@@ -393,5 +393,47 @@ describe('notas de crédito y de débito (R-BV a R-BX, §6.2 regla 7, §12.3)', 
     const c = await cuadreCxC(db);
     expect(c.auxiliar_ves).toBe(c.mayor_ves);
     expect(c.auxiliar_usd).toBe(c.mayor_usd);
+  });
+
+  it('propone pronto pago al cubrir el neto de las líneas ajustadas y emite una sola nota por el saldo', async () => {
+    await db.query("update condicion_pago set descuento_pronto_pago_pct = 10, dias_pronto_pago = 0 where codigo = 'CONTADO'");
+    const f = await facturar(clienteA, [[pastilla, '2'], [aceite, '1']]);
+    await db.query("update condicion_pago set descuento_pronto_pago_pct = 25 where codigo = 'CONTADO'");
+    await emitir(await aprobada(devolver(f.id, f.linea, '1')));
+    await emitir(await aprobada({ facturaId: f.id, clase: 'descuento_comercial', porcentaje: '10', motivoId: motivoDescuento, lineaIds: [f.linea] }));
+
+    // Base gravada ajustada: 800 - 400 - 80 = 320. Base exenta: 800.
+    // Saldo: 1.171,20. Descuento propuesto: 32 + 5,12 de IVA + 80 = 117,12.
+    const { rows: [p] } = await db.query<{ id: string; fecha: string }>(
+      'select id, fecha::text from partida_cxc where documento_id = $1', [f.id]);
+    const cuenta = (await db.query<{ id: string }>('select id from cuenta_bancaria limit 1')).rows[0].id;
+    const transferencia = (await listarInstrumentos(db)).find((i) => i.codigo === 'TRANSFERENCIA')!.id;
+    const cobrar = (monto: string) => como(cobranzas, (tx) => registrarCobro(tx, cobranzas, {
+      clienteId: clienteA, fecha: p.fecha, instrumentoId: transferencia, cuentaBancariaId: cuenta, monto,
+      aplicaciones: [{ partidaId: p.id, monto }],
+    }));
+    const parcial = await cobrar('100');
+    expect(await propuestasProntoPago(db, { cobroId: parcial.id })).toEqual([]);
+    const anulado = await cobrar('954.08');
+    expect(await propuestasProntoPago(db, { cobroId: anulado.id })).toHaveLength(1);
+    await como(cobranzas, (tx) => anularCobro(tx, cobranzas, anulado.id, { motivoId: OTRO, detalle: 'Prueba de anulación' }));
+    expect(await propuestasProntoPago(db, { cobroId: anulado.id })).toEqual([]);
+    const final = await cobrar('954.08');
+    expect(await propuestasProntoPago(db, { cobroId: final.id })).toMatchObject([
+      { factura_id: f.id, porcentaje: '10.00', total: '117.12' },
+    ]);
+
+    const crear = (u: Usuario) => como(u, (tx) => crearNotaProntoPago(tx, u, f.id, final.id));
+    await esperarError(crear(cobranzas), 'permiso');
+    const id = await crear(facturacion);
+    expect(await detalleNota(db, id)).toMatchObject({
+      estado: 'borrador', motivo_nc: 'pronto_pago', base_imponible: '32.00', exento: '80.00', iva: '5.12', total: '117.12',
+    });
+    await esperarError(crear(facturacion), 'ya no cumple');
+    await como(facturacion, (tx) => enviarAprobacion(tx, facturacion, id));
+    await como(supervisor, (tx) => resolverAprobacion(tx, 'nota_credito', id, supervisor.id, 'aprobada'));
+    await emitir(id);
+    expect(await partida(f.id)).toMatchObject({ saldo: '0.00', estado: 'cancelada' });
+    await cuadra();
   });
 });

@@ -9,7 +9,8 @@ import { monto, tasa } from '@/lib/formato';
 import { listarMotivos } from '@/lib/maestros/motivos';
 import { verTodosLosDocumentos } from '@/lib/ventas/pedidos';
 import { ROLES_FACTURAN, ROLES_VEN_FACTURAS, detalleFactura } from '@/lib/ventas/facturas';
-import { ROLES_CREAN_NOTAS, notasDeFactura } from '@/lib/ventas/notas';
+import { ROLES_CREAN_NOTAS, notasDeFactura, propuestasProntoPago } from '@/lib/ventas/notas';
+import { crearNotaProntoPagoAccion } from '../../notas/acciones';
 import { anularFacturaAccion, asignarControlAccion } from '../acciones';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,6 +31,7 @@ export default async function FacturaPage({ params }: { params: Promise<{ id: st
   const simulada = f.imprenta === PROVEEDOR_SIMULADO;
   const notas = await notasDeFactura(db, id);
   const puedeNotas = tieneRol(u, [...ROLES_CREAN_NOTAS]);
+  const [prontoPago] = emitida && puedeNotas ? await propuestasProntoPago(db, { facturaId: id }) : [];
 
   return (
     <>
@@ -64,6 +66,17 @@ export default async function FacturaPage({ params }: { params: Promise<{ id: st
         </div>
       )}
       {f.estado === 'anulado' && <div className="mb-5"><Aviso tono="peligro">Anulada: {f.anulado_motivo}</Aviso></div>}
+
+      {prontoPago && (
+        <div className="mb-5"><Aviso tono="info">
+          El cobro cubrió el saldo con descuento por pronto pago. Nota de crédito propuesta: Bs. {monto(prontoPago.total)} ({monto(prontoPago.porcentaje)} %).
+          <Formulario accion={crearNotaProntoPagoAccion} className="mt-3">
+            <input type="hidden" name="factura_id" value={id} />
+            <input type="hidden" name="cobro_id" value={prontoPago.cobro_id} />
+            <BotonEnviar variante="secundario">Crear borrador de pronto pago</BotonEnviar>
+          </Formulario>
+        </Aviso></div>
+      )}
 
       <Panel titulo="Datos de la factura">
         <dl className="grid gap-x-8 gap-y-2 text-sm md:grid-cols-3">

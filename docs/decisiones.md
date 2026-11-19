@@ -28,6 +28,7 @@ Estas decisiones condicionan el diseño del ERP (§16 de la [especificación](sp
 
 | Fecha | Cambio | Autor |
 |---|---|---|
+| 2026-11-19 | **Propuesta de NC por pronto pago (migración 0060):** se propone solo cuando el cobro dentro del plazo cubre todo el saldo descontado. El descuento se calcula sobre las líneas de la factura ajustadas por las notas de crédito emitidas. | Usuario |
 | 2026-09-23 | Registro creado a partir de la §16 de la especificación | — |
 | 2026-09-23 | **Fase 0 asume provisionalmente las recomendaciones 1 y 2**: cada línea del mayor guarda VES (legal) y USD (gestión), y la tasa BCV es la única fuente para registros (la fuente PARALELO existe solo para gestión). El modelo no cambia si se confirman; si se decide otra cosa, se ajusta con una migración nueva antes de la Fase 2 | Desarrollo |
 | 2026-09-24 | **Aprobador de asientos manuales:** se crea el rol *Jefe de contabilidad* (`jefe_contabilidad`), como indica la matriz de la §4.3. Solo ese rol aprueba, y nunca quien registró el asiento | Usuario (confirmado en desarrollo) |

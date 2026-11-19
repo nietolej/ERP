@@ -207,6 +207,7 @@ export const MODULOS: Modulo[] = [
       { texto: 'Auditoría', href: '/configuracion/auditoria', roles: ROLES_VEN_AUDITORIA },
       { texto: 'Motivos (descuentos, anulaciones…)', href: '/configuracion/motivos', roles: [...ROLES_MOTIVOS] },
       { texto: 'Parámetros de reportes e inventario', href: '/configuracion/parametros-reportes', roles: [...ROLES_PARAMETROS] },
+      { texto: 'Descuento por pronto pago', href: '/configuracion/pronto-pago', roles: ['gerencia'] },
       { texto: 'Bandeja de aprobaciones', href: '/aprobaciones' },
       { texto: 'Checklist de arranque', href: '/configuracion/arranque', roles: [...ROLES_VEN_CHECKLIST] as Rol[] },
       { texto: 'Apertura: saldos iniciales', href: '/configuracion/apertura', roles: [...ROLES_VEN_APERTURA] },

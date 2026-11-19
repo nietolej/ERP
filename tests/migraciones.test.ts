@@ -74,6 +74,7 @@ describe('migraciones', () => {
       '0057_empresa_demo.sql',
       '0058_crm.sql',
       '0059_retenciones_recibidas.sql',
+      '0060_propuesta_pronto_pago.sql',
     ]);
   });
 
