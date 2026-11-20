@@ -168,7 +168,6 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
   let mostrador: string;
   let clienteA: string;
   let clienteB: string;
-  let clienteC: string;
   let aceite: string;
   let vendedorId: string;
   let motivoDevolucion = '';
@@ -224,7 +223,7 @@ describe('M3 Vendedores: detalle, pestaña "Vista general / anual" (spec_reporte
     };
     clienteA = await cliente('J-00000011-5', 'Repuestos Lara, C.A.');
     clienteB = await cliente('J-00000021-2', 'Autopartes Sur, C.A.');
-    clienteC = await cliente('J-00000031-0', 'Frenos Centro, C.A.');
+    await cliente('J-00000031-0', 'Frenos Centro, C.A.');
 
     const exento = (await db.query<{ id: string }>(`select id from alicuota_iva where codigo = 'EXENTO'`)).rows[0].id;
     const marca = await db.transaction((tx) => crearCatalogo(tx, 'marca', 'GENERICA', 'Genérica'));

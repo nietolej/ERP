@@ -1,6 +1,7 @@
 import type { Rol } from '@/lib/auth/constantes';
 import { ROLES_VEN_AUDITORIA } from '@/lib/auditoria';
 import { ROLES_VEN_BANCOS } from '@/lib/maestros/bancos';
+import { ROLES_VEN_PRODUCTOS } from '@/lib/maestros/productos';
 import { ROLES_VEN_METAS } from '@/lib/maestros/metas';
 import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/roles';
 import { ROLES_VEN_COMPRAS } from '@/lib/compras/ordenes';
@@ -187,13 +188,13 @@ export const MODULOS: Modulo[] = [
     descripcion: 'Reportes equivalentes al dashboard anterior (spec_reportes) y analítica avanzada.',
     items: [
       { texto: 'Inicio', href: '/' },
-      { texto: 'Clientes (M1)', href: '/reportes/clientes' },
-      { texto: 'Productos (M2)', href: '/reportes/productos' },
-      { texto: 'Vendedores (M3)', href: '/reportes/vendedores' },
-      { texto: 'Cobranzas (M4)', href: '/reportes/cobranzas' },
-      { texto: 'Devoluciones (M5)', href: '/reportes/devoluciones' },
-      { texto: 'Inventario (M6)', href: '/reportes/inventario' },
-      { texto: 'Análisis avanzado (M7)', href: '/reportes/analisis-avanzado' },
+      { texto: 'Clientes (M1)', href: '/reportes/clientes', roles: [...ROLES_VEN_CLIENTES] },
+      { texto: 'Productos (M2)', href: '/reportes/productos', roles: [...ROLES_VEN_PRODUCTOS] },
+      { texto: 'Vendedores (M3)', href: '/reportes/vendedores', roles: [...ROLES_VEN_CLIENTES] },
+      { texto: 'Cobranzas (M4)', href: '/reportes/cobranzas', roles: [...ROLES_VEN_CLIENTES] },
+      { texto: 'Devoluciones (M5)', href: '/reportes/devoluciones', roles: [...ROLES_VEN_CLIENTES] },
+      { texto: 'Inventario (M6)', href: '/reportes/inventario', roles: [...ROLES_VEN_DISPONIBILIDAD] },
+      { texto: 'Análisis avanzado (M7)', href: '/reportes/analisis-avanzado', roles: [...ROLES_VEN_CLIENTES] },
     ],
   },
   {

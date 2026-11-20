@@ -92,6 +92,17 @@ describe('mayor contable: reglas garantizadas por la base de datos', () => {
     );
   });
 
+  it('R-B: las líneas contabilizadas conservan su asiento e importes', async () => {
+    const origen = await contabilizarManual('2026-03-13', gasto);
+    const destino = await crearAsiento(db, '2026-03-13', []);
+    const lineas = () => db.query('select id, debe_ves, haber_ves, debe_usd, haber_usd from asiento_linea where asiento_id = $1 order by id', [origen.id]);
+    const antes = await lineas();
+    expect(antes.rows).toHaveLength(2);
+    await esperarError(db.query('update asiento_linea set asiento_id = $2 where asiento_id = $1', [origen.id, destino]), 'trasladar');
+    expect((await lineas()).rows).toEqual(antes.rows);
+    expect((await db.query('select id from asiento_linea where asiento_id = $1', [destino])).rows).toEqual([]);
+  });
+
   it('R-B: se corrige con un reverso espejo que deja saldo cero, una sola vez', async () => {
     const a = await contabilizarManual('2026-03-14', [['6.2.03', '250.00', '0'], ['1.1.01.01', '0', '250.00']]);
     const { rows } = await db.query<{ id: string }>(

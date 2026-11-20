@@ -4,6 +4,7 @@
  *   - Con DATABASE_URL=postgres://… migra PostgreSQL.
  *   - Sin DATABASE_URL, migra la base local PGlite en ./.data/erp.
  */
+import './entorno.mts';
 import { getDb } from '../src/lib/db';
 import { migrar } from '../src/lib/db/migrar';
 

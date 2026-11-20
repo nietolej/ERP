@@ -1,10 +1,11 @@
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import { FiltroCatalogoVendedores } from '@/components/reportes/filtro-catalogo-vendedores';
 import { TablaCatalogoVendedores } from '@/components/reportes/tabla-catalogo-vendedores';
 import { Encabezado, Panel } from '@/components/ui';
 import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { aniosDisponibles } from '@/lib/reportes/clientes';
-import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/clientes';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import { catalogoVendedores, type OrdenVendedores } from '@/lib/reportes/vendedores';
 
 type Busqueda = { texto?: string; anios?: string | string[]; orden?: string; incluir?: string };
@@ -22,12 +23,9 @@ export default async function ReporteVendedoresPage({ searchParams }: { searchPa
   const incluirAdministrativos = q.incluir === '1';
 
   // Seguridad por fila (§4.3): quien solo tiene el rol Ventas ve nada más su propia fila.
-  const verTodos = (ROLES_VEN_TODOS as string[]).some((r) => u.roles.includes(r));
-  let filas = await catalogoVendedores(db, { anios, texto, orden, incluirAdministrativos });
-  if (!verTodos) {
-    const { rows } = await db.query<{ id: string }>('select id from vendedor where usuario_id = $1', [u.id]);
-    filas = filas.filter((f) => f.id === rows[0]?.id);
-  }
+  const vendedorId = await vendedorDeCartera(db, u);
+  const catalogo = await catalogoVendedores(db, { anios, texto, orden, incluirAdministrativos });
+  const filas = vendedorId ? catalogo.filter((fila) => fila.id === vendedorId) : catalogo;
 
   const anios_ = await aniosDisponibles(db);
 

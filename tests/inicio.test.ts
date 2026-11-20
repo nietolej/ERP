@@ -114,6 +114,18 @@ describe('Inicio: vw_venta_documento y tarjetas comerciales (spec_reportes §2, 
     expect(rows[0]).toMatchObject({ cliente_id: clienteA, base_usd: '100.00', total_usd: '100.00', saldo_usd: '100.00', cancelada: false });
   });
 
+  it.each([
+    ['2026-03-31', '2026-02-28'], ['2024-03-31', '2024-02-29'],
+    ['2026-05-31', '2026-04-30'], ['2026-04-30', '2026-03-30'],
+  ])('compara ventas al %s con el corte anterior %s', async (hoy, anterior) => {
+    await db.transaction(async (tx) => {
+      await tx.query('create temp table vw_venta_documento (fecha date, base_usd numeric) on commit drop');
+      await tx.query(`insert into vw_venta_documento values ($1, 100), (date_trunc('month', $2::date)::date, 75), ($2, 125)`, [anterior, hoy]);
+      if (anterior === '2026-03-30') await tx.query("insert into vw_venta_documento values ('2026-03-31', 500)");
+      expect(await ventaMes(tx, hoy)).toEqual({ ventaUsd: '200.00', variacionPct: 100 });
+    });
+  });
+
   it('ventaMes, clientes activos, cobranza pendiente y productos en quiebre reflejan la factura emitida', async () => {
     expect((await ventaMes(db)).ventaUsd).toBe('100.00');
     expect(await clientesActivos90Dias(db)).toBe(1);

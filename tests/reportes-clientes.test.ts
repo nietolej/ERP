@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolverAprobacion } from '@/lib/flujo/objetos';
 import { ImprentaSimulada } from '@/lib/fiscal/imprenta';
 import { asignarUsuarios, crearAlmacen } from '@/lib/maestros/almacenes';
-import { aprobarCliente, crearCliente } from '@/lib/maestros/clientes';
+import { aprobarCliente, crearCliente, puedeVerCliente } from '@/lib/maestros/clientes';
 import { crearCuentaBancaria, listarInstrumentos } from '@/lib/maestros/cuentas-bancarias';
 import { aprobarLoteMetas, crearLoteMetas } from '@/lib/maestros/metas';
 import { crearCatalogo, crearProducto, fijarPrecio, resolverProductoBase } from '@/lib/maestros/productos';
@@ -16,6 +16,7 @@ import {
   analisisAnio, analisisHistorico, comparacionPeriodos, estadoCuentaDetalle, partidasAbiertas, periodosPorDefecto, topItems,
 } from '@/lib/reportes/clientes';
 import type { Db } from '@/lib/db/tipos';
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import { baseDePrueba, usuarioDePrueba } from './apoyo';
 
 describe('M1 Clientes: análisis por año (spec_reportes §4.1, §2, §12)', () => {
@@ -150,6 +151,25 @@ describe('M1 Clientes: análisis por año (spec_reportes §4.1, §2, §12)', () 
     await db.transaction((tx) => aprobarLoteMetas(tx, lote[0].id, idGer));
   });
   afterAll(() => cerrar());
+
+  it('aplica el alcance al detalle y a los totales de Ventas y Supervisión', async () => {
+    const nuevo = { id: await usuarioDePrueba(db, 'cartera@prueba.test', ['ventas']), roles: ['ventas'] };
+    await expect(vendedorDeCartera(db, nuevo)).rejects.toMatchObject({ digest: expect.stringContaining('/sin-permiso') });
+    expect(await puedeVerCliente(db, nuevo, clienteA)).toBe(false);
+    const vendedor = await db.transaction((tx) => crearVendedor(tx, supervisor.id, { nombre: 'Otro vendedor', tipo: 'interno', usuarioId: nuevo.id }));
+    const vendedorId = await vendedorDeCartera(db, nuevo);
+    expect(vendedorId).toBe(vendedor.id);
+    expect((await analisisAnio(db, { vendedorId, anios: [anioActual] })).finanzasMetas.ventaTotalUsd).toBe('0.00');
+    expect(await puedeVerCliente(db, nuevo, clienteA)).toBe(false);
+    const propio = await vendedorDeCartera(db, ventas);
+    expect(propio).toBeTruthy();
+    expect((await analisisAnio(db, { vendedorId: propio, anios: [anioActual] })).finanzasMetas.ventaTotalUsd).toBe('620.00');
+    expect(await puedeVerCliente(db, ventas, clienteA)).toBe(true);
+    const global = await vendedorDeCartera(db, supervisor);
+    expect(global).toBeUndefined();
+    expect((await analisisAnio(db, { vendedorId: global, anios: [anioActual] })).finanzasMetas.ventaTotalUsd).toBe('620.00');
+    expect(await puedeVerCliente(db, supervisor, clienteA)).toBe(true);
+  });
 
   it('cliente A: venta, devolución, descuentos ponderados, CxC y el insight de deuda', async () => {
     const r = await analisisAnio(db, { clienteId: clienteA, anios: [anioActual] });

@@ -1,3 +1,4 @@
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import { BuscadorCliente } from '@/components/buscador-cliente';
 import { FiltroAnio } from '@/components/reportes/filtro-anio';
 import { FiltroComparacion } from '@/components/reportes/filtro-comparacion';
@@ -11,7 +12,7 @@ import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import type { Db } from '@/lib/db/tipos';
 import { hoyCaracas } from '@/lib/formato';
-import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/clientes';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import {
   analisisAnio, analisisHistorico, aniosDisponibles, comparacionPeriodos, partidasAbiertas, periodosPorDefecto, topItems,
   type FiltroClientes,
@@ -34,12 +35,7 @@ export default async function ReporteClientesPage({ searchParams }: { searchPara
   const incluirInactivos = q.incluir === '1';
 
   // Seguridad por fila (§4.3): quien solo tiene el rol Ventas ve nada más su propia cartera.
-  const verTodos = (ROLES_VEN_TODOS as string[]).some((r) => u.roles.includes(r));
-  let vendedorId: string | undefined;
-  if (!verTodos) {
-    const { rows } = await db.query<{ id: string }>('select id from vendedor where usuario_id = $1', [u.id]);
-    vendedorId = rows[0]?.id;
-  }
+  const vendedorId = await vendedorDeCartera(db, u);
 
   const filtro = { anios, incluirInactivos, vendedorId };
   const hoy = hoyCaracas();

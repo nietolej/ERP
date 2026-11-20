@@ -14,20 +14,21 @@ export interface VentaMes {
 }
 
 /** Venta del mes en curso contra el mismo número de días del mes anterior (tarjeta "Ventas del mes"). */
-export async function ventaMes(db: Db): Promise<VentaMes> {
-  const { rows } = await db.query<{ actual: string; anterior: string }>(
-    `select
-       coalesce((select sum(base_usd) from vw_venta_documento
-                  where fecha >= date_trunc('month', ${HOY})::date and fecha <= ${HOY}), 0)::numeric(16,2)::text as actual,
-       coalesce((select sum(base_usd) from vw_venta_documento
-                  where fecha >= (date_trunc('month', ${HOY}) - interval '1 month')::date
-                    and fecha <= (date_trunc('month', ${HOY}) - interval '1 month')::date
-                                  + (${HOY} - date_trunc('month', ${HOY})::date)), 0)::numeric(16,2)::text as anterior`,
+export async function ventaMes(db: Db, fechaCorte?: string): Promise<VentaMes> {
+  const { rows } = await db.query<{ actual: string; variacion: string }>(
+    `with corte as (select coalesce($1::date, ${HOY}) as hoy),
+     importes as (
+       select coalesce(sum(base_usd) filter (where fecha >= date_trunc('month', hoy)::date), 0) as actual,
+              coalesce(sum(base_usd) filter (where fecha <= (hoy - interval '1 month')::date), 0) as anterior
+         from vw_venta_documento cross join corte
+        where fecha between (date_trunc('month', hoy) - interval '1 month')::date and hoy
+     )
+     select actual::numeric(16,2)::text as actual,
+            case when anterior <> 0 then (actual - anterior) * 100 / anterior
+                 when actual > 0 then 100 else 0 end as variacion
+       from importes`, [fechaCorte ?? null],
   );
-  const actual = Number(rows[0].actual);
-  const anterior = Number(rows[0].anterior);
-  const variacionPct = anterior === 0 ? (actual > 0 ? 100 : 0) : ((actual - anterior) / anterior) * 100;
-  return { ventaUsd: rows[0].actual, variacionPct };
+  return { ventaUsd: rows[0].actual, variacionPct: Number(rows[0].variacion) };
 }
 
 /** Clientes con al menos una factura en los últimos 90 días (definición propia de esta tarjeta, distinta de cliente.estado). */

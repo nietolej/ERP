@@ -24,6 +24,7 @@ export const NOMBRE_ROL: Record<Rol, string> = {
 };
 
 /** Cookie del usuario elegido en el modo sin login (solo desarrollo). */
+export const EMAIL_USUARIO_DEV = 'desarrollo@sin-login.local';
 export const COOKIE_USUARIO_DEV = 'erp_dev_usuario';
 
 /**

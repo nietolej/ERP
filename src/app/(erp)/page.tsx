@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { GraficoVentasMensuales } from '@/components/grafico-ventas';
 import { Aviso, Encabezado, KpiCard, Panel, Paso } from '@/components/ui';
-import { exigirSesion } from '@/lib/auth/dal';
+import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/roles';
+import { tieneRol, exigirSesion } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { fecha, hoyCaracas, monto, tasa } from '@/lib/formato';
 import {
@@ -92,13 +94,13 @@ export default async function InicioPage() {
               <Aviso tono="peligro">Diferencia en el mayor de {e.cuadre_ves} VES. Avise a Contabilidad y al administrador.</Aviso>
             )}
           </Panel>
-          <Panel titulo="Accesos rápidos">
+          {(tieneRol(u, ROLES_VEN_CLIENTES) || tieneRol(u, ROLES_VEN_DISPONIBILIDAD)) && <Panel titulo="Accesos rápidos">
             <div className="flex flex-col gap-2 text-sm">
-              <Link href="/reportes/inventario" className="font-semibold text-acento hover:underline">Sugerido de compras →</Link>
-              <Link href="/reportes/cobranzas" className="font-semibold text-acento hover:underline">Análisis de cartera →</Link>
-              <Link href="/reportes/devoluciones" className="font-semibold text-acento hover:underline">Auditoría de calidad →</Link>
+              {tieneRol(u, ROLES_VEN_DISPONIBILIDAD) && <Link href="/reportes/inventario" className="font-semibold text-acento hover:underline">Sugerido de compras →</Link>}
+              {tieneRol(u, ROLES_VEN_CLIENTES) && <Link href="/reportes/cobranzas" className="font-semibold text-acento hover:underline">Análisis de cartera →</Link>}
+              {tieneRol(u, ROLES_VEN_CLIENTES) && <Link href="/reportes/devoluciones" className="font-semibold text-acento hover:underline">Auditoría de calidad →</Link>}
             </div>
-          </Panel>
+          </Panel>}
         </div>
       </div>
     </>

@@ -75,6 +75,7 @@ describe('migraciones', () => {
       '0058_crm.sql',
       '0059_retenciones_recibidas.sql',
       '0060_propuesta_pronto_pago.sql',
+      '0061_inmutabilidad_asiento_linea.sql',
     ]);
   });
 

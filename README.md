@@ -1,6 +1,6 @@
-# ERP Distribuciones Hanei Motors
+# NEXO
 
-Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, ventas, compras, inventario, comisiones, gastos, tesorería, contabilidad, módulo fiscal venezolano y estados financieros.
+Sistema de planificación de recursos empresariales con datos maestros, ventas, compras, inventario, comisiones, gastos, tesorería, contabilidad, módulo fiscal venezolano y estados financieros.
 
 > **Proyecto independiente.** Este ERP no comparte código, base de datos, usuarios ni procesos con el dashboard de ventas, con su base PostgreSQL/Supabase, con el sistema DBF ni con los archivos `.txt` exportados. La base de datos nace vacía y se llena con la operación diaria desde la fecha de arranque.
 
@@ -72,7 +72,7 @@ Sistema administrativo integral de Distribuciones Hanei Motors: datos maestros, 
 
 Requiere Node.js 24.
 
-**En Windows, lo más simple:** doble clic en [abrir-erp.bat](abrir-erp.bat). Instala lo que falte, prepara la base, pide los datos del administrador la primera vez y abre el ERP en http://localhost:3100. Cerrar su ventana detiene el ERP.
+**En Windows, lo más simple:** doble clic en [abrir-erp.bat](abrir-erp.bat). Instala lo que falte, prepara la base, pide los datos del administrador si falta una cuenta activa y abre el ERP en http://127.0.0.1:3100 con inicio de sesión obligatorio. Cerrar su ventana detiene el ERP.
 
 A mano:
 

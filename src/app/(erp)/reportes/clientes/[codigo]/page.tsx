@@ -1,3 +1,4 @@
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import { notFound } from 'next/navigation';
 import { BuscadorCliente } from '@/components/buscador-cliente';
 import { FiltroAnio } from '@/components/reportes/filtro-anio';
@@ -14,7 +15,7 @@ import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import type { Db } from '@/lib/db/tipos';
 import { fecha, hoyCaracas } from '@/lib/formato';
-import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS, puedeVerCliente } from '@/lib/maestros/clientes';
+import { ROLES_VEN_CLIENTES, puedeVerCliente } from '@/lib/maestros/clientes';
 import {
   analisisAnio, analisisHistorico, aniosDisponibles, comparacionPeriodos, estadoCuentaDetalle, partidasAbiertas, periodosPorDefecto,
   topItems, type FiltroClientes,
@@ -51,12 +52,7 @@ export default async function ReporteClientePage({ params, searchParams }: {
 
   const anios = (Array.isArray(q.anios) ? q.anios : q.anios ? [q.anios] : []).map(Number).filter((n) => Number.isInteger(n));
   const incluirInactivos = q.incluir === '1';
-  const verTodos = (ROLES_VEN_TODOS as string[]).some((r) => u.roles.includes(r));
-  let vendedorId: string | undefined;
-  if (!verTodos) {
-    const { rows: v } = await db.query<{ id: string }>('select id from vendedor where usuario_id = $1', [u.id]);
-    vendedorId = v[0]?.id;
-  }
+  const vendedorId = await vendedorDeCartera(db, u);
 
   const filtro = { clienteId: cliente.id, anios, incluirInactivos, vendedorId };
   const base = `/reportes/clientes/${codigo}`;

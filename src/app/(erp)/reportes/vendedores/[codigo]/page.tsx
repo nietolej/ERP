@@ -1,3 +1,4 @@
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import { notFound } from 'next/navigation';
 import { FiltroAnioProducto } from '@/components/reportes/filtro-anio-producto';
 import { FiltroComparativaProducto } from '@/components/reportes/filtro-comparativa-producto';
@@ -12,7 +13,7 @@ import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { hoyCaracas } from '@/lib/formato';
 import { aniosDisponibles } from '@/lib/reportes/clientes';
-import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/clientes';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import {
   analiticaEstrategicaVendedor, carteraActivaVendedor, comparativaMultianualVendedor, productosVendidosVendedor, vendedorPorCodigo,
   vistaGeneralVendedor,
@@ -35,11 +36,8 @@ export default async function ReporteVendedorPage({ params, searchParams }: {
   if (!vendedor) notFound();
 
   // Seguridad por fila (§4.3): quien solo tiene el rol Ventas ve nada más su propia ficha.
-  const verTodos = (ROLES_VEN_TODOS as string[]).some((r) => u.roles.includes(r));
-  if (!verTodos) {
-    const { rows } = await db.query<{ id: string }>('select id from vendedor where usuario_id = $1', [u.id]);
-    if (rows[0]?.id !== vendedor.id) notFound();
-  }
+  const vendedorId = await vendedorDeCartera(db, u);
+  if (vendedorId && vendedorId !== vendedor.id) notFound();
 
   const anios_ = await aniosDisponibles(db);
 

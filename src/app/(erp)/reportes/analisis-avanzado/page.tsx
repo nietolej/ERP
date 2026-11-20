@@ -1,3 +1,4 @@
+import { vendedorDeCartera } from '@/lib/reportes/cartera';
 import Link from 'next/link';
 import { PanelHistogramaPedidos, PanelMorosidad, PanelQuiebres, PanelVelocidadQuiebre } from '@/components/reportes/paneles-analisis';
 import { Pestanas } from '@/components/reportes/pestanas';
@@ -5,7 +6,7 @@ import { Encabezado, Panel } from '@/components/ui';
 import { exigirRol } from '@/lib/auth/dal';
 import { getDb } from '@/lib/db';
 import { ROLES_VEN_DISPONIBILIDAD } from '@/lib/inventario/disponibilidad';
-import { ROLES_VEN_CLIENTES, ROLES_VEN_TODOS } from '@/lib/maestros/clientes';
+import { ROLES_VEN_CLIENTES } from '@/lib/maestros/clientes';
 import {
   almacenesDisponibles, aniosConQuiebres, gruposDisponibles, histogramaPedidos, patronesMorosidad, quiebresPorMes, quiebresPorProducto,
   sucursalesDisponibles, velocidadTrasQuiebre, zonasDisponibles, type OrdenMorosidad, type OrdenQuiebres,
@@ -35,12 +36,7 @@ export default async function AnalisisAvanzadoPage({ searchParams }: { searchPar
   const almacenId = q.almacen || undefined;
 
   // Seguridad por fila (§4.3): quien solo tiene el rol Ventas ve nada más su propia cartera.
-  const verTodos = (ROLES_VEN_TODOS as string[]).some((r) => u.roles.includes(r));
-  let vendedorId: string | undefined;
-  if (!verTodos) {
-    const { rows } = await db.query<{ id: string }>('select id from vendedor where usuario_id = $1', [u.id]);
-    vendedorId = rows[0]?.id ?? '00000000-0000-0000-0000-000000000000';
-  }
+  const vendedorId = esComercial ? await vendedorDeCartera(db, u) : undefined;
 
   const filtroComercial = { anios, incluirInactivos, vendedorId, sucursalId, zona, texto };
   const filtroQuiebres = { anios, grupoId, almacenId };

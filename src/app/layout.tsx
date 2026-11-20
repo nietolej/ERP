@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ERP Hanei Motors",
-  description: "Sistema administrativo de Distribuciones Hanei Motors",
+  title: "NEXO",
+  description: "Sistema de planificación de recursos empresariales",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

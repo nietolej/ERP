@@ -9,8 +9,8 @@ export default async function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <div className="panel w-full max-w-sm p-7">
-        <p className="text-xs font-semibold uppercase tracking-wider text-acento">Distribuciones Hanei Motors</p>
-        <h1 className="mt-1 mb-6 text-2xl font-bold">ERP · Iniciar sesión</h1>
+        <p className="text-xs font-semibold uppercase tracking-wider text-acento">NEXO</p>
+        <h1 className="mt-1 mb-6 text-2xl font-bold">Iniciar sesión</h1>
         <Formulario accion={iniciarSesion} className="space-y-4">
           <Campo etiqueta="Correo">
             <input name="email" type="email" autoComplete="username" required className="campo" />

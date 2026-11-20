@@ -1,3 +1,4 @@
+import { urlPostgres } from './configuracion';
 import path from 'node:path';
 import type { Db } from './tipos';
 
@@ -13,8 +14,8 @@ let conexion: Promise<Db> | null = null;
 export function getDb(): Promise<Db> {
   if (!conexion) {
     conexion = (async () => {
-      const url = process.env.DATABASE_URL;
-      if (url && /^postgres(ql)?:\/\//.test(url)) {
+      const url = urlPostgres(process.env.DATABASE_URL, process.env.NODE_ENV);
+      if (url) {
         const { crearDbPostgres } = await import('./postgres');
         return crearDbPostgres(url).db;
       }

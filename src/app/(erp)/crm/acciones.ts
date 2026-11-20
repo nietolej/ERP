@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { mensajeDeError, texto, type EstadoAccion } from '@/lib/acciones';
 import { autorizar } from '@/lib/auth/dal';
-import { conUsuario } from '@/lib/db';
+import { conUsuario, getDb } from '@/lib/db';
 import { abrirCaso, actualizarCaso, cambiarEstadoCaso, enlazarNotaCredito, type EstadoCaso, type TipoCaso } from '@/lib/crm/casos';
-import { ROLES_CASOS, ROLES_CRM, UUID } from '@/lib/crm/comun';
+import { ROLES_CASOS, ROLES_CRM, ROLES_VEN_CRM, UUID } from '@/lib/crm/comun';
 import { actualizarContacto, crearContacto, registrarActividad, type TipoActividad } from '@/lib/crm/contactos';
 import {
   agregarLineaCotizacion, anularCotizacion, crearCotizacion, eliminarCotizacion, emitirCotizacion, quitarLineaCotizacion,
@@ -14,7 +14,7 @@ import {
 import {
   actualizarOportunidad, avanzarOportunidad, cambiarCotizacion, crearOportunidad, ganarOportunidad, generarPedidoDeOportunidad, perderOportunidad,
 } from '@/lib/crm/oportunidades';
-import { descartarProspecto, reactivarProspecto, reasignarProspecto, registrarProspecto } from '@/lib/crm/prospectos';
+import { listarProspectos, type FilaProspecto, descartarProspecto, reactivarProspecto, reasignarProspecto, registrarProspecto } from '@/lib/crm/prospectos';
 import { ErrorConfirmable, ErrorMaestro } from '@/lib/errores';
 import { productoPorCodigo } from '@/lib/ventas/pedidos';
 
@@ -30,6 +30,19 @@ const ficha = (id: string) => `/crm/terceros/${id}`;
 // ---------------------------------------------------------------------
 // Prospectos y contactos
 // ---------------------------------------------------------------------
+
+type ResultadoBusqueda = { filas: FilaProspecto[]; estado: string; texto: string; error?: string } | null;
+
+export async function buscarProspectosAccion(_: ResultadoBusqueda, fd: FormData): Promise<ResultadoBusqueda> {
+  const u = await autorizar(...ROLES_VEN_CRM);
+  const filtro = { estado: texto(fd, 'estado'), texto: texto(fd, 'q') };
+  try {
+    const filas = await listarProspectos(await getDb(), u, filtro);
+    return { filas, ...filtro };
+  } catch {
+    return { filas: [], ...filtro, error: 'No se pudo consultar la lista de prospectos. Intente de nuevo.' };
+  }
+}
 
 export async function registrarProspectoAccion(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   let id: string;

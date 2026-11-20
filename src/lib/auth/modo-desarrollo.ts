@@ -1,5 +1,5 @@
 import { hashClave, claveTemporal } from './clave';
-import { ROLES } from './constantes';
+import { EMAIL_USUARIO_DEV, ROLES } from './constantes';
 import { cargarUsuario, type UsuarioSesion } from './sesiones';
 import type { Db } from '@/lib/db/tipos';
 
@@ -15,7 +15,7 @@ import type { Db } from '@/lib/db/tipos';
  */
 
 export { COOKIE_USUARIO_DEV, sinLogin } from './constantes';
-export const EMAIL_USUARIO_DEV = 'desarrollo@sin-login.local';
+export { EMAIL_USUARIO_DEV };
 
 /** Crea (una vez) el usuario de desarrollo con todos los roles. Su clave es aleatoria y nunca se muestra: no sirve para entrar por /login. */
 export async function asegurarUsuarioDesarrollo(db: Db): Promise<UsuarioSesion> {
